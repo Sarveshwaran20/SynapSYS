@@ -1,0 +1,404 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// This security rules file assumes the following data structures for SynapSYS
+// Industrial IIoT & SCADA Platform:
+//
+// Collection: /users/{userId}
+// Document ID: Firebase Auth UID
+// Fields:
+//   - id: string or int (optional) - Internal user reference id
+//   - email: string (required, 5..100 chars, valid email pattern)
+//   - full_name: string (required, 1..100 chars) - Operator/Admin display name
+//   - company_name: string (required, 1..100 chars) - Enterprise corporate name
+//   - company_domain: string (required, 1..100 chars) - Domain name (e.g. synapsys.com)
+//   - role: string (required, enum: 'admin', 'operator', 'demo') - Access role
+//   - assigned_facility: string (optional, 1..100 chars) - Assigned plant site slug
+//   - created_at: timestamp or ISO string (optional, immutable)
+//   - password_hash: string (optional, <= 128 chars) - Internal hash if synced
+//
+// Collection: /production_sites/{siteId}
+// Document ID: site slug e.g. 'synapsys-mfg-prod-us'
+// Fields:
+//   - id: string (required, 1..64 chars, immutable) - Site identifier
+//   - name: string (required, 1..100 chars) - Human-readable plant name
+//   - region: string (required, 1..50 chars) - Edge/cloud region
+//   - location: string (required, 1..100 chars) - Physical location
+//   - facility_type: string (required, 1..100 chars) - Industry domain
+//   - status: string (required, enum: 'active', 'standby', 'commissioning')
+//   - active_lines: int/number (optional, >= 0, <= 1000)
+//   - target_capacity: number (optional, >= 0, <= 10000000)
+//   - nominal_oee: number (optional, >= 0.0, <= 100.0)
+//   - company_domain: string (optional, 1..100 chars)
+//   - company_name: string (optional, 1..100 chars)
+//   - latitude: number (optional, -90.0 .. 90.0)
+//   - longitude: number (optional, -180.0 .. 180.0)
+//   - created_at: timestamp or ISO string (optional, immutable)
+//
+// Collection: /telemetry/{telemetryId}
+// Document ID: Unique telemetry point id or timestamp slug
+// Fields:
+//   - machine_id: string (required, 1..64 chars, immutable)
+//   - status: string (required, 1..50 chars, e.g. 'Running', 'Idle', 'Down')
+//   - timestamp: timestamp or ISO string (optional, immutable)
+//   - site_id: string (optional, 1..64 chars)
+//   - machine_name: string (optional, 1..100 chars)
+//   - location: string (optional, 1..100 chars)
+//   - operator: string (optional, 1..100 chars)
+//   - output_count: number (optional, >= 0)
+//   - target_output: number (optional, >= 0)
+//   - good_count: number (optional, >= 0)
+//   - scrap_count: number (optional, >= 0)
+//   - cycle_time_sec: number (optional, >= 0.0)
+//   - ideal_cycle_time_sec: number (optional, >= 0.0)
+//   - uptime_seconds: number (optional, >= 0.0)
+//   - downtime_seconds: number (optional, >= 0.0)
+//   - active_alarm: string (optional, <= 255 chars)
+//   - alarm_severity: string (optional, enum: 'Critical', 'Warning', 'None')
+//   - alarm_code: string (optional, <= 50 chars)
+//   - temperature_c: number (optional)
+//   - vibration_mm_s: number (optional)
+//   - power_kw: number (optional)
+//   - pressure_bar: number (optional)
+//   - sensors: map (optional, <= 20 keys)
+//   - predictive: map (optional, <= 20 keys)
+//   - work_order: map (optional, <= 20 keys)
+//   - losses: map (optional, <= 20 keys)
+//   - oee_metrics: map (optional, <= 20 keys)
+//
+// Collection: /alarm_events/{alarmId}
+// Document ID: Unique alarm incident id
+// Fields:
+//   - machine_id: string (required, 1..64 chars, immutable)
+//   - severity: string (required, enum: 'Critical', 'Warning', 'Info', 'None')
+//   - acknowledged: bool (required)
+//   - alarm: string (optional, <= 255 chars)
+//   - message: string (optional, <= 255 chars)
+//   - alarm_code: string (optional, <= 50 chars)
+//   - code: string (optional, <= 50 chars)
+//   - machine_name: string (optional, <= 100 chars)
+//   - site_id: string (optional, <= 64 chars)
+//   - category: string (optional, <= 50 chars)
+//   - duration_sec: number (optional, >= 0)
+//   - timestamp: timestamp or ISO string (optional)
+//   - created_at: timestamp or ISO string (optional, immutable)
+//   - cleared_at: timestamp or ISO string (optional)
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Global Helper Functions
+    // ===============================================================
+
+    // Check if the caller is an authenticated user
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if caller's UID matches the resource owner ID
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Verify whether the caller possesses an administrator role
+    function isAdmin() {
+      return isAuthenticated() &&
+        (
+          request.auth.token.role == 'admin' ||
+          request.auth.token.admin == true ||
+          (request.auth.token.email != null &&
+           (request.auth.token.email == 'admin@synapsys.com' ||
+            request.auth.token.email.matches('.*admin@synapsys\\.com$'))) ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+        );
+    }
+
+    // Verify whether the caller possesses an operator or admin role
+    function isOperator() {
+      return isAuthenticated() &&
+        (
+          isAdmin() ||
+          request.auth.token.role == 'operator' ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'operator')
+        );
+    }
+
+    // Verify whether caller is an automated backend edge service role
+    function isServiceRole() {
+      return isAuthenticated() &&
+        (
+          request.auth.token.role == 'service_role' ||
+          request.auth.token.service == true ||
+          (request.auth.token.firebase != null &&
+           request.auth.token.firebase.sign_in_provider == 'custom')
+        );
+    }
+
+    // Validate that all specified fields are present
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // Validate that document contains only allowed fields (no schema pollution)
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // Validate that immutable keys have not been modified during an update
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // Validate email format and bounded length
+    function isValidEmail(email) {
+      return email is string &&
+        email.size() >= 5 &&
+        email.size() <= 100 &&
+        email.matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
+    }
+
+    // Validate optional string with minimum and maximum length bounds
+    function isValidOptionalString(field, minLen, maxLen) {
+      return !(field in request.resource.data) ||
+        request.resource.data[field] == null ||
+        (request.resource.data[field] is string &&
+         request.resource.data[field].size() >= minLen &&
+         request.resource.data[field].size() <= maxLen);
+    }
+
+    // Validate optional numeric field within range
+    function isValidOptionalNumber(field, minVal, maxVal) {
+      return !(field in request.resource.data) ||
+        request.resource.data[field] == null ||
+        (request.resource.data[field] is number &&
+         request.resource.data[field] >= minVal &&
+         request.resource.data[field] <= maxVal);
+    }
+
+    // Validate optional timestamp or ISO date string
+    function isValidOptionalTimestampOrString(field) {
+      return !(field in request.resource.data) ||
+        request.resource.data[field] == null ||
+        request.resource.data[field] is timestamp ||
+        (request.resource.data[field] is string && request.resource.data[field].size() <= 64);
+    }
+
+    // Validate optional nested map object
+    function isValidOptionalMap(field, maxKeys) {
+      return !(field in request.resource.data) ||
+        request.resource.data[field] == null ||
+        (request.resource.data[field] is map &&
+         request.resource.data[field].keys().size() <= maxKeys);
+    }
+
+    // ===============================================================
+    // Domain Validator Functions (Applied to both create and update)
+    // ===============================================================
+
+    // Validates /users/{userId} documents
+    function isValidUser(data) {
+      return hasRequiredFields(['email', 'full_name', 'company_name', 'company_domain', 'role']) &&
+        hasOnlyAllowedFields([
+          'id', 'email', 'full_name', 'company_name', 'company_domain',
+          'role', 'assigned_facility', 'created_at', 'password_hash'
+        ]) &&
+        isValidEmail(data.email) &&
+        data.full_name is string && data.full_name.size() >= 1 && data.full_name.size() <= 100 &&
+        data.company_name is string && data.company_name.size() >= 1 && data.company_name.size() <= 100 &&
+        data.company_domain is string && data.company_domain.size() >= 1 && data.company_domain.size() <= 100 &&
+        data.role is string && data.role in ['admin', 'operator', 'demo'] &&
+        isValidOptionalString('assigned_facility', 1, 100) &&
+        isValidOptionalString('password_hash', 1, 128) &&
+        isValidOptionalTimestampOrString('created_at') &&
+        (!( 'id' in data ) || data.id is string || data.id is int);
+    }
+
+    // Validates /production_sites/{siteId} documents
+    function isValidProductionSite(data) {
+      return hasRequiredFields(['id', 'name', 'region', 'location', 'facility_type', 'status']) &&
+        hasOnlyAllowedFields([
+          'id', 'name', 'region', 'location', 'facility_type', 'status',
+          'active_lines', 'target_capacity', 'nominal_oee', 'company_domain',
+          'company_name', 'latitude', 'longitude', 'created_at'
+        ]) &&
+        data.id is string && data.id.size() >= 1 && data.id.size() <= 64 &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+        data.region is string && data.region.size() >= 1 && data.region.size() <= 50 &&
+        data.location is string && data.location.size() >= 1 && data.location.size() <= 100 &&
+        data.facility_type is string && data.facility_type.size() >= 1 && data.facility_type.size() <= 100 &&
+        data.status is string && data.status in ['active', 'standby', 'commissioning'] &&
+        isValidOptionalNumber('active_lines', 0, 1000) &&
+        isValidOptionalNumber('target_capacity', 0, 10000000) &&
+        isValidOptionalNumber('nominal_oee', 0.0, 100.0) &&
+        isValidOptionalString('company_domain', 1, 100) &&
+        isValidOptionalString('company_name', 1, 100) &&
+        isValidOptionalNumber('latitude', -90.0, 90.0) &&
+        isValidOptionalNumber('longitude', -180.0, 180.0) &&
+        isValidOptionalTimestampOrString('created_at');
+    }
+
+    // Validates /telemetry/{telemetryId} documents
+    function isValidTelemetry(data) {
+      return hasRequiredFields(['machine_id', 'status']) &&
+        hasOnlyAllowedFields([
+          'machine_id', 'status', 'timestamp', 'site_id', 'machine_name',
+          'location', 'operator', 'output_count', 'target_output',
+          'good_count', 'scrap_count', 'cycle_time_sec', 'ideal_cycle_time_sec',
+          'uptime_seconds', 'downtime_seconds', 'active_alarm', 'alarm_severity',
+          'alarm_code', 'temperature_c', 'vibration_mm_s', 'power_kw',
+          'pressure_bar', 'sensors', 'predictive', 'work_order', 'losses',
+          'oee_metrics'
+        ]) &&
+        data.machine_id is string && data.machine_id.size() >= 1 && data.machine_id.size() <= 64 &&
+        data.status is string && data.status.size() >= 1 && data.status.size() <= 50 &&
+        isValidOptionalTimestampOrString('timestamp') &&
+        isValidOptionalString('site_id', 1, 64) &&
+        isValidOptionalString('machine_name', 1, 100) &&
+        isValidOptionalString('location', 1, 100) &&
+        isValidOptionalString('operator', 1, 100) &&
+        isValidOptionalNumber('output_count', 0, 100000000) &&
+        isValidOptionalNumber('target_output', 0, 100000000) &&
+        isValidOptionalNumber('good_count', 0, 100000000) &&
+        isValidOptionalNumber('scrap_count', 0, 100000000) &&
+        isValidOptionalNumber('cycle_time_sec', 0.0, 86400.0) &&
+        isValidOptionalNumber('ideal_cycle_time_sec', 0.0, 86400.0) &&
+        isValidOptionalNumber('uptime_seconds', 0.0, 315360000.0) &&
+        isValidOptionalNumber('downtime_seconds', 0.0, 315360000.0) &&
+        isValidOptionalString('active_alarm', 0, 255) &&
+        (!( 'alarm_severity' in data ) || data.alarm_severity in ['Critical', 'Warning', 'None']) &&
+        isValidOptionalString('alarm_code', 1, 50) &&
+        isValidOptionalNumber('temperature_c', -100.0, 2000.0) &&
+        isValidOptionalNumber('vibration_mm_s', 0.0, 500.0) &&
+        isValidOptionalNumber('power_kw', 0.0, 100000.0) &&
+        isValidOptionalNumber('pressure_bar', 0.0, 5000.0) &&
+        isValidOptionalMap('sensors', 20) &&
+        isValidOptionalMap('predictive', 20) &&
+        isValidOptionalMap('work_order', 20) &&
+        isValidOptionalMap('losses', 20) &&
+        isValidOptionalMap('oee_metrics', 20);
+    }
+
+    // Validates /alarm_events/{alarmId} documents
+    function isValidAlarmEvent(data) {
+      return hasRequiredFields(['machine_id', 'severity', 'acknowledged']) &&
+        hasOnlyAllowedFields([
+          'machine_id', 'severity', 'acknowledged', 'alarm', 'message',
+          'alarm_code', 'code', 'machine_name', 'site_id', 'category',
+          'duration_sec', 'timestamp', 'created_at', 'cleared_at'
+        ]) &&
+        data.machine_id is string && data.machine_id.size() >= 1 && data.machine_id.size() <= 64 &&
+        data.severity is string && data.severity in ['Critical', 'Warning', 'Info', 'None'] &&
+        data.acknowledged is bool &&
+        isValidOptionalString('alarm', 1, 255) &&
+        isValidOptionalString('message', 1, 255) &&
+        isValidOptionalString('alarm_code', 1, 50) &&
+        isValidOptionalString('code', 1, 50) &&
+        isValidOptionalString('machine_name', 1, 100) &&
+        isValidOptionalString('site_id', 1, 64) &&
+        isValidOptionalString('category', 1, 50) &&
+        isValidOptionalNumber('duration_sec', 0, 315360000) &&
+        isValidOptionalTimestampOrString('timestamp') &&
+        isValidOptionalTimestampOrString('created_at') &&
+        isValidOptionalTimestampOrString('cleared_at');
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    // 1. Users Collection
+    // Read: Authenticated users can only read their own profile (PII protection),
+    //       while administrators have supervisory read privileges.
+    // Write: Operators/Admins can write. Self-registration cannot escalate to admin.
+    //        Self-updates cannot alter assigned roles or immutable keys.
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+
+      allow create: if isAuthenticated() &&
+        isValidUser(request.resource.data) &&
+        (
+          isAdmin() ||
+          (isOwner(userId) && request.resource.data.role in ['operator', 'demo'])
+        );
+
+      allow update: if isAuthenticated() &&
+        isValidUser(request.resource.data) &&
+        (
+          isAdmin() ||
+          (
+            isOwner(userId) &&
+            request.resource.data.role == resource.data.role &&
+            areImmutableFieldsUnchanged(['id', 'email', 'created_at'])
+          )
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    // 2. Production Sites Collection
+    // Read: All authenticated personnel can inspect plant facilities.
+    // Write: Strictly restricted to administrators.
+    match /production_sites/{siteId} {
+      allow read: if isAuthenticated();
+
+      allow create: if isAdmin() &&
+        isValidProductionSite(request.resource.data) &&
+        request.resource.data.id == siteId;
+
+      allow update: if isAdmin() &&
+        isValidProductionSite(request.resource.data) &&
+        areImmutableFieldsUnchanged(['id', 'created_at']);
+
+      allow delete: if isAdmin();
+    }
+
+    // 3. Telemetry Collection
+    // Read: All authenticated personnel can stream live telemetry & SCADA state.
+    // Write: Authenticated operators/users or backend service role (ingestion engine).
+    //        Updates are restricted to service role or admin, keeping audit keys immutable.
+    match /telemetry/{telemetryId} {
+      allow read: if isAuthenticated();
+
+      allow create: if (isAuthenticated() || isServiceRole()) &&
+        isValidTelemetry(request.resource.data);
+
+      allow update: if (isAdmin() || isServiceRole()) &&
+        isValidTelemetry(request.resource.data) &&
+        areImmutableFieldsUnchanged(['machine_id', 'timestamp']);
+
+      allow delete: if isAdmin();
+    }
+
+    // 4. Alarm Events Collection
+    // Read: All authenticated personnel can monitor active and historic alarms.
+    // Write/Update: Permitted for operators and administrators (e.g. acknowledge fault).
+    match /alarm_events/{alarmId} {
+      allow read: if isAuthenticated();
+
+      allow create: if (isOperator() || isAdmin() || isServiceRole()) &&
+        isValidAlarmEvent(request.resource.data);
+
+      allow update: if (isOperator() || isAdmin() || isServiceRole()) &&
+        isValidAlarmEvent(request.resource.data) &&
+        areImmutableFieldsUnchanged(['machine_id', 'created_at']);
+
+      allow delete: if isAdmin();
+    }
+
+    // ===============================================================
+    // Secure Default Deny
+    // ===============================================================
+    // Deny read/write access to any other document path by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

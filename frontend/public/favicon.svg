@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#172030"/>
+      <stop offset="100%" stop-color="#0B0F17"/>
+    </linearGradient>
+    <linearGradient id="conduit" x1="15" y1="14" x2="33" y2="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4C8DF6"/>
+      <stop offset="55%" stop-color="#60A5FA"/>
+      <stop offset="100%" stop-color="#8A5CF6"/>
+    </linearGradient>
+  </defs>
+  <polygon points="15.3,3.5 32.7,3.5 44.5,15.3 44.5,32.7 32.7,44.5 15.3,44.5 3.5,32.7 3.5,15.3" fill="url(#bg)" stroke="#3B82F6" stroke-width="2.2"/>
+  <path d="M 24 8.8 A 15.2 15.2 0 0 1 39.2 24" stroke="#4C8DF6" stroke-width="1.9" stroke-linecap="round" opacity="0.85"/>
+  <path d="M 24 39.2 A 15.2 15.2 0 0 1 8.8 24" stroke="#8A5CF6" stroke-width="1.9" stroke-linecap="round" opacity="0.85"/>
+  <path d="M 31 15.5 H 22 L 17.5 20 V 21.5 L 30.5 26.5 V 28 L 26 32.5 H 17" stroke="url(#conduit)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="31.5" cy="15.5" r="3" fill="#0B0F17" stroke="#4C8DF6" stroke-width="2"/>
+  <circle cx="16.5" cy="32.5" r="3" fill="#0B0F17" stroke="#8A5CF6" stroke-width="2"/>
+  <circle cx="24" cy="24" r="3.4" fill="#F8FAFC"/>
+</svg>
+

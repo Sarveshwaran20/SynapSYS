@@ -1,0 +1,781 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root, .dark {
+    /* Midnight Marble RGB Channels (for opacity-aware Tailwind utilities) */
+    --obsidian-rgb: 8 10 13;
+    --basalt-rgb: 14 18 23;
+    --slate-rgb: 20 26 33;
+    --graphite-rgb: 28 35 44;
+    --line-rgb: 42 50 61;
+    --marble-rgb: 241 243 246;
+    --silver-rgb: 167 176 188;
+    --pewter-rgb: 110 120 134;
+    --aegean-rgb: 76 141 246;
+    --aegean-deep-rgb: 30 79 168;
+    --aegean-hover-rgb: 61 122 232;
+    --tyrian-rgb: 154 91 208;
+    --laurel-rgb: 63 178 127;
+    --coral-rgb: 238 123 90;
+    --crimson-rgb: 214 69 80;
+
+    /* Midnight Marble Design Tokens */
+    --obsidian: #080A0D;
+    --basalt: #0E1217;
+    --slate: #141A21;
+    --graphite: #1C232C;
+    --line: #2A323D;
+    --marble: #F1F3F6;
+    --silver: #A7B0BC;
+    --pewter: #6E7886;
+    --aegean: #4C8DF6;
+    --aegean-deep: #1E4FA8;
+    --tyrian: #9A5BD0;
+    --laurel: #3FB27F;
+    --coral: #EE7B5A;
+    --crimson: #D64550;
+
+    /* Semantic Mappings */
+    --g-bg: var(--obsidian);
+    --g-surface: var(--slate);
+    --g-surface-elevated: var(--graphite);
+    --g-surface-subtle: var(--basalt);
+    --g-border: var(--line);
+    --g-border-subtle: #1F2630;
+    --g-text: var(--marble);
+    --g-text-secondary: var(--silver);
+    --g-text-muted: var(--pewter);
+    --g-blue: var(--aegean);
+    --g-blue-hover: #3D7AE8;
+    --g-blue-light: rgba(76, 141, 246, 0.12);
+    --g-green: var(--laurel);
+    --g-green-light: rgba(63, 178, 127, 0.12);
+    --g-red: var(--crimson);
+    --g-red-light: rgba(214, 69, 80, 0.12);
+    --g-yellow: var(--coral);
+    --g-yellow-light: rgba(238, 123, 90, 0.12);
+    --accent: var(--aegean);
+  }
+
+  /* Light Carrara Marble Mode (strictly neutral gallery whites & deep slate inks) */
+  :root:not(.dark) {
+    --obsidian-rgb: 245 247 250;
+    --basalt-rgb: 236 240 245;
+    --slate-rgb: 255 255 255;
+    --graphite-rgb: 232 238 245;
+    --line-rgb: 203 213 225;
+    --marble-rgb: 15 23 42;
+    --silver-rgb: 71 85 105;
+    --pewter-rgb: 100 116 139;
+    --aegean-rgb: 37 99 235;
+    --aegean-deep-rgb: 29 78 216;
+    --aegean-hover-rgb: 29 78 216;
+    --tyrian-rgb: 122 62 184;
+    --laurel-rgb: 21 128 61;
+    --coral-rgb: 194 65 12;
+    --crimson-rgb: 185 28 28;
+
+    --obsidian: #F5F7FA;
+    --basalt: #ECF0F5;
+    --slate: #FFFFFF;
+    --graphite: #E8EEF5;
+    --line: #CBD5E1;
+    --marble: #0F172A;
+    --silver: #475569;
+    --pewter: #64748B;
+    --aegean: #2563EB;
+    --aegean-deep: #1D4ED8;
+    --tyrian: #7A3EB8;
+    --laurel: #15803D;
+    --coral: #C2410C;
+    --crimson: #B91C1C;
+
+    --g-bg: var(--obsidian);
+    --g-surface: var(--slate);
+    --g-surface-elevated: var(--graphite);
+    --g-surface-subtle: var(--basalt);
+    --g-border: var(--line);
+    --g-border-subtle: #E2E8F0;
+    --g-text: var(--marble);
+    --g-text-secondary: var(--silver);
+    --g-text-muted: var(--pewter);
+    --g-blue: var(--aegean);
+    --g-blue-hover: #1D4ED8;
+    --g-blue-light: rgba(37, 99, 235, 0.1);
+    --g-green: var(--laurel);
+    --g-green-light: rgba(21, 128, 61, 0.1);
+    --g-red: var(--crimson);
+    --g-red-light: rgba(185, 28, 28, 0.1);
+    --g-yellow: var(--coral);
+    --g-yellow-light: rgba(194, 65, 12, 0.1);
+    --accent: var(--aegean);
+  }
+
+  html, body, #root {
+    overflow-x: clip;
+    max-width: 100vw;
+    width: 100%;
+    min-height: 100vh;
+  }
+
+  body {
+    background-color: var(--obsidian);
+    color: var(--marble);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    margin: 0;
+    padding: 0;
+    background-image: 
+      radial-gradient(circle at 50% 0%, rgba(76, 141, 246, 0.035) 0%, transparent 60%),
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.02'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Greek Key Meander Border Strip */
+.meander-strip {
+  width: 100%;
+  height: 8px;
+  background-repeat: repeat-x;
+  background-size: 24px 8px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='8' viewBox='0 0 24 8'%3E%3Cpath d='M0 7h10V3H4v2h4v-1h-2M12 7h10V3h-6v2h4v-1h-2' fill='none' stroke='%232A323D' stroke-width='1' stroke-linecap='square'/%3E%3C/svg%3E");
+  opacity: 0.85;
+}
+
+/* Midnight Marble Cards */
+.midnight-card {
+  position: relative;
+  background: linear-gradient(180deg, #141A21 0%, #10151C 100%);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.6);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.midnight-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(76, 141, 246, 0.4);
+  box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(76, 141, 246, 0.15);
+}
+
+:root:not(.dark) .midnight-card {
+  background: var(--g-surface);
+  border-color: var(--g-border);
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.08), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+}
+
+:root:not(.dark) .midnight-card:hover {
+  border-color: rgba(37, 99, 235, 0.42);
+  box-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(37, 99, 235, 0.14);
+}
+
+:root:not(.dark) .meander-strip {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='8' viewBox='0 0 24 8'%3E%3Cpath d='M0 7h10V3H4v2h4v-1h-2M12 7h10V3h-6v2h4v-1h-2' fill='none' stroke='%23CBD5E1' stroke-width='1' stroke-linecap='square'/%3E%3C/svg%3E");
+}
+
+.g-card {
+  background-color: var(--g-surface);
+  border: 1px solid var(--g-border);
+  border-radius: 12px;
+}
+
+/* Corner Notch Accents on Stone Tablet */
+.stone-notch {
+  position: relative;
+}
+.stone-notch::before,
+.stone-notch::after {
+  content: '';
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-color: rgba(167, 176, 188, 0.25);
+  pointer-events: none;
+  transition: border-color 0.25s ease;
+}
+.stone-notch::before {
+  top: -1px;
+  left: -1px;
+  border-top: 1px solid;
+  border-left: 1px solid;
+}
+.stone-notch::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 1px solid;
+  border-right: 1px solid;
+}
+.stone-notch:hover::before,
+.stone-notch:hover::after {
+  border-color: rgba(76, 141, 246, 0.5);
+}
+
+/* Machine Card Needing Attention (Coral Left Border) */
+.card-attention {
+  border-left: 2px solid var(--coral) !important;
+}
+
+/* Classical Roman Medallion (I, II, III) */
+.roman-medallion {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  border: 1px solid var(--line);
+  background: var(--graphite);
+  font-family: 'Cinzel', serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--silver);
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.4);
+}
+
+:root:not(.dark) .roman-medallion {
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+/* Classical Ornamental Divider */
+.classical-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--line);
+}
+.classical-divider::before,
+.classical-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background-color: var(--line);
+}
+
+/* Spotlighting Cursor Follower */
+.spotlight-container {
+  position: relative;
+  overflow: hidden;
+}
+.spotlight-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(
+    400px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    rgba(76, 141, 246, 0.08),
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  z-index: 1;
+}
+.spotlight-container:hover::before {
+  opacity: 1;
+}
+
+/* Standard Buttons: 38px height, 8px radius */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 16px;
+  background-color: var(--aegean);
+  color: #FFFFFF;
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  cursor: pointer;
+}
+.btn-primary:hover {
+  background-color: #3D7AE8;
+  box-shadow: 0 4px 16px -2px rgba(76, 141, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 14px;
+  background-color: transparent;
+  color: var(--marble);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: 14px;
+  transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  cursor: pointer;
+}
+.btn-secondary:hover {
+  background-color: var(--graphite);
+  border-color: rgba(var(--silver-rgb), 0.45);
+  color: var(--marble);
+}
+.btn-secondary:active {
+  transform: scale(0.98);
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 10px;
+  background-color: transparent;
+  color: var(--silver);
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 14px;
+  transition: color 0.15s ease, background-color 0.15s ease;
+  border: none;
+  cursor: pointer;
+}
+.btn-ghost:hover {
+  color: var(--marble);
+  background-color: var(--graphite);
+}
+
+/* Monospace ID tag */
+.id-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--silver);
+  background-color: var(--graphite);
+  border: 1px solid var(--line);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+/* Calm 4px Progress Bar */
+.progress-track {
+  height: 4px;
+  background-color: var(--graphite);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  background-color: var(--aegean);
+  transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--obsidian);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--pewter);
+}
+
+/* Motion Reduced */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Pause CSS infinite animations when browser tab is hidden */
+[data-tab-hidden="true"] *,
+[data-tab-hidden="true"] *::before,
+[data-tab-hidden="true"] *::after {
+  animation-play-state: paused !important;
+}
+
+/* Scroll-triggered header backdrop & hairline transition (CSS only) */
+.header-scroll-transition {
+  transition: backdrop-filter 200ms cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 200ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Slow ambient marble texture drift for landing hero (60s linear, 2% movement) */
+@keyframes marbleDrift {
+  0% {
+    transform: translate3d(-1%, -1%, 0);
+  }
+  50% {
+    transform: translate3d(1%, 1%, 0);
+  }
+  100% {
+    transform: translate3d(-1%, -1%, 0);
+  }
+}
+
+.marble-drift-layer {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 240 240' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='marbleNoise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23marbleNoise)' opacity='0.035'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  animation: marbleDrift 60s linear infinite;
+  will-change: transform;
+}
+
+/* =========================================================
+   Digital Twin Spatial Layout & Landing Blueprint Utilities
+   All colors derived from existing CSS custom properties.
+   ========================================================= */
+
+.twin-floor-grid {
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--g-text) 3.5%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--g-text) 3.5%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 32px 32px;
+}
+
+.twin-expansion-slot {
+  border: 1.5px dashed color-mix(in srgb, var(--accent) 50%, transparent);
+  transition: border-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.twin-expansion-slot:hover,
+.twin-expansion-slot:focus-within {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+}
+
+.twin-btn-primary-glow {
+  transition: background-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.twin-btn-primary-glow:hover {
+  box-shadow: 0 0 24px color-mix(in srgb, var(--g-blue) 16%, transparent);
+}
+
+@keyframes heroBlueprintDrift {
+  0% {
+    transform: translate3d(0%, 0%, 0);
+  }
+  50% {
+    transform: translate3d(-2%, -2%, 0);
+  }
+  100% {
+    transform: translate3d(0%, 0%, 0);
+  }
+}
+
+.hero-blueprint-grid {
+  background-image:
+    radial-gradient(
+      circle,
+      color-mix(in srgb, var(--g-text) 7%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--g-text) 4.2%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--g-text) 4.2%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 32px 32px, 64px 64px, 64px 64px;
+  -webkit-mask-image: radial-gradient(ellipse at 50% 45%, black 35%, transparent 92%);
+  mask-image: radial-gradient(ellipse at 50% 45%, black 35%, transparent 92%);
+  animation: heroBlueprintDrift 60s linear infinite;
+}
+
+.hero-ambient-glow {
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--g-blue) 11%, transparent) 0%,
+    transparent 70%
+  );
+  filter: blur(120px);
+}
+
+.hero-ambient-glow-blue {
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--g-blue) 11%, transparent) 0%,
+    transparent 70%
+  );
+  filter: blur(130px);
+}
+
+.hero-ambient-glow-purple {
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--tyrian) 9%, transparent) 0%,
+    transparent 70%
+  );
+  filter: blur(140px);
+}
+
+.hero-canvas-vignette {
+  background: radial-gradient(
+    circle at 50% 45%,
+    transparent 24%,
+    color-mix(in srgb, var(--g-bg) 68%, transparent) 92%
+  );
+}
+
+.lp-notch-card {
+  position: relative;
+  border-radius: 4px;
+  background: var(--g-surface);
+  border: 1px solid var(--g-border);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+              background-color 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lp-notch-card:hover {
+  border-color: color-mix(in srgb, var(--g-blue) 42%, var(--g-border));
+}
+
+.lp-notch-card::before,
+.lp-notch-card::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  pointer-events: none;
+  border-color: color-mix(in srgb, var(--g-text-muted) 45%, transparent);
+  transition: border-color 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+              width 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+              height 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lp-notch-card::before {
+  top: 6px;
+  left: 6px;
+  border-top: 1px solid;
+  border-left: 1px solid;
+}
+
+.lp-notch-card::after {
+  bottom: 6px;
+  right: 6px;
+  border-bottom: 1px solid;
+  border-right: 1px solid;
+}
+
+.lp-notch-card:hover::before,
+.lp-notch-card:hover::after {
+  width: 12px;
+  height: 12px;
+  border-color: color-mix(in srgb, var(--g-blue) 60%, transparent);
+}
+
+/* Interactive Grid Container & Panel Surface Transitions */
+.grid-container-surface {
+  transition: border-color 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.grid-container-surface:hover {
+  border-color: color-mix(in srgb, var(--g-blue) 35%, var(--g-border));
+}
+
+[data-tab-hidden="true"] .hero-blueprint-grid,
+[data-tab-hidden="true"] .marble-drift-layer,
+[data-tab-hidden="true"] .synapsys-slow-spin,
+[data-tab-hidden="true"] .synapsys-reverse-spin,
+[data-tab-hidden="true"] .synapsys-core-pulse,
+[data-tab-hidden="true"] .dash-telemetry-sweep,
+[data-tab-hidden="true"] .auth-orbit-spin,
+[data-tab-hidden="true"] .auth-orbit-reverse,
+[data-tab-hidden="true"] .auth-scan-sweep,
+[data-tab-hidden="true"] .lp-marquee-track {
+  animation-play-state: paused !important;
+}
+
+@keyframes synapsysSlowSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes synapsysReverseSpin {
+  0% { transform: rotate(360deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes synapsysCorePulse {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.18);
+  }
+}
+
+@keyframes dashTelemetrySweep {
+  0% {
+    transform: translateX(-100%);
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateX(320%);
+    opacity: 0.2;
+  }
+}
+
+.synapsys-slow-spin {
+  animation: synapsysSlowSpin 28s linear infinite;
+}
+
+.synapsys-reverse-spin {
+  animation: synapsysReverseSpin 42s linear infinite;
+}
+
+.synapsys-core-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: synapsysCorePulse 2.8s ease-in-out infinite;
+}
+
+.dash-telemetry-sweep {
+  animation: dashTelemetrySweep 6.5s linear infinite;
+}
+
+.auth-orbit-spin {
+  animation: synapsysSlowSpin 14s linear infinite;
+}
+
+.auth-orbit-reverse {
+  animation: synapsysReverseSpin 20s linear infinite;
+}
+
+.auth-scan-sweep {
+  animation: dashTelemetrySweep 2.2s linear infinite;
+}
+
+@keyframes lpMarqueeScroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.lp-marquee-mask {
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 10%, black 90%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, black 10%, black 90%, transparent 100%);
+}
+
+.lp-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: lpMarqueeScroll 34s linear infinite;
+}
+
+.lp-marquee-mask:hover .lp-marquee-track {
+  animation-play-state: paused;
+}
+
+/* Telemetry Oscilloscope Reticle & Engineering Sliders */
+.scope-grid-bg {
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--g-border) 28%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--g-border) 28%, transparent) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.scada-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--g-surface-elevated);
+  border: 1px solid var(--g-border);
+  outline: none;
+  cursor: pointer;
+}
+
+.scada-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: var(--g-blue);
+  border: 2px solid var(--g-surface);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--g-blue) 45%, transparent);
+  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.16s ease;
+}
+
+.scada-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.16);
+}
+
+.scada-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: var(--g-blue);
+  border: 2px solid var(--g-surface);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--g-blue) 45%, transparent);
+  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-blueprint-grid,
+  .marble-drift-layer,
+  .synapsys-slow-spin,
+  .synapsys-reverse-spin,
+  .synapsys-core-pulse,
+  .dash-telemetry-sweep,
+  .auth-orbit-spin,
+  .auth-orbit-reverse,
+  .auth-scan-sweep,
+  .lp-marquee-track {
+    animation: none !important;
+  }
+}

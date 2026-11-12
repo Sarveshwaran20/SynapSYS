@@ -1,0 +1,13 @@
+timestamp,machine_id,machine_name,status,output_count,target_output,good_count,scrap_count,cycle_time_sec,ideal_cycle_time_sec,uptime_sec,downtime_sec,temp_c,vibration_rms,power_kw,pressure_bar,active_alarm,alarm_code
+2026-11-05T06:00:00Z,CNC-101,5-Axis CNC Milling Center,Running,1,250,1,0,12.1,12.0,12.1,0.0,42.5,1.25,18.4,6.2,,
+2026-11-05T06:15:00Z,CNC-101,5-Axis CNC Milling Center,Running,74,250,73,1,12.3,12.0,890.0,10.0,52.1,1.48,22.8,6.3,,
+2026-11-05T06:30:00Z,CNC-101,5-Axis CNC Milling Center,Running,148,250,146,2,12.2,12.0,1780.0,20.0,54.8,1.55,23.1,6.4,,
+2026-11-05T07:15:00Z,CNC-101,5-Axis CNC Milling Center,Down,162,250,159,3,0.0,12.0,1950.0,180.0,88.4,4.92,3.2,5.9,Spindle Bearings Thermal Trip (>88°C),ALM-E204
+2026-11-05T08:00:00Z,CNC-101,5-Axis CNC Milling Center,Running,195,250,191,4,12.4,12.0,2400.0,210.0,56.2,1.68,22.4,6.3,,
+2026-11-05T06:00:00Z,INJ-202,Hydraulic Injection Press,Running,1,500,1,0,6.5,6.5,6.5,0.0,62.0,1.10,32.0,140.0,,
+2026-11-05T07:00:00Z,INJ-202,Hydraulic Injection Press,Running,280,500,278,2,6.6,6.5,1850.0,15.0,68.4,1.40,36.5,142.5,,
+2026-11-05T08:00:00Z,INJ-202,Hydraulic Injection Press,Running,410,500,406,4,6.5,6.5,2700.0,25.0,69.1,1.45,37.2,142.0,,
+2026-11-05T06:00:00Z,WLD-303,Robotic Arc Welding Cell,Running,1,160,1,0,18.0,18.0,18.0,0.0,32.0,0.20,2.4,5.8,,
+2026-11-05T07:30:00Z,WLD-303,Robotic Arc Welding Cell,Idle,75,160,74,1,0.0,18.0,1350.0,65.0,35.4,0.32,3.1,5.8,Torch Nozzle Reaming & Anti-Spatter Clean,ALM-W512
+2026-11-05T08:30:00Z,WLD-303,Robotic Arc Welding Cell,Running,110,160,108,2,18.2,18.0,1980.0,85.0,42.1,0.45,14.6,6.0,,
+
