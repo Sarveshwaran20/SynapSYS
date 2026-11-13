@@ -10,6 +10,7 @@ export interface BayCardProps {
   onSelectDrawer: (machine: MachineDashboardState) => void;
   onInspectSupervisory: (machine: MachineDashboardState) => void;
   onOpenWorkOrder?: (orderId: string, machineId: string) => void;
+  onOpenXRay?: (machine: MachineDashboardState) => void;
 }
 
 export const BayCard: React.FC<BayCardProps> = React.memo(
@@ -20,6 +21,7 @@ export const BayCard: React.FC<BayCardProps> = React.memo(
     onSelectDrawer,
     onInspectSupervisory,
     onOpenWorkOrder,
+    onOpenXRay,
   }) => {
     const isRunning = machine.status === 'Running';
     const isFault = machine.status === 'Down';
@@ -160,15 +162,31 @@ export const BayCard: React.FC<BayCardProps> = React.memo(
           </div>
         </div>
 
-        {/* Footer Action Button */}
-        <div className="pt-4 mt-4 border-t border-g-borderSubtle relative z-10">
+        {/* Footer Action Buttons */}
+        <div className="pt-4 mt-4 border-t border-g-borderSubtle relative z-10 flex items-center gap-2">
+          {onOpenXRay && (
+            <button
+              type="button"
+              onClick={() => onOpenXRay(machine)}
+              title="Open 2.5D Animated X-Ray Spatial Lens"
+              aria-label={`Open X-Ray Lens for ${machine.machine_name}`}
+              className="h-10 px-3 rounded-[8px] border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 active:scale-[0.98] text-cyan-300 text-[13px] font-medium inline-flex items-center gap-1.5 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 3v18M3 12h18" />
+              </svg>
+              <span>X-Ray</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => onInspectSupervisory(machine)}
             aria-label={`Open supervisory control for ${machine.machine_name} (${machine.machine_id})`}
-            className="w-full h-10 px-4 rounded-[8px] border border-g-border bg-g-surfaceElevated hover:bg-g-surfaceSubtle text-[14px] font-medium text-g-text inline-flex items-center justify-center gap-2 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-g-blue"
+            className="flex-1 h-10 px-3 rounded-[8px] border border-g-border bg-g-surfaceElevated hover:bg-g-surfaceSubtle active:scale-[0.98] text-[13px] font-medium text-g-text inline-flex items-center justify-center gap-1.5 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-g-blue truncate"
           >
-            <span>Inspect and control</span>
+            <span>Control</span>
             <svg
               className="w-4 h-4 text-g-textSecondary"
               viewBox="0 0 24 24"

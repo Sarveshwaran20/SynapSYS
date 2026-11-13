@@ -12,4 +12,8 @@ export { FloorDrawer } from './FloorDrawer';
 export type { FloorDrawerProps } from './FloorDrawer';
 export { DigitalTwinFloor } from './DigitalTwinFloor';
 export type { DigitalTwinFloorProps } from './DigitalTwinFloor';
+export { ChronosTimelineScrubber } from './ChronosTimelineScrubber';
+export type { ChronosTimelineScrubberProps, IncidentMarker } from './ChronosTimelineScrubber';
+export { MachineXRayModal } from './MachineXRayModal';
+export type { MachineXRayModalProps } from './MachineXRayModal';
 

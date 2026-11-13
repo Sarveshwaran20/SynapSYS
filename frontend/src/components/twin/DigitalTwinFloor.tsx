@@ -6,6 +6,8 @@ import { ExpansionCard } from './ExpansionCard';
 import { Conveyor } from './Conveyor';
 import { AgvTrack } from './AgvTrack';
 import { FloorDrawer } from './FloorDrawer';
+import { ChronosTimelineScrubber, IncidentMarker } from './ChronosTimelineScrubber';
+import { MachineXRayModal } from './MachineXRayModal';
 
 export interface DigitalTwinFloorProps {
   machines: MachineDashboardState[];
@@ -75,13 +77,80 @@ export const DigitalTwinFloor: React.FC<DigitalTwinFloorProps> = ({
   onOpenWorkOrder,
 }) => {
   const [drawerMachineId, setDrawerMachineId] = useState<string | null>(null);
+  const [xrayMachine, setXrayMachine] = useState<MachineDashboardState | null>(null);
+  const [chronosTimeOffset, setChronosTimeOffset] = useState<number>(0);
+  const [chronosPlaying, setChronosPlaying] = useState<boolean>(false);
+  const [chronosSpeed, setChronosSpeed] = useState<1 | 2 | 5 | 10>(1);
+
+  // Sample incident bookmarks for Chronos timeline scrubbing
+  const incidentMarkers: IncidentMarker[] = useMemo(() => [
+    {
+      id: 'inc-1',
+      timeOffsetSec: -1080, // -18 min
+      label: 'Spindle Overheat Trip',
+      severity: 'Critical',
+      machineId: machines[0]?.machine_id || 'CNC-101',
+    },
+    {
+      id: 'inc-2',
+      timeOffsetSec: -2100, // -35 min
+      label: 'Die Setup & Micro-stop',
+      severity: 'Warning',
+      machineId: machines[1]?.machine_id || 'INJ-202',
+    },
+    {
+      id: 'inc-3',
+      timeOffsetSec: -3000, // -50 min
+      label: 'Optical Calibration Sync',
+      severity: 'Info',
+      machineId: machines[2]?.machine_id || 'WLD-303',
+    },
+  ], [machines]);
+
+  // Dynamically interpolate machines when scrubbing back in time
+  const effectiveMachines = useMemo(() => {
+    if (chronosTimeOffset >= 0) return machines;
+    return machines.map((m, idx) => {
+      const clone: MachineDashboardState = JSON.parse(JSON.stringify(m));
+      // Simulated incident at -18 min (-1080s)
+      if (idx === 0 && chronosTimeOffset <= -960 && chronosTimeOffset >= -1200) {
+        clone.status = 'Down';
+        if (clone.sensors) {
+          clone.sensors.temperature_c = 82.4;
+          clone.sensors.vibration_mm_s = 4.85;
+        }
+        if (clone.oee_metrics) {
+          clone.oee_metrics.oee = 48.2;
+          clone.oee_metrics.oee_percentage = 48.2;
+        }
+      } else if (idx === 1 && chronosTimeOffset <= -1980 && chronosTimeOffset >= -2220) {
+        // Simulated micro-stop at -35 min (-2100s)
+        clone.status = 'Idle';
+        if (clone.sensors) {
+          clone.sensors.power_kw = 2.4;
+        }
+        if (clone.oee_metrics) {
+          clone.oee_metrics.oee = 55.0;
+          clone.oee_metrics.oee_percentage = 55.0;
+        }
+      } else {
+        const deltaWave = Math.sin((chronosTimeOffset + idx * 300) * 0.01);
+        if (clone.sensors) {
+          clone.sensors.temperature_c = Math.round(((clone.sensors.temperature_c || 45) + deltaWave * 3.5) * 10) / 10;
+          clone.sensors.power_kw = Math.round(((clone.sensors.power_kw || 15) + Math.cos(deltaWave) * 2.0) * 10) / 10;
+          clone.sensors.vibration_mm_s = Math.round(Math.max(0.5, (clone.sensors.vibration_mm_s || 1.2) + deltaWave * 0.4) * 100) / 100;
+        }
+      }
+      return clone;
+    });
+  }, [machines, chronosTimeOffset]);
 
   const orderedBays = useMemo(() => {
-    const parsed = machines.map((m, idx) => parseBayEntry(m, idx));
+    const parsed = effectiveMachines.map((m, idx) => parseBayEntry(m, idx));
     return [...parsed].sort((a, b) =>
       a.sortKey !== b.sortKey ? a.sortKey - b.sortKey : a.originalIndex - b.originalIndex
     );
-  }, [machines]);
+  }, [effectiveMachines]);
 
   const productionBays = orderedBays.slice(0, 3);
   const assemblyBays = orderedBays.slice(3);
@@ -186,6 +255,21 @@ export const DigitalTwinFloor: React.FC<DigitalTwinFloorProps> = ({
         </div>
       </div>
 
+      {/* INNOVATION: Chronos Factory Time-Travel & Telemetry Replay Engine */}
+      <ChronosTimelineScrubber
+        timeOffsetSec={chronosTimeOffset}
+        onChangeTimeOffset={setChronosTimeOffset}
+        isPlaying={chronosPlaying}
+        onTogglePlay={() => setChronosPlaying(!chronosPlaying)}
+        playbackSpeed={chronosSpeed}
+        onChangePlaybackSpeed={setChronosSpeed}
+        incidents={incidentMarkers}
+        onSelectIncident={(inc) => {
+          const match = effectiveMachines.find((m) => m.machine_id === inc.machineId);
+          if (match) setDrawerMachineId(match.machine_id);
+        }}
+      />
+
       {/* 3. Main Floor Plan Panel */}
       <div className="relative bg-g-surface border border-g-border rounded-[12px] p-6 sm:p-8 twin-floor-grid grid-container-surface overflow-x-auto">
         {/* Continuous Closed Return Conveyor Loop on Desktop (never dangles) */}
@@ -255,6 +339,7 @@ export const DigitalTwinFloor: React.FC<DigitalTwinFloorProps> = ({
                     onSelectDrawer={(m) => setDrawerMachineId(m.machine_id)}
                     onInspectSupervisory={onInspectSupervisory}
                     onOpenWorkOrder={onOpenWorkOrder}
+                    onOpenXRay={(m) => setXrayMachine(m)}
                   />
 
                   {/* Horizontal Conveyor in Grid Gap (Desktop 3-col) */}
@@ -355,6 +440,7 @@ export const DigitalTwinFloor: React.FC<DigitalTwinFloorProps> = ({
                       onSelectDrawer={(m) => setDrawerMachineId(m.machine_id)}
                       onInspectSupervisory={onInspectSupervisory}
                       onOpenWorkOrder={onOpenWorkOrder}
+                      onOpenXRay={(m) => setXrayMachine(m)}
                     />
 
                     {hasRightDesktop && (
@@ -416,6 +502,13 @@ export const DigitalTwinFloor: React.FC<DigitalTwinFloorProps> = ({
         cellName={activeDrawerEntry?.cellName}
         onClose={() => setDrawerMachineId(null)}
         onOpenSupervisoryControl={onInspectSupervisory}
+      />
+
+      {/* 5. 2.5D Animated X-Ray Spatial Lens Modal */}
+      <MachineXRayModal
+        machine={xrayMachine}
+        isOpen={!!xrayMachine}
+        onClose={() => setXrayMachine(null)}
       />
     </section>
   );
