@@ -211,6 +211,8 @@ class DashboardSummary(BaseModel):
 
 class CopilotQuery(BaseModel):
     prompt: str
+    site_id: Optional[str] = None
+    company_domain: Optional[str] = None
 
 
 class CopilotResponse(BaseModel):
@@ -2111,7 +2113,13 @@ class DashboardResponseModel(BaseModel):
 
 
 @app.get("/api/dashboard", response_model=DashboardResponseModel)
-def get_dashboard(site_id: Optional[str] = Query(None), company_domain: Optional[str] = Query(None)):
+def get_dashboard(site_id: Optional[str] = Query(default=None), company_domain: Optional[str] = Query(default=None)):
+    # Safely handle non-string or Query default arguments when called programmatically
+    if not isinstance(site_id, str):
+        site_id = None
+    if not isinstance(company_domain, str):
+        company_domain = None
+
     if company_domain:
         comp_domain = company_domain.strip().lower()
         comp_sites = get_sites_for_company(comp_domain)
@@ -2376,53 +2384,106 @@ def get_alarms():
 
 @app.post("/api/copilot/query", response_model=CopilotResponse)
 def copilot_query(query: CopilotQuery):
-    prompt = query.prompt.lower()
-    dash = get_dashboard()
+    prompt = query.prompt.lower().strip()
+    dash = get_dashboard(site_id=query.site_id, company_domain=query.company_domain)
     summary = dash.summary
+    site_name = dash.site_name or (query.site_id or "Active Production Facility")
+    machines = dash.machines or []
 
-    if "bottleneck" in prompt or "loss" in prompt or "oee" in prompt:
-        lowest_m = min(dash.machines, key=lambda m: m.oee_metrics.oee)
+    if "asset" in prompt or "machine" in prompt or "line" in prompt or "equipment" in prompt:
+        m_lines = []
+        for m in machines[:5]:
+            m_lines.append(
+                f"{m.machine_name} ({m.machine_id}): Status {m.status}, OEE {m.oee_metrics.oee_percentage}%, "
+                f"Temp {m.sensors.temperature_c}°C, Vibration {m.sensors.vibration_mm_s} mm/s"
+            )
+        asset_summary = "; ".join(m_lines) if m_lines else "No equipment currently registered."
         ans = (
-            f"Plant OEE is currently operating at {summary.overall_plant_oee}%. "
-            f"The primary line bottleneck is asset {lowest_m.machine_id} ({lowest_m.machine_name}) at {lowest_m.oee_metrics.oee_percentage}% OEE. "
-            f"Analysis of Nakajima Six Losses identifies {format_time_sec(lowest_m.losses.setup_adjustment_sec + lowest_m.losses.idling_minor_stops_sec)} "
-            f"lost to setup/idling and {lowest_m.losses.process_defects_units} scrap units on Work Order {lowest_m.work_order.order_id}."
+            f"{site_name} floor monitoring: {len(machines)} production assets detected. "
+            f"Asset breakdown: {asset_summary}. "
+            f"Overall facility cadence is {summary.mean_line_speed_sec}s cycle time across {summary.running_machines} active units."
         )
         citations = [
-            f"{lowest_m.machine_id} OEE: {lowest_m.oee_metrics.oee_percentage}%",
-            f"Target Takt: {summary.takt_time_sec}s vs Mean: {summary.mean_line_speed_sec}s",
-            f"Active Work Order: {lowest_m.work_order.order_id} ({lowest_m.work_order.customer})",
+            f"Total Monitored Assets: {len(machines)}",
+            f"Running: {summary.running_machines} | Idle: {summary.idle_machines} | Down: {summary.down_machines}",
+            f"Active Site: {site_name}",
         ]
         actions = [
-            f"Deploy tooling technician to {lowest_m.location} for die alignment",
-            "Adjust feed rate override to align with customer Takt 12.0s",
-            "Review optical calibration to reduce scrap count",
+            "Review real-time digital twin layout on Floor Twin view",
+            "Check component lubrication for machines operating > 55°C",
+            "Monitor live cycle delta on active work orders",
         ]
+
+    elif "alarm" in prompt or "incident" in prompt or "alert" in prompt:
+        active_a = dash.active_alarms or []
+        if active_a:
+            alarm_details = ", ".join([f"{a.machine_id}: {a.message} ({a.severity})" for a in active_a[:3]])
+            ans = f"There are {len(active_a)} active ISA-18.2 alarms logged for {site_name}: {alarm_details}. Operator acknowledgment and root cause diagnosis are recommended."
+        else:
+            ans = f"No critical alarms currently flagged for {site_name}. All equipment is running within nominal safety and vibration thresholds."
+        citations = [
+            f"Active Alarms: {len(active_a)}",
+            f"Safety Status: {'Nominal' if not active_a else 'Incident Active'}",
+            f"Facility: {site_name}",
+        ]
+        actions = [
+            "Inspect Alarms view to acknowledge active incidents",
+            "Run Fault Simulator to test operator drill preparedness",
+        ]
+
+    elif "bottleneck" in prompt or "loss" in prompt or "oee" in prompt:
+        if machines:
+            lowest_m = min(machines, key=lambda m: m.oee_metrics.oee)
+            ans = (
+                f"{site_name} OEE is currently operating at {summary.overall_plant_oee}%. "
+                f"The primary line bottleneck is asset {lowest_m.machine_id} ({lowest_m.machine_name}) at {lowest_m.oee_metrics.oee_percentage}% OEE. "
+                f"Analysis of Nakajima Six Losses identifies {format_time_sec(lowest_m.losses.setup_adjustment_sec + lowest_m.losses.idling_minor_stops_sec)} "
+                f"lost to setup/idling and {lowest_m.losses.process_defects_units} scrap units on Work Order {lowest_m.work_order.order_id}."
+            )
+            citations = [
+                f"{lowest_m.machine_id} OEE: {lowest_m.oee_metrics.oee_percentage}%",
+                f"Target Takt: {summary.takt_time_sec}s vs Mean: {summary.mean_line_speed_sec}s",
+                f"Active Work Order: {lowest_m.work_order.order_id}",
+            ]
+            actions = [
+                f"Deploy tooling technician to {lowest_m.location} for die alignment",
+                "Adjust feed rate override to align with customer Takt 12.0s",
+                "Review optical calibration to reduce scrap count",
+            ]
+        else:
+            ans = f"Plant OEE is operating at {summary.overall_plant_oee}%. Telemetry streaming normally."
+            citations = [f"Plant OEE: {summary.overall_plant_oee}%"]
+            actions = ["Calibrate machine telemetry baseline"]
 
     elif "predictive" in prompt or "failure" in prompt or "bearing" in prompt or "rul" in prompt:
-        critical_m = max(dash.machines, key=lambda m: m.predictive.anomaly_score)
-        ans = (
-            f"Predictive anomaly scan evaluated all 3 assets. "
-            f"Asset {critical_m.machine_id} presents the highest mechanical risk with an Anomaly Score of {critical_m.predictive.anomaly_score}% "
-            f"({critical_m.predictive.health_status}). "
-            f"Remaining Useful Life (RUL) for {critical_m.predictive.component_at_risk} is estimated at {critical_m.predictive.remaining_useful_life_hrs} operating hours. "
-            f"Diagnostic finding: {critical_m.predictive.root_cause_analysis}"
-        )
-        citations = [
-            f"Sensor Vibration: {critical_m.sensors.vibration_mm_s} mm/s RMS",
-            f"Core Temp: {critical_m.sensors.temperature_c}°C",
-            f"RUL Horizon: {critical_m.predictive.remaining_useful_life_hrs}h",
-        ]
-        actions = [
-            f"Schedule bearing lube service for {critical_m.machine_id} during shift handover (14:00 UTC)",
-            "Engage acoustic vibration secondary probe to verify race wear",
-            "Check spare parts inventory in Central Crib (Bearing Kit #T04)",
-        ]
+        if machines:
+            critical_m = max(machines, key=lambda m: m.predictive.anomaly_score)
+            ans = (
+                f"Predictive anomaly scan evaluated {len(machines)} assets at {site_name}. "
+                f"Asset {critical_m.machine_id} presents the highest mechanical risk with an Anomaly Score of {critical_m.predictive.anomaly_score}% "
+                f"({critical_m.predictive.health_status}). "
+                f"Remaining Useful Life (RUL) for {critical_m.predictive.component_at_risk} is estimated at {critical_m.predictive.remaining_useful_life_hrs} operating hours. "
+                f"Diagnostic finding: {critical_m.predictive.root_cause_analysis}"
+            )
+            citations = [
+                f"Sensor Vibration: {critical_m.sensors.vibration_mm_s} mm/s RMS",
+                f"Core Temp: {critical_m.sensors.temperature_c}°C",
+                f"RUL Horizon: {critical_m.predictive.remaining_useful_life_hrs}h",
+            ]
+            actions = [
+                f"Schedule bearing lube service for {critical_m.machine_id} during shift handover",
+                "Engage acoustic vibration secondary probe to verify race wear",
+                "Check spare parts inventory in Central Tooling Crib",
+            ]
+        else:
+            ans = "Predictive anomaly scan evaluated all assets as nominal."
+            citations = ["RUL: Nominal"]
+            actions = ["Maintain standard PM inspection schedule"]
 
     elif "financial" in prompt or "cost" in prompt or "roi" in prompt or "revenue" in prompt:
         roi = summary.financial_roi
         ans = (
-            f"Current shift has generated ${roi.revenue_generated_usd:,.2f} in gross production value "
+            f"Current shift at {site_name} has generated ${roi.revenue_generated_usd:,.2f} in gross production value "
             f"across {summary.total_good} conforming parts. "
             f"Unplanned downtime losses total -${roi.downtime_cost_usd:,.2f} (rate: $1,200/hr) "
             f"and scrap defect waste is -${roi.scrap_waste_cost_usd:,.2f}. "
@@ -2436,14 +2497,14 @@ def copilot_query(query: CopilotQuery):
         ]
         actions = [
             "Execute What-If cycle delta simulation in financial drawer",
-            "Prioritize bottleneck machine recovery to reclaim $290/hr in lost margin",
+            "Prioritize bottleneck machine recovery to reclaim lost margin",
         ]
 
     else:
         ans = (
-            f"Detroit Site 04 operating at {summary.overall_plant_oee}% OEE with {summary.running_machines} assets online. "
-            f"Current production output is {summary.total_output} of {summary.total_target} scheduled units (68% shift elapsed). "
-            f"Total plant electrical demand is {summary.energy.total_power_kw} kW with specific intensity of {summary.energy.specific_energy_kwh_per_unit} kWh/part. "
+            f"{site_name} operating at {summary.overall_plant_oee}% OEE with {summary.running_machines} assets online. "
+            f"Current production output is {summary.total_output} of {summary.total_target} scheduled units. "
+            f"Total facility electrical demand is {summary.energy.total_power_kw} kW with specific intensity of {summary.energy.specific_energy_kwh_per_unit} kWh/part. "
             f"There are currently {summary.active_alarms_count} unresolved ISA-18.2 alarms requiring operator review."
         )
         citations = [
@@ -2452,9 +2513,11 @@ def copilot_query(query: CopilotQuery):
             f"Active Alarms: {summary.active_alarms_count}",
         ]
         actions = [
-            "Verify Work Order WO-84920 delivery milestone for Pratt & Whitney",
             "Review ISA-18.2 alarm dispatch table for unacknowledged incidents",
+            "Inspect live work orders for upcoming delivery milestones",
         ]
+
+    return CopilotResponse(answer=ans, citations=citations, suggested_actions=actions)
 
     return CopilotResponse(answer=ans, citations=citations, suggested_actions=actions)
 

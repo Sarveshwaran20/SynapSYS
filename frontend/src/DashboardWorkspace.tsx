@@ -2807,23 +2807,33 @@ export default function DashboardWorkspace({
     setCopilotInput('');
     setCopilotLoading(true);
 
+    const payload = {
+      prompt: queryText,
+      site_id: currentProject,
+      company_domain: currentUser?.company_domain,
+    };
+
     try {
-      let res: Response;
+      let res: Response | null = null;
       try {
         res = await fetch('/api/copilot/query', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: queryText }),
+          body: JSON.stringify(payload),
         });
       } catch {
-        res = await fetch('http://localhost:8000/api/copilot/query', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: queryText }),
-        });
+        try {
+          res = await fetch('http://localhost:8000/api/copilot/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+        } catch {
+          res = null;
+        }
       }
 
-      if (res.ok) {
+      if (res && res.ok) {
         const json = await res.json();
         const aiMsg: CopilotMessage = {
           id: `ai-${Date.now()}`,
@@ -2833,13 +2843,82 @@ export default function DashboardWorkspace({
           citations: json.citations,
         };
         setCopilotMessages((prev) => [...prev, aiMsg]);
+        return;
       }
-    } catch {
-      // Fallback response if network disconnects
+
+      // If backend responded with non-200 or was unreachable, synthesize from live client telemetry state
+      const pLower = queryText.toLowerCase();
+      let fallbackText = '';
+      let fallbackCitations: string[] = [];
+
+      if (pLower.includes('asset') || pLower.includes('machine') || pLower.includes('equipment') || pLower.includes('line')) {
+        const lines = (data.machines || []).map(
+          (m) => `${m.machine_name} (${m.machine_id}): Status ${m.status}, OEE ${m.oee_metrics?.oee_percentage || 0}%, Temp ${m.sensors?.temperature_c || 0}°C, Vibration ${m.sensors?.vibration_mm_s || 0} mm/s`
+        );
+        fallbackText = `${data.site_name || 'Plant'} floor monitoring: ${data.machines?.length || 0} production assets detected. Asset breakdown: ${lines.join('; ') || 'No equipment registered'}. Current facility cadence is ${data.summary?.mean_line_speed_sec || 0}s cycle time across ${data.summary?.running_machines || 0} active units.`;
+        fallbackCitations = [
+          `Total Monitored Assets: ${data.machines?.length || 0}`,
+          `Running: ${data.summary?.running_machines || 0} | Idle: ${data.summary?.idle_machines || 0} | Down: ${data.summary?.down_machines || 0}`,
+          `Active Site: ${data.site_name || 'Active Production Facility'}`,
+        ];
+      } else if (pLower.includes('bottleneck') || pLower.includes('loss') || pLower.includes('oee')) {
+        const lowestM = [...(data.machines || [])].sort((a, b) => (a.oee_metrics?.oee || 0) - (b.oee_metrics?.oee || 0))[0];
+        fallbackText = `Facility OEE is currently operating at ${data.summary?.overall_plant_oee || 0}%. Primary line bottleneck is ${lowestM ? `${lowestM.machine_name} (${lowestM.machine_id}) at ${lowestM.oee_metrics?.oee_percentage || 0}% OEE` : 'nominal'}. Planned cadence is ${data.summary?.takt_time_sec || 0}s customer takt.`;
+        fallbackCitations = [
+          `Overall OEE: ${data.summary?.overall_plant_oee || 0}%`,
+          `Target Takt: ${data.summary?.takt_time_sec || 0}s vs Mean: ${data.summary?.mean_line_speed_sec || 0}s`,
+          lowestM?.work_order?.order_id ? `Active Work Order: ${lowestM.work_order.order_id}` : `Facility: ${data.site_name || 'Active Production Facility'}`,
+        ];
+      } else if (pLower.includes('predictive') || pLower.includes('rul') || pLower.includes('failure') || pLower.includes('bearing')) {
+        const criticalM = [...(data.machines || [])].sort((a, b) => (b.predictive?.anomaly_score || 0) - (a.predictive?.anomaly_score || 0))[0];
+        fallbackText = criticalM
+          ? `Predictive anomaly scan evaluated ${data.machines?.length || 0} assets at ${data.site_name || 'Facility'}. Asset ${criticalM.machine_id} presents the highest mechanical risk with Anomaly Score ${criticalM.predictive?.anomaly_score || 0}% (${criticalM.predictive?.health_status || 'Monitored'}). Remaining Useful Life for ${criticalM.predictive?.component_at_risk || 'bearing assembly'} is estimated at ${criticalM.predictive?.remaining_useful_life_hrs || 0} operating hours.`
+          : `All machine telemetry indicators are within nominal tolerance. No anomalous degradation detected.`;
+        fallbackCitations = criticalM
+          ? [
+              `Vibration RMS: ${criticalM.sensors?.vibration_mm_s || 0} mm/s`,
+              `Core Temp: ${criticalM.sensors?.temperature_c || 0}°C`,
+              `RUL Horizon: ${criticalM.predictive?.remaining_useful_life_hrs || 0}h`,
+            ]
+          : [`Health Status: Nominal`];
+      } else if (pLower.includes('alarm') || pLower.includes('incident') || pLower.includes('alert')) {
+        const alarms = data.active_alarms || [];
+        fallbackText = alarms.length > 0
+          ? `There are currently ${alarms.length} active ISA-18.2 alarms logged: ${alarms.map(a => `${a.machine_id} - ${a.alarm} (${a.severity})`).join(', ')}. Operator acknowledgment and root-cause inspection are advised.`
+          : `No critical alarms currently flagged for ${data.site_name || 'Facility'}. All machinery running within safe thermal and vibration boundaries.`;
+        fallbackCitations = [`Active Alarms: ${alarms.length}`, `Facility: ${data.site_name || 'Active Production Facility'}`];
+      } else if (pLower.includes('financial') || pLower.includes('cost') || pLower.includes('roi') || pLower.includes('revenue')) {
+        const roi = data.summary?.financial_roi;
+        fallbackText = roi
+          ? `Current shift at ${data.site_name || 'Facility'} has generated $${(roi.revenue_generated_usd || 0).toLocaleString()} in gross production value across ${data.summary?.total_good || 0} conforming parts. Unplanned downtime losses total -$${(roi.downtime_cost_usd || 0).toLocaleString()} and scrap waste is -$${(roi.scrap_waste_cost_usd || 0).toLocaleString()}. Net shift economic yield stands at $${(roi.net_shift_value_usd || 0).toLocaleString()}.`
+          : `Economic metrics: Overall OEE ${data.summary?.overall_plant_oee || 0}%, output ${data.summary?.total_output || 0} parts.`;
+        fallbackCitations = [
+          `Gross Value: $${(roi?.revenue_generated_usd || 0).toLocaleString()}`,
+          `Downtime Cost: -$${(roi?.downtime_cost_usd || 0).toLocaleString()}`,
+          `Conforming Parts: ${data.summary?.total_good || 0} / ${data.summary?.total_target || 0}`,
+        ];
+      } else {
+        fallbackText = `${data.site_name || 'Active Production Facility'} operating at ${data.summary?.overall_plant_oee || 0}% OEE with ${data.summary?.running_machines || 0} assets online. Current production output is ${data.summary?.total_output || 0} of ${data.summary?.total_target || 0} scheduled units with ${data.summary?.active_alarms_count || 0} unresolved ISA-18.2 alarms.`;
+        fallbackCitations = [
+          `Plant OEE: ${data.summary?.overall_plant_oee || 0}%`,
+          `Active Assets: ${data.summary?.running_machines || 0} / ${data.machines?.length || 0}`,
+          `Active Alarms: ${data.summary?.active_alarms_count || 0}`,
+        ];
+      }
+
       const fallbackMsg: CopilotMessage = {
         id: `ai-${Date.now()}`,
         sender: 'assistant',
-        text: `Analysis based on cached telemetry: Plant OEE is currently ${data.summary.overall_plant_oee}%. Asset CNC-101 is producing at cadence with ${data.summary.active_alarms_count} active alarm(s) requiring acknowledgment.`,
+        text: fallbackText,
+        timestamp: new Date().toLocaleTimeString(),
+        citations: fallbackCitations,
+      };
+      setCopilotMessages((prev) => [...prev, fallbackMsg]);
+    } catch {
+      const fallbackMsg: CopilotMessage = {
+        id: `ai-${Date.now()}`,
+        sender: 'assistant',
+        text: `Analysis based on live telemetry: Facility OEE is currently ${data.summary?.overall_plant_oee || 0}% with ${data.summary?.running_machines || 0} active asset(s) and ${data.summary?.active_alarms_count || 0} alarm(s).`,
         timestamp: new Date().toLocaleTimeString(),
       };
       setCopilotMessages((prev) => [...prev, fallbackMsg]);
