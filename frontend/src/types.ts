@@ -249,6 +249,7 @@ export interface InventoryItem {
   min_safety_stock: number;
   reorder_quantity: number;
   unit: string;
+  unit_cost_inr?: number;
   unit_cost_usd: number;
   bin_location: string;
   preferred_supplier_id: string;
@@ -270,7 +271,7 @@ export interface SupplierVendor {
   payment_terms: string;
 }
 
-export type PurchaseOrderStatus = 'Draft' | 'Emailed' | 'Confirmed' | 'Received' | 'Cancelled';
+export type PurchaseOrderStatus = 'Draft' | 'Pending 2FA' | 'Emailed' | 'Confirmed' | 'Received' | 'Cancelled';
 
 export interface PurchaseOrderItem {
   item_id: string;
@@ -278,7 +279,9 @@ export interface PurchaseOrderItem {
   name: string;
   quantity: number;
   unit: string;
+  unit_price_inr?: number;
   unit_price_usd: number;
+  total_price_inr?: number;
   total_price_usd: number;
 }
 
@@ -290,11 +293,21 @@ export interface PurchaseOrder {
   supplier_email: string;
   status: PurchaseOrderStatus;
   items: PurchaseOrderItem[];
+  subtotal_inr?: number;
   subtotal_usd: number;
+  tax_inr?: number;
+  cgst_inr?: number;
+  sgst_inr?: number;
   tax_usd: number;
+  total_inr?: number;
   total_usd: number;
   estimated_delivery: string;
   email_subject?: string;
   email_dispatched_at?: string;
   notes?: string;
+  priority?: string;
+  facility?: string;
+  security_2fa_verified?: boolean;
+  authorized_by?: string;
+  authorization_hash?: string;
 }

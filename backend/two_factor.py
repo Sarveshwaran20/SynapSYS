@@ -184,3 +184,196 @@ def verify_2fa_code(email: str, provided_otp: str) -> Optional[dict]:
 
     return None
 
+
+# ---------------------------------------------------------------------------
+# Procurement Purchase Order 2FA Authorization Engine
+# ---------------------------------------------------------------------------
+_PENDING_PO_AUTHORIZATIONS: Dict[str, Tuple[str, float, dict]] = {}
+
+
+def send_po_security_alert_email(
+    po_draft: dict,
+    otp_code: str,
+    recipient_email: str = DESIGNATED_SECURITY_EMAIL,
+) -> bool:
+    """
+    Sends an immediate 2FA security challenge email to the supervisor alerting
+    that an operator is requesting to dispatch a Purchase Order to an external seller.
+    Includes full PO line items, INR pricing, and 6-digit confirmation code.
+    """
+    smtp_host = os.getenv("SMTP_HOST")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_pass = os.getenv("SMTP_PASS")
+    sender_email = os.getenv("SMTP_FROM", "security@synapsys.industrial")
+
+    po_id = po_draft.get("po_id", "PO-DRAFT")
+    vendor_name = po_draft.get("supplier_name", "Approved Vendor")
+    vendor_email = po_draft.get("supplier_email", "N/A")
+    total_inr = float(po_draft.get("total_inr") or po_draft.get("total_usd") or 0.0)
+    operator = po_draft.get("created_by") or "Authorized Plant Operator"
+    facility = po_draft.get("facility") or "Detroit Plant C4 / Coimbatore Unit"
+    items = po_draft.get("items", [])
+
+    subject = f"[SynapSYS Security] 2FA Purchase Order Authorization: {po_id} (₹{total_inr:,.2f})"
+
+    items_html = "".join([
+        f"""<tr>
+            <td style="padding: 8px; border-bottom: 1px solid #374151; font-family: monospace;">{it.get('sku', 'N/A')}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #374151;">{it.get('name', 'Item')}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #374151; text-align: center;">{it.get('quantity', 1)} {it.get('unit', 'pcs')}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #374151; text-align: right; font-weight: bold;">₹{float(it.get('unit_price_inr') or it.get('unit_price_usd') or it.get('unit_price') or 0.0):,.2f}</td>
+        </tr>"""
+        for it in items
+    ])
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0b0f19; color: #f3f4f6; margin: 0; padding: 24px; }}
+        .card {{ max-width: 580px; margin: 0 auto; background: #111827; border: 1px solid #1f2937; border-top: 4px solid #10b981; border-radius: 8px; padding: 28px; }}
+        .badge {{ display: inline-block; padding: 4px 10px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 14px; }}
+        .header {{ font-size: 20px; font-weight: 700; color: #ffffff; letter-spacing: 0.5px; margin-bottom: 8px; }}
+        .desc {{ font-size: 13px; color: #9ca3af; line-height: 1.6; margin-bottom: 18px; }}
+        .details {{ background: #1f2937; border-radius: 6px; padding: 14px 18px; margin-bottom: 20px; font-size: 13px; }}
+        .detail-row {{ display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #374151; }}
+        .detail-row:last-child {{ border-bottom: none; }}
+        .label {{ color: #9ca3af; }}
+        .val {{ color: #f9fafb; font-weight: 600; }}
+        .otp-box {{ text-align: center; background: #030712; border: 2px dashed #10b981; border-radius: 8px; padding: 18px; margin: 20px 0; }}
+        .otp-title {{ font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #6ee7b7; margin-bottom: 6px; font-weight: 700; }}
+        .otp-code {{ font-size: 36px; font-family: monospace; font-weight: 800; letter-spacing: 8px; color: #34d399; }}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }}
+        th {{ background: #111827; color: #9ca3af; text-align: left; padding: 8px; font-size: 11px; text-transform: uppercase; }}
+        .footer {{ font-size: 11px; color: #6b7280; text-align: center; margin-top: 24px; border-top: 1px solid #1f2937; padding-top: 16px; }}
+      </style>
+    </head>
+    <body>
+      <div class="card">
+        <div class="badge">Procurement 2FA Authorization Required</div>
+        <div class="header">Purchase Order Dispatch Approval</div>
+        <div class="desc">
+          An operator has requested to place and dispatch an official purchase order to an external vendor. 
+          To prevent unauthorized, accidental, or rogue supplier orders, enter this 6-digit 2FA authorization code on the SynapSYS Inventory Terminal:
+        </div>
+
+        <div class="details">
+          <div class="detail-row"><span class="label">Purchase Order ID:</span> <span class="val">{po_id}</span></div>
+          <div class="detail-row"><span class="label">Target Seller / Vendor:</span> <span class="val">{vendor_name} ({vendor_email})</span></div>
+          <div class="detail-row"><span class="label">Requesting Operator:</span> <span class="val">{operator}</span></div>
+          <div class="detail-row"><span class="label">Destination Facility:</span> <span class="val">{facility}</span></div>
+          <div class="detail-row"><span class="label">Total Amount (incl. 18% GST):</span> <span class="val" style="color: #34d399; font-size: 15px;">₹{total_inr:,.2f}</span></div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>SKU</th>
+              <th>Description</th>
+              <th style="text-align: center;">Qty</th>
+              <th style="text-align: right;">Unit Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items_html}
+          </tbody>
+        </table>
+
+        <div class="otp-box">
+          <div class="otp-title">One-Time Procurement Authorization 2FA Code</div>
+          <div class="otp-code">{otp_code}</div>
+        </div>
+
+        <div class="desc" style="font-size: 12px; margin-bottom: 0;">
+          Code expires in <strong>10 minutes</strong>. Once confirmed, the order will be locked, cryptographically signed, and emailed to the vendor. If this request was not authorized, discard this alert.
+        </div>
+
+        <div class="footer">
+          SynapSYS IIoT Platform &bull; ISO-9001 Procurement Governance &bull; Supervisor Alert: {recipient_email}
+        </div>
+      </div>
+    </body>
+    </html>
+    """
+
+    print("=" * 70)
+    print(f"[PROCUREMENT 2FA OTP DISPATCHED] -> {recipient_email}")
+    print(f"   Subject:    {subject}")
+    print(f"   PO Target:  {po_id} -> {vendor_name} ({vendor_email})")
+    print(f"   Total INR:  ₹{total_inr:,.2f}")
+    print(f"   2FA CODE:   [ {otp_code} ] (Expires in 10 minutes)")
+    print("=" * 70)
+
+    if not smtp_host or not smtp_user or not smtp_pass:
+        logger.info(f"SMTP unconfigured; 2FA procurement authorization code displayed in console: {otp_code}")
+        return True
+
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = sender_email
+        msg["To"] = recipient_email
+
+        part_html = MIMEText(html_content, "html")
+        msg.attach(part_html)
+
+        server = smtplib.SMTP(smtp_host, smtp_port, timeout=8.0)
+        server.starttls()
+        server.login(smtp_user, smtp_pass)
+        server.sendmail(sender_email, [recipient_email], msg.as_string())
+        server.quit()
+        logger.info(f"Successfully emailed procurement 2FA OTP to {recipient_email}")
+        return True
+    except Exception as exc:
+        logger.warning(f"Failed to transmit procurement 2FA message: {exc}")
+        return True
+
+
+def initiate_po_authorization_2fa(po_draft: dict) -> Tuple[str, str]:
+    """
+    Registers a pending Purchase Order authorization request with a 10-minute expiry.
+    Returns (auth_token, otp_code).
+    """
+    import uuid
+    auth_token = f"PO-AUTH-{uuid.uuid4().hex[:12].upper()}"
+    otp = generate_otp()
+    expires_at = time.time() + 600.0  # 10 minutes
+
+    _PENDING_PO_AUTHORIZATIONS[auth_token] = (otp, expires_at, po_draft)
+
+    send_po_security_alert_email(
+        po_draft=po_draft,
+        otp_code=otp,
+        recipient_email=DESIGNATED_SECURITY_EMAIL,
+    )
+    return auth_token, otp
+
+
+def verify_po_authorization_2fa(auth_token: str, provided_otp: str) -> Optional[dict]:
+    """
+    Validates the 2FA code for a pending purchase order authorization.
+    Returns the po_draft if valid, or None if invalid/expired.
+    """
+    clean_token = auth_token.strip()
+    clean_otp = provided_otp.strip()
+
+    entry = _PENDING_PO_AUTHORIZATIONS.get(clean_token)
+    if not entry:
+        return None
+
+    expected_otp, expires_at, po_draft = entry
+
+    if time.time() > expires_at:
+        _PENDING_PO_AUTHORIZATIONS.pop(clean_token, None)
+        return None
+
+    if clean_otp == expected_otp:
+        _PENDING_PO_AUTHORIZATIONS.pop(clean_token, None)
+        return po_draft
+
+    return None
+
+

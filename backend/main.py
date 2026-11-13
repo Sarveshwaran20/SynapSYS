@@ -23,9 +23,21 @@ except ImportError:
     from firebase_store import firebase_store
 
 try:
-    from .two_factor import initiate_2fa_signup, verify_2fa_code, DESIGNATED_SECURITY_EMAIL
+    from .two_factor import (
+        initiate_2fa_signup,
+        verify_2fa_code,
+        initiate_po_authorization_2fa,
+        verify_po_authorization_2fa,
+        DESIGNATED_SECURITY_EMAIL,
+    )
 except ImportError:
-    from two_factor import initiate_2fa_signup, verify_2fa_code, DESIGNATED_SECURITY_EMAIL
+    from two_factor import (
+        initiate_2fa_signup,
+        verify_2fa_code,
+        initiate_po_authorization_2fa,
+        verify_po_authorization_2fa,
+        DESIGNATED_SECURITY_EMAIL,
+    )
 
 try:
     from .procurement import (
@@ -2312,9 +2324,9 @@ def get_dashboard(site_id: Optional[str] = Query(default=None), company_domain: 
     divisor = max(1, num_machines)
     overall_oee_pct = round((accumulated_oee / divisor) * 100, 2)
 
-    rev_gen = total_good * 85.0
-    dt_cost = round((total_downtime_sec / 3600.0) * 1200.0, 2)
-    scrap_cost = total_scrap * 45.0
+    rev_gen = total_good * 7200.0
+    dt_cost = round((total_downtime_sec / 3600.0) * 95000.0, 2)
+    scrap_cost = total_scrap * 3800.0
     net_val = round(rev_gen - dt_cost - scrap_cost, 2)
     pot_savings = round(dt_cost * 0.65 + scrap_cost * 0.8, 2)
 
@@ -2528,16 +2540,16 @@ def copilot_query(query: CopilotQuery):
     elif "financial" in prompt or "cost" in prompt or "roi" in prompt or "revenue" in prompt:
         roi = summary.financial_roi
         ans = (
-            f"Current shift at {site_name} has generated ${roi.revenue_generated_usd:,.2f} in gross production value "
+            f"Current shift at {site_name} has generated ₹{roi.revenue_generated_usd:,.2f} in gross production value "
             f"across {summary.total_good} conforming parts. "
-            f"Unplanned downtime losses total -${roi.downtime_cost_usd:,.2f} (rate: $1,200/hr) "
-            f"and scrap defect waste is -${roi.scrap_waste_cost_usd:,.2f}. "
-            f"Net shift economic yield stands at ${roi.net_shift_value_usd:,.2f}. "
-            f"Recoverable opportunity through process tuning is estimated at +${roi.potential_savings_usd:,.2f}."
+            f"Unplanned downtime losses total -₹{roi.downtime_cost_usd:,.2f} (rate: ₹95,000/hr) "
+            f"and scrap defect waste is -₹{roi.scrap_waste_cost_usd:,.2f}. "
+            f"Net shift economic yield stands at ₹{roi.net_shift_value_usd:,.2f}. "
+            f"Recoverable opportunity through process tuning is estimated at +₹{roi.potential_savings_usd:,.2f}."
         )
         citations = [
-            f"Gross Value: ${roi.revenue_generated_usd:,.2f}",
-            f"Downtime Hours Cost: -${roi.downtime_cost_usd:,.2f}",
+            f"Gross Value: ₹{roi.revenue_generated_usd:,.2f}",
+            f"Downtime Hours Cost: -₹{roi.downtime_cost_usd:,.2f}",
             f"Conforming Parts: {summary.total_good} / {summary.total_target}",
         ]
         actions = [
@@ -2570,6 +2582,25 @@ class CreatePORequest(BaseModel):
     items: List[Dict[str, Any]]
     notes: Optional[str] = None
     company_name: Optional[str] = "SynapSYS Industrial Operations"
+    facility: Optional[str] = "Detroit Plant C4 / Coimbatore Tooling Unit"
+    priority: Optional[str] = "Standard"
+    operator_name: Optional[str] = "Plant Supervisor"
+
+
+class InitiatePO2FARequest(BaseModel):
+    supplier_id: str
+    items: List[Dict[str, Any]]
+    notes: Optional[str] = None
+    company_name: Optional[str] = "SynapSYS Industrial Operations"
+    facility: Optional[str] = "Detroit Plant C4 / Coimbatore Tooling Unit"
+    priority: Optional[str] = "Standard"
+    operator_name: Optional[str] = "Plant Supervisor"
+
+
+class VerifyPO2FARequest(BaseModel):
+    auth_token: str
+    otp: str
+    operator_name: Optional[str] = "Plant Supervisor"
 
 
 class AdjustStockRequest(BaseModel):
@@ -2580,14 +2611,21 @@ class AdjustStockRequest(BaseModel):
 
 @app.get("/api/inventory")
 def get_inventory():
-    total_val = sum(it["quantity"] * it["unit_cost_usd"] for it in DEFAULT_INVENTORY)
+    total_val_inr = sum(
+        it["quantity"] * float(it.get("unit_cost_inr") or (it.get("unit_cost_usd", 0) * 86.0))
+        for it in DEFAULT_INVENTORY
+    )
+    total_val_usd = sum(it["quantity"] * float(it.get("unit_cost_usd", 0)) for it in DEFAULT_INVENTORY)
     low_stock = [it for it in DEFAULT_INVENTORY if it["quantity"] <= it["min_safety_stock"]]
     return {
         "items": DEFAULT_INVENTORY,
         "total_items": len(DEFAULT_INVENTORY),
-        "total_valuation_usd": round(total_val, 2),
+        "total_valuation_inr": round(total_val_inr, 2),
+        "total_valuation_usd": round(total_val_usd, 2),
         "low_stock_count": len(low_stock),
         "low_stock_items": low_stock,
+        "currency": "INR",
+        "currency_symbol": "₹",
     }
 
 
@@ -2601,6 +2639,98 @@ def get_purchase_orders():
     return _PURCHASE_ORDERS
 
 
+@app.post("/api/inventory/orders/initiate-2fa")
+def initiate_po_order_2fa(req: InitiatePO2FARequest):
+    """
+    Guards procurement by issuing an instant 6-digit 2FA challenge code
+    dispatched to the supervisor email (sarveshwaran.k2008@gmail.com).
+    """
+    sup = next((s for s in DEFAULT_SUPPLIERS if s["id"] == req.supplier_id), None)
+    if not sup:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+    if not req.items:
+        raise HTTPException(status_code=400, detail="Cannot create PO with empty line items")
+
+    po_num = f"PO-2026-{1000 + len(_PURCHASE_ORDERS) + 1}"
+    subtotal_inr = sum(
+        it.get("quantity", 1) * float(it.get("unit_price_inr") or it.get("unit_price_usd") or it.get("unit_price") or 0.0)
+        for it in req.items
+    )
+    # Standard Indian GST for industrial machine components & tooling is 18% (CGST 9% + SGST 9%)
+    cgst_inr = round(subtotal_inr * 0.09, 2)
+    sgst_inr = round(subtotal_inr * 0.09, 2)
+    tax_inr = round(cgst_inr + sgst_inr, 2)
+    total_inr = round(subtotal_inr + tax_inr, 2)
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    po_draft = {
+        "po_id": po_num,
+        "created_at": now_iso,
+        "supplier_id": sup["id"],
+        "supplier_name": sup["name"],
+        "supplier_email": sup["email"],
+        "status": "Pending 2FA",
+        "items": req.items,
+        "subtotal_inr": round(subtotal_inr, 2),
+        "tax_inr": tax_inr,
+        "cgst_inr": cgst_inr,
+        "sgst_inr": sgst_inr,
+        "total_inr": total_inr,
+        "subtotal_usd": round(subtotal_inr / 86.0, 2),
+        "total_usd": round(total_inr / 86.0, 2),
+        "estimated_delivery": datetime.now(timezone.utc).date().isoformat(),
+        "notes": req.notes or "Automated requisition dispatch",
+        "priority": req.priority or "Standard",
+        "facility": req.facility or "Detroit Plant C4 / Coimbatore Tooling Unit",
+        "created_by": req.operator_name or "Plant Supervisor",
+    }
+
+    auth_token, otp = initiate_po_authorization_2fa(po_draft)
+    return {
+        "success": True,
+        "auth_token": auth_token,
+        "po_id": po_num,
+        "total_inr": total_inr,
+        "supervisor_email": DESIGNATED_SECURITY_EMAIL,
+        "expires_in_sec": 600,
+        "message": f"2FA code dispatched to supervisor {DESIGNATED_SECURITY_EMAIL}",
+    }
+
+
+@app.post("/api/inventory/orders/verify-2fa")
+def verify_po_order_2fa(req: VerifyPO2FARequest):
+    """
+    Validates the 6-digit OTP code against the pending procurement session.
+    Upon verification, commits the PO, emails the vendor, and updates inventory records.
+    """
+    po_draft = verify_po_authorization_2fa(req.auth_token, req.otp)
+    if not po_draft:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired 2FA authorization code. Re-check the code or request a new OTP."
+        )
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    po_draft["status"] = "Emailed"
+    po_draft["authorized_at"] = now_iso
+    po_draft["authorized_by"] = req.operator_name or po_draft.get("created_by") or "Authorized Supervisor"
+    po_draft["security_2fa_verified"] = True
+    po_draft["email_dispatched_at"] = now_iso
+    po_draft["email_subject"] = f"Purchase Order {po_draft['po_id']} - {po_draft.get('supplier_name')}"
+
+    # Generate authorization cryptographic signature
+    sig_payload = f"{po_draft['po_id']}|{po_draft['total_inr']}|{now_iso}|{DESIGNATED_SECURITY_EMAIL}"
+    po_draft["authorization_hash"] = hashlib.sha256(sig_payload.encode()).hexdigest()[:16].upper()
+
+    _PURCHASE_ORDERS.insert(0, po_draft)
+    dispatch_supplier_po_email(po_draft, company_name="SynapSYS Industrial Operations")
+    return {
+        "success": True,
+        "po": po_draft,
+        "message": f"Purchase order {po_draft['po_id']} authorized via 2FA and emailed to {po_draft['supplier_email']}"
+    }
+
+
 @app.post("/api/inventory/orders/create")
 def create_purchase_order(req: CreatePORequest):
     sup = next((s for s in DEFAULT_SUPPLIERS if s["id"] == req.supplier_id), None)
@@ -2608,9 +2738,14 @@ def create_purchase_order(req: CreatePORequest):
         raise HTTPException(status_code=404, detail="Supplier not found")
 
     po_num = f"PO-2026-{1000 + len(_PURCHASE_ORDERS) + 1}"
-    subtotal = sum(it.get("quantity", 1) * float(it.get("unit_price_usd") or it.get("unit_price") or 0.0) for it in req.items)
-    tax = subtotal * 0.09
-    total = subtotal + tax
+    subtotal_inr = sum(
+        it.get("quantity", 1) * float(it.get("unit_price_inr") or it.get("unit_price_usd") or it.get("unit_price") or 0.0)
+        for it in req.items
+    )
+    cgst_inr = round(subtotal_inr * 0.09, 2)
+    sgst_inr = round(subtotal_inr * 0.09, 2)
+    tax_inr = round(cgst_inr + sgst_inr, 2)
+    total_inr = round(subtotal_inr + tax_inr, 2)
     now_iso = datetime.now(timezone.utc).isoformat()
 
     po_data = {
@@ -2621,13 +2756,21 @@ def create_purchase_order(req: CreatePORequest):
         "supplier_email": sup["email"],
         "status": "Emailed",
         "items": req.items,
-        "subtotal_usd": round(subtotal, 2),
-        "tax_usd": round(tax, 2),
-        "total_usd": round(total, 2),
+        "subtotal_inr": round(subtotal_inr, 2),
+        "tax_inr": tax_inr,
+        "cgst_inr": cgst_inr,
+        "sgst_inr": sgst_inr,
+        "total_inr": total_inr,
+        "subtotal_usd": round(subtotal_inr / 86.0, 2),
+        "total_usd": round(total_inr / 86.0, 2),
         "estimated_delivery": datetime.now(timezone.utc).date().isoformat(),
         "email_subject": f"Purchase Order {po_num} - {req.company_name}",
         "email_dispatched_at": now_iso,
         "notes": req.notes or "Automated requisition dispatch",
+        "priority": req.priority or "Standard",
+        "facility": req.facility or "Detroit Plant C4 / Coimbatore Tooling Unit",
+        "security_2fa_verified": False,
+        "created_by": req.operator_name or "Supervisor",
     }
 
     _PURCHASE_ORDERS.insert(0, po_data)

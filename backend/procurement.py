@@ -83,6 +83,7 @@ DEFAULT_INVENTORY: List[Dict[str, Any]] = [
         "min_safety_stock": 4,
         "reorder_quantity": 6,
         "unit": "sets",
+        "unit_cost_inr": 32500.00,
         "unit_cost_usd": 385.00,
         "bin_location": "Tooling Crib A - Shelf 02 - Bin 14",
         "preferred_supplier_id": "sup-002",
@@ -99,6 +100,7 @@ DEFAULT_INVENTORY: List[Dict[str, Any]] = [
         "min_safety_stock": 15,
         "reorder_quantity": 25,
         "unit": "pcs",
+        "unit_cost_inr": 5800.00,
         "unit_cost_usd": 68.50,
         "bin_location": "Crib B - Carousel 01 - Drawer 08",
         "preferred_supplier_id": "sup-001",
@@ -115,6 +117,7 @@ DEFAULT_INVENTORY: List[Dict[str, Any]] = [
         "min_safety_stock": 20,
         "reorder_quantity": 40,
         "unit": "kg",
+        "unit_cost_inr": 10500.00,
         "unit_cost_usd": 125.00,
         "bin_location": "Raw Yard Bay 01 - Rack R-12",
         "preferred_supplier_id": "sup-003",
@@ -131,6 +134,7 @@ DEFAULT_INVENTORY: List[Dict[str, Any]] = [
         "min_safety_stock": 2,
         "reorder_quantity": 4,
         "unit": "units",
+        "unit_cost_inr": 45000.00,
         "unit_cost_usd": 540.00,
         "bin_location": "Crib A - Shelf 04 - Bin 03",
         "preferred_supplier_id": "sup-004",
@@ -147,6 +151,7 @@ DEFAULT_INVENTORY: List[Dict[str, Any]] = [
         "min_safety_stock": 2,
         "reorder_quantity": 4,
         "unit": "drums",
+        "unit_cost_inr": 38500.00,
         "unit_cost_usd": 480.00,
         "bin_location": "Chemical Containment Zone C - Pallet 02",
         "preferred_supplier_id": "sup-004",
@@ -163,6 +168,7 @@ DEFAULT_INVENTORY: List[Dict[str, Any]] = [
         "min_safety_stock": 30,
         "reorder_quantity": 100,
         "unit": "pcs",
+        "unit_cost_inr": 350.00,
         "unit_cost_usd": 4.20,
         "bin_location": "Crib B - Carousel 03 - Bin 22",
         "preferred_supplier_id": "sup-001",
@@ -188,17 +194,24 @@ _PURCHASE_ORDERS: List[Dict[str, Any]] = [
                 "name": "Solid Carbide End Mill 12mm 4-Flute AlTiN Coated",
                 "quantity": 25,
                 "unit": "pcs",
+                "unit_price_inr": 5800.00,
                 "unit_price_usd": 68.50,
+                "total_price_inr": 145000.00,
                 "total_price_usd": 1712.50,
             }
         ],
+        "subtotal_inr": 145000.00,
         "subtotal_usd": 1712.50,
+        "tax_inr": 26100.00,
         "tax_usd": 154.13,
+        "total_inr": 171100.00,
         "total_usd": 1866.63,
         "estimated_delivery": "2026-11-14",
         "email_subject": "Purchase Order PO-2026-1081 - SynapSYS Production",
         "email_dispatched_at": "2026-11-10T14:22:00Z",
         "notes": "Urgent replenishment for Coimbatore tooling run",
+        "security_2fa_verified": True,
+        "authorized_by": "Sarveshwaran K (Plant Supervisor)",
     }
 ]
 
@@ -218,7 +231,11 @@ def dispatch_supplier_po_email(
     supplier_name = po_data.get("supplier_name", "Supplier Partner")
     po_id = po_data.get("po_id")
     items = po_data.get("items", [])
-    total_val = po_data.get("total_usd", 0.0)
+    total_val = float(po_data.get("total_inr") or po_data.get("total_usd") or 0.0)
+    subtotal_val = float(po_data.get("subtotal_inr") or po_data.get("subtotal_usd") or (total_val / 1.18))
+    tax_val = float(po_data.get("tax_inr") or po_data.get("tax_usd") or (total_val - subtotal_val))
+    cgst_val = round(tax_val / 2.0, 2)
+    sgst_val = round(tax_val / 2.0, 2)
 
     smtp_host = os.getenv("SMTP_HOST")
     smtp_port = int(os.getenv("SMTP_PORT", "587"))
@@ -226,15 +243,15 @@ def dispatch_supplier_po_email(
     smtp_pass = os.getenv("SMTP_PASS")
     sender_email = os.getenv("SMTP_FROM", "procurement@synapsys.industrial")
 
-    subject = f"[PURCHASE ORDER] {po_id} from {company_name}"
+    subject = f"[PURCHASE ORDER] {po_id} from {company_name} (₹{total_val:,.2f})"
 
     item_rows_html = "".join([
         f"""<tr>
             <td style="padding: 10px; border-bottom: 1px solid #2d3748; font-family: monospace;">{it.get('sku', 'N/A')}</td>
             <td style="padding: 10px; border-bottom: 1px solid #2d3748;">{it.get('name', 'Industrial Item')}</td>
             <td style="padding: 10px; border-bottom: 1px solid #2d3748; text-align: center;">{it.get('quantity', 1)} {it.get('unit', 'pcs')}</td>
-            <td style="padding: 10px; border-bottom: 1px solid #2d3748; text-align: right;">${float(it.get('unit_price_usd') or it.get('unit_price') or 0.0):,.2f}</td>
-            <td style="padding: 10px; border-bottom: 1px solid #2d3748; text-align: right; font-weight: bold;">${float(it.get('total_price_usd') or (float(it.get('quantity', 1)) * float(it.get('unit_price_usd') or it.get('unit_price') or 0.0))):,.2f}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #2d3748; text-align: right;">₹{float(it.get('unit_price_inr') or it.get('unit_price_usd') or it.get('unit_price') or 0.0):,.2f}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #2d3748; text-align: right; font-weight: bold;">₹{float(it.get('total_price_inr') or it.get('total_price_usd') or (float(it.get('quantity', 1)) * float(it.get('unit_price_inr') or it.get('unit_price_usd') or it.get('unit_price') or 0.0))):,.2f}</td>
         </tr>"""
         for it in items
     ])
@@ -246,9 +263,9 @@ def dispatch_supplier_po_email(
       <meta charset="utf-8">
       <style>
         body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0b0f19; color: #f3f4f6; padding: 24px; }}
-        .po-box {{ max-width: 680px; margin: 0 auto; background: #111827; border: 1px solid #1f2937; border-top: 4px solid #06b6d4; border-radius: 8px; padding: 32px; }}
+        .po-box {{ max-width: 680px; margin: 0 auto; background: #111827; border: 1px solid #1f2937; border-top: 4px solid #10b981; border-radius: 8px; padding: 32px; }}
         .header {{ font-size: 20px; font-weight: 700; color: #ffffff; letter-spacing: 0.5px; }}
-        .badge {{ display: inline-block; padding: 4px 10px; background: rgba(6, 182, 212, 0.15); border: 1px solid rgba(6, 182, 212, 0.4); color: #22d3ee; border-radius: 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; }}
+        .badge {{ display: inline-block; padding: 4px 10px; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; border-radius: 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; }}
         table {{ width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }}
         th {{ background: #1f2937; color: #9ca3af; text-align: left; padding: 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }}
         .footer {{ margin-top: 28px; padding-top: 16px; border-top: 1px solid #1f2937; font-size: 12px; color: #6b7280; text-align: center; }}
@@ -259,7 +276,7 @@ def dispatch_supplier_po_email(
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
           <div>
             <div class="header">SYNAPSYS INDUSTRIAL PROCUREMENT</div>
-            <div style="color: #9ca3af; font-size: 13px; margin-top: 4px;">Automated Material & MRO Requisition Gateway</div>
+            <div style="color: #9ca3af; font-size: 13px; margin-top: 4px;">Automated Material & MRO Requisition Gateway &bull; India Operations</div>
           </div>
           <span class="badge">OFFICIAL PURCHASE ORDER</span>
         </div>
@@ -269,7 +286,7 @@ def dispatch_supplier_po_email(
         </p>
         <p style="font-size: 13px; color: #9ca3af; line-height: 1.6;">
           Please accept this formal purchase order <strong>{po_id}</strong> on behalf of <strong>{company_name}</strong>.
-          Kindly confirm receipt, availability, and expected dispatch timeline at your earliest convenience.
+          Kindly confirm receipt, inventory availability, and expected dispatch timeline at your earliest convenience.
         </p>
 
         <table>
@@ -278,8 +295,8 @@ def dispatch_supplier_po_email(
               <th>SKU / Part No</th>
               <th>Description</th>
               <th style="text-align: center;">Qty</th>
-              <th style="text-align: right;">Unit Price</th>
-              <th style="text-align: right;">Subtotal</th>
+              <th style="text-align: right;">Unit Rate (INR)</th>
+              <th style="text-align: right;">Subtotal (INR)</th>
             </tr>
           </thead>
           <tbody>
@@ -288,17 +305,19 @@ def dispatch_supplier_po_email(
         </table>
 
         <div style="margin-top: 20px; text-align: right; font-size: 15px; color: #f3f4f6;">
-          <div>Subtotal: <strong>${po_data.get('subtotal_usd', 0):,.2f}</strong></div>
-          <div style="color: #9ca3af; font-size: 13px; margin-top: 4px;">Tax (EST): ${po_data.get('tax_usd', 0):,.2f}</div>
-          <div style="font-size: 18px; color: #22d3ee; margin-top: 6px; font-weight: bold;">
-            Total PO Amount: ${total_val:,.2f}
+          <div>Taxable Subtotal: <strong>₹{subtotal_val:,.2f}</strong></div>
+          <div style="color: #9ca3af; font-size: 13px; margin-top: 4px;">CGST (9.0%): ₹{cgst_val:,.2f}</div>
+          <div style="color: #9ca3af; font-size: 13px; margin-top: 4px;">SGST (9.0%): ₹{sgst_val:,.2f}</div>
+          <div style="font-size: 20px; color: #34d399; margin-top: 8px; font-weight: bold;">
+            Total PO Amount (INR): ₹{total_val:,.2f}
           </div>
         </div>
 
         <div style="margin-top: 24px; padding: 14px; background: #1a2234; border: 1px solid #2d3748; border-radius: 6px; font-size: 12px; color: #9ca3af;">
-          <div><strong>Delivery Address:</strong> SynapSYS Advanced Production Plant, Inbound Logistics Gate 02</div>
+          <div><strong>Delivery Address:</strong> {po_data.get('facility') or 'SynapSYS Production Facility, Inbound Logistics Gate 02'}</div>
           <div style="margin-top: 4px;"><strong>Target Delivery Date:</strong> {po_data.get('estimated_delivery', 'Standard Lead Time')}</div>
-          <div style="margin-top: 4px;"><strong>Payment Terms:</strong> Net 30 Days upon physical receipt inspection</div>
+          <div style="margin-top: 4px;"><strong>Payment Terms:</strong> Net 30 Days upon physical delivery inspection & GST tax invoice</div>
+          <div style="margin-top: 4px;"><strong>Authorization:</strong> 2FA Verified by {po_data.get('authorized_by', 'Plant Supervisor')}</div>
         </div>
 
         <div class="footer">
@@ -314,7 +333,7 @@ def dispatch_supplier_po_email(
     print(f"   PO Number: {po_id}")
     print(f"   Supplier:  {supplier_name} <{supplier_email}>")
     print(f"   CC Alert:  {SUPERVISOR_ALERT_EMAIL}")
-    print(f"   Total PO:  ${total_val:,.2f}")
+    print(f"   Total PO:  ₹{total_val:,.2f} INR")
     print(f"   Items:     {len(items)} line item(s)")
     print("=" * 70)
 

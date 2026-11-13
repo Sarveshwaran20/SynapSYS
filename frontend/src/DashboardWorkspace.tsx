@@ -2897,11 +2897,11 @@ export default function DashboardWorkspace({
       } else if (pLower.includes('financial') || pLower.includes('cost') || pLower.includes('roi') || pLower.includes('revenue')) {
         const roi = data.summary?.financial_roi;
         fallbackText = roi
-          ? `Current shift at ${data.site_name || 'Facility'} has generated $${(roi.revenue_generated_usd || 0).toLocaleString()} in gross production value across ${data.summary?.total_good || 0} conforming parts. Unplanned downtime losses total -$${(roi.downtime_cost_usd || 0).toLocaleString()} and scrap waste is -$${(roi.scrap_waste_cost_usd || 0).toLocaleString()}. Net shift economic yield stands at $${(roi.net_shift_value_usd || 0).toLocaleString()}.`
+          ? `Current shift at ${data.site_name || 'Facility'} has generated ₹${(roi.revenue_generated_usd || 0).toLocaleString()} in gross production value across ${data.summary?.total_good || 0} conforming parts. Unplanned downtime losses total -₹${(roi.downtime_cost_usd || 0).toLocaleString()} and scrap waste is -₹${(roi.scrap_waste_cost_usd || 0).toLocaleString()}. Net shift economic yield stands at ₹${(roi.net_shift_value_usd || 0).toLocaleString()}.`
           : `Economic metrics: Overall OEE ${data.summary?.overall_plant_oee || 0}%, output ${data.summary?.total_output || 0} parts.`;
         fallbackCitations = [
-          `Gross Value: $${(roi?.revenue_generated_usd || 0).toLocaleString()}`,
-          `Downtime Cost: -$${(roi?.downtime_cost_usd || 0).toLocaleString()}`,
+          `Gross Value: ₹${(roi?.revenue_generated_usd || 0).toLocaleString()}`,
+          `Downtime Cost: -₹${(roi?.downtime_cost_usd || 0).toLocaleString()}`,
           `Conforming Parts: ${data.summary?.total_good || 0} / ${data.summary?.total_target || 0}`,
         ];
       } else {
@@ -3305,7 +3305,7 @@ export default function DashboardWorkspace({
         id: 'kpi-financial',
         category: 'Action',
         title: 'Shift Economic Yield & ROI Ledger',
-        subtitle: `$${(data.summary.financial_roi?.net_shift_value_usd || 0).toLocaleString()} realized net value`,
+        subtitle: `₹${(data.summary.financial_roi?.net_shift_value_usd || 0).toLocaleString()} realized net value`,
         badge: 'KPI',
         badgeTone: 'emerald',
         keywords: 'financial roi revenue downtime cost yield ledger money kpi',
@@ -4278,14 +4278,14 @@ export default function DashboardWorkspace({
                     <RomanMedallion numeral="03" size="md" active />
                     <span className="font-cinzel tracking-wider font-semibold truncate">SHIFT ECONOMIC YIELD</span>
                   </div>
-                  <span className="text-xs font-mono text-laurel px-2 py-0.5 rounded bg-laurel/10 border border-laurel/25 shrink-0">+$85/unit</span>
+                  <span className="text-xs font-mono text-laurel px-2 py-0.5 rounded bg-laurel/10 border border-laurel/25 shrink-0">+₹7,200/unit</span>
                 </div>
                 <div className="my-4 flex items-center justify-between gap-3">
                   <div className="flex flex-col gap-1">
                     <AnimatedNumber
                       value={data.summary.financial_roi?.net_shift_value_usd || 14970}
                       decimals={2}
-                      prefix="$"
+                      prefix="₹"
                       className="font-cinzel text-3xl sm:text-4xl xl:text-[40px] font-bold text-marble tracking-tight leading-none"
                     />
                     <span className="text-xs text-silver font-sans">Realized Net Shift Value</span>
@@ -4305,9 +4305,9 @@ export default function DashboardWorkspace({
                   </div>
                 </div>
                 <div className="text-[13px] text-silver pt-3.5 border-t border-line flex items-center justify-between font-mono">
-                  <span className="text-crimson">Downtime: -<AnimatedNumber value={data.summary.financial_roi?.downtime_cost_usd || 0} decimals={0} prefix="$" /></span>
+                  <span className="text-crimson">Downtime: -<AnimatedNumber value={data.summary.financial_roi?.downtime_cost_usd || 0} decimals={0} prefix="₹" /></span>
                   <span className="text-line">|</span>
-                  <span>Gross: <strong className="text-marble font-semibold"><AnimatedNumber value={data.summary.financial_roi?.revenue_generated_usd || 0} decimals={0} prefix="$" /></strong></span>
+                  <span>Gross: <strong className="text-marble font-semibold"><AnimatedNumber value={data.summary.financial_roi?.revenue_generated_usd || 0} decimals={0} prefix="₹" /></strong></span>
                 </div>
               </SpotlightCard>
             </RevealItem>
@@ -5619,7 +5619,7 @@ export default function DashboardWorkspace({
                 <div className="bg-g-surfaceElevated p-5 rounded-xl border border-g-border flex items-center justify-between text-[13px] sm:text-sm font-mono grid-container-surface">
                   <span className="text-g-textSecondary">Total recoverable variance:</span>
                   <span className="text-emerald-700 dark:text-emerald-400 font-semibold text-base">
-                    <AnimatedNumber value={100 - data.summary.overall_plant_oee} decimals={1} suffix="%" /> (<AnimatedNumber value={data.summary.financial_roi?.net_shift_value_usd || 14970} decimals={0} prefix="$" /> net yield)
+                    <AnimatedNumber value={100 - data.summary.overall_plant_oee} decimals={1} suffix="%" /> (<AnimatedNumber value={data.summary.financial_roi?.net_shift_value_usd || 14970} decimals={0} prefix="₹" /> net yield)
                   </span>
                 </div>
               </Reveal>
@@ -6953,7 +6953,7 @@ export default function DashboardWorkspace({
                     Shift Economic Yield & Operational ROI Breakdown
                   </h3>
                   <p className="text-xs text-g-textSecondary font-mono mt-0.5">
-                    Unit Contract Baseline: +$85.00 / finished part • Downtime Cost Penalty: $220.00 / hr per asset
+                    Unit Contract Baseline: +₹7,200 / finished part • Downtime Cost Penalty: ₹95,000 / hr per asset
                   </p>
                 </div>
                 <button
@@ -6970,22 +6970,22 @@ export default function DashboardWorkspace({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono">
                 <div className="bg-g-surfaceElevated p-4 rounded-xl border border-g-border">
                   <span className="text-[10px] text-g-textSecondary uppercase block">Net Shift Yield</span>
-                  <div className="text-2xl font-bold text-g-text mt-1">${data.summary.financial_roi?.net_shift_value_usd.toLocaleString()}</div>
+                  <div className="text-2xl font-bold text-g-text mt-1">₹{data.summary.financial_roi?.net_shift_value_usd.toLocaleString()}</div>
                   <span className="text-[10px] text-emerald-700 dark:text-emerald-400 mt-1 block">Net Realized Value</span>
                 </div>
                 <div className="bg-g-surfaceElevated p-4 rounded-xl border border-g-border">
                   <span className="text-[10px] text-g-textSecondary uppercase block">Gross Contract Output</span>
-                  <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">${data.summary.financial_roi?.revenue_generated_usd.toLocaleString()}</div>
+                  <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">₹{data.summary.financial_roi?.revenue_generated_usd.toLocaleString()}</div>
                   <span className="text-[10px] text-g-textSecondary mt-1 block">Total Delivered Output</span>
                 </div>
                 <div className="bg-g-surfaceElevated p-4 rounded-xl border border-g-border">
                   <span className="text-[10px] text-g-textSecondary uppercase block">Downtime Cost Penalty</span>
-                  <div className="text-2xl font-bold text-rose-600 dark:text-rose-500 mt-1">-${data.summary.financial_roi?.downtime_cost_usd}</div>
+                  <div className="text-2xl font-bold text-rose-600 dark:text-rose-500 mt-1">-₹{data.summary.financial_roi?.downtime_cost_usd}</div>
                   <span className="text-[10px] text-rose-700 dark:text-rose-400 mt-1 block">Unplanned Stoppages</span>
                 </div>
                 <div className="bg-g-surfaceElevated p-4 rounded-xl border border-g-border">
                   <span className="text-[10px] text-g-textSecondary uppercase block">AI Recoverable Savings</span>
-                  <div className="text-2xl font-bold text-g-blue mt-1">+${data.summary.financial_roi?.potential_savings_usd}</div>
+                  <div className="text-2xl font-bold text-g-blue mt-1">+₹{data.summary.financial_roi?.potential_savings_usd}</div>
                   <span className="text-[10px] text-g-blue mt-1 block">Via Gemini Diagnostics</span>
                 </div>
               </div>
@@ -6997,20 +6997,20 @@ export default function DashboardWorkspace({
                 </span>
                 <div className="space-y-2 text-xs font-mono">
                   <div className="flex justify-between py-1 border-b border-g-borderSubtle/50">
-                    <span className="text-g-textSecondary">Gross Value from Conforming Output ({data.summary.total_good} units × $85.00):</span>
-                    <span className="font-bold text-emerald-700 dark:text-emerald-400">+${(data.summary.total_good * 85).toLocaleString()}</span>
+                    <span className="text-g-textSecondary">Gross Value from Conforming Output ({data.summary.total_good} units × ₹7,200):</span>
+                    <span className="font-bold text-emerald-700 dark:text-emerald-400">+₹{(data.summary.total_good * 7200).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-g-borderSubtle/50">
                     <span className="text-g-textSecondary">Unplanned Machine Downtime Labor & Capital Penalty:</span>
-                    <span className="font-bold text-rose-700 dark:text-rose-400">-${data.summary.financial_roi?.downtime_cost_usd}</span>
+                    <span className="font-bold text-rose-700 dark:text-rose-400">-₹{data.summary.financial_roi?.downtime_cost_usd}</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-g-borderSubtle/50">
-                    <span className="text-g-textSecondary">Scrap Rejection Material Loss ({data.summary.total_scrap} units × $45.00 scrap cost):</span>
-                    <span className="font-bold text-rose-700 dark:text-rose-400">-${(data.summary.total_scrap * 45).toLocaleString()}</span>
+                    <span className="text-g-textSecondary">Scrap Rejection Material Loss ({data.summary.total_scrap} units × ₹3,800 scrap cost):</span>
+                    <span className="font-bold text-rose-700 dark:text-rose-400">-₹{(data.summary.total_scrap * 3800).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between py-1.5 font-bold text-sm bg-g-surface p-2.5 rounded border border-g-border">
                     <span className="text-g-text">Net Realized Economic Value for {activeSite?.name.replace(/\s*\(Production Live\)/i, '') || 'Active Facility'}:</span>
-                    <span className="text-emerald-700 dark:text-emerald-400">${data.summary.financial_roi?.net_shift_value_usd.toLocaleString()}</span>
+                    <span className="text-emerald-700 dark:text-emerald-400">₹{data.summary.financial_roi?.net_shift_value_usd.toLocaleString()}</span>
                   </div>
 
                 </div>
@@ -7088,8 +7088,8 @@ export default function DashboardWorkspace({
                 </div>
                 <div className="bg-g-surfaceElevated p-4 rounded-xl border border-g-border">
                   <span className="text-[10px] text-g-textSecondary uppercase block">Shift Energy Cost</span>
-                  <div className="text-2xl font-bold text-g-text mt-1">${data.summary.energy?.energy_cost_usd || 69.78}</div>
-                  <span className="text-[10px] text-g-textSecondary mt-1 block">@ $0.14 / kWh Tariff</span>
+                  <div className="text-2xl font-bold text-g-text mt-1">₹{Math.round((data.summary.energy?.energy_cost_usd || 69.78) * 86).toLocaleString()}</div>
+                  <span className="text-[10px] text-g-textSecondary mt-1 block">@ ₹11.50 / kWh Tariff</span>
                 </div>
               </div>
 
@@ -7198,8 +7198,8 @@ export default function DashboardWorkspace({
                 </div>
                 <div className="bg-g-surfaceElevated p-3.5 rounded-xl border border-g-border">
                   <span className="text-[10px] text-g-textSecondary uppercase block font-sans">Net Economic Yield</span>
-                  <span className="text-2xl font-bold text-g-text mt-1 block">${data.summary.financial_roi?.net_shift_value_usd.toLocaleString()}</span>
-                  <span className="text-[10px] text-rose-700 dark:text-rose-400 mt-0.5 block">Downtime: -${data.summary.financial_roi?.downtime_cost_usd}</span>
+                  <span className="text-2xl font-bold text-g-text mt-1 block">₹{data.summary.financial_roi?.net_shift_value_usd.toLocaleString()}</span>
+                  <span className="text-[10px] text-rose-700 dark:text-rose-400 mt-0.5 block">Downtime: -₹{data.summary.financial_roi?.downtime_cost_usd}</span>
                 </div>
                 <div className="bg-g-surfaceElevated p-3.5 rounded-xl border border-g-border">
                   <span className="text-[10px] text-g-textSecondary uppercase block font-sans">Fleet Energy</span>
