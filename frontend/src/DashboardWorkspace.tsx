@@ -68,6 +68,11 @@ const LazyFirebaseCloudPanel = lazy(() =>
     default: m.FirebaseCloudPanel,
   }))
 );
+const LazyInventoryManagementDeck = lazy(() =>
+  import('./components/dashboard/InventoryManagementDeck').then((m) => ({
+    default: m.InventoryManagementDeck,
+  }))
+);
 
 // Initial baseline data for immediate presentation
 const INITIAL_DASHBOARD: DashboardResponse = {
@@ -1542,7 +1547,7 @@ export default function DashboardWorkspace({
   const [data, setData] = useState<DashboardResponse>(() => {
     return getMockDataForSite(currentProject);
   });
-  const [activeTab, setActiveTab] = useState<'overview' | 'connectors' | 'twin' | 'losses' | 'workorders' | 'alarms'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'connectors' | 'twin' | 'losses' | 'workorders' | 'alarms' | 'inventory'>('overview');
   const [statusFilter, setStatusFilter] = useState<'all' | 'running' | 'idle' | 'down'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
@@ -1903,6 +1908,8 @@ export default function DashboardWorkspace({
         setActiveTab('workorders');
       } else if (e.key === '6') {
         setActiveTab('alarms');
+      } else if (e.key === '7') {
+        setActiveTab('inventory');
       } else if (e.key === ' ') {
         e.preventDefault();
         setAutoRefresh((prev) => !prev);
@@ -3139,6 +3146,16 @@ export default function DashboardWorkspace({
         onSelect: () => setActiveTab('alarms'),
       },
       {
+        id: 'nav-inventory',
+        category: 'Navigation',
+        title: '07 Inventory & Procurement',
+        subtitle: 'MRO tooling, spares, verified seller directory, RFQ/PO email dispatches & stock-in receipt',
+        badge: 'Tab 7',
+        badgeTone: 'emerald',
+        keywords: 'inventory procurement vendors suppliers purchase orders mro spares raw materials seller email tooling',
+        onSelect: () => setActiveTab('inventory'),
+      },
+      {
         id: 'view-cards',
         category: 'Navigation',
         title: 'Fleet Cards View',
@@ -4092,6 +4109,12 @@ export default function DashboardWorkspace({
                   badge: data.active_alarms.filter((a) => !a.acknowledged).length > 0
                     ? data.active_alarms.filter((a) => !a.acknowledged).length
                     : null,
+                },
+                {
+                  id: 'inventory',
+                  numeral: '07',
+                  label: 'Inventory & MRO',
+                  subtitle: 'Tooling & Procurement',
                 },
               ].map((tab) => {
                 const isActive = activeTab === tab.id;
@@ -5941,6 +5964,13 @@ export default function DashboardWorkspace({
               </div>
             );
           })()}
+
+          {/* TAB 7: Inventory & Procurement MRO Deck */}
+          {activeTab === 'inventory' && (
+            <Suspense fallback={<ChunkPanelFallback label="Loading Inventory & Procurement Deck..." />}>
+              <LazyInventoryManagementDeck />
+            </Suspense>
+          )}
           </SlidingTabContent>
 
           {/* INNOVATION 3: SynapSYS Copilot AI Slide-Over Drawer */}
@@ -7879,6 +7909,20 @@ export default function DashboardWorkspace({
                           <span className="text-xs font-mono text-emerald-500">Nominal</span>
                         )}
                       </button>
+
+                      <button
+                        onClick={() => { setActiveTab('inventory'); setSidebarOpen(false); }}
+                        className={`w-full px-3 py-2.5 rounded-lg text-left font-medium flex items-center justify-between transition-colors ${activeTab === 'inventory' ? 'bg-g-blue text-white shadow-sm' : 'text-g-text hover:bg-g-surfaceElevated'
+                          }`}
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <svg className="w-4 h-4 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                          </svg>
+                          <span>Inventory & MRO</span>
+                        </span>
+                        <span className="text-xs font-mono text-emerald-500 font-bold">MRO</span>
+                      </button>
                     </div>
                   </div>
 
@@ -8943,6 +8987,17 @@ export default function DashboardWorkspace({
             )}
           </div>
           <span className="text-[10px] mt-0.5 font-medium">Alarms</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('inventory')}
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-lg transition-colors cursor-pointer ${activeTab === 'inventory' ? 'text-g-blue font-semibold' : 'text-g-textSecondary hover:text-g-text'
+            }`}
+        >
+          <svg className="w-5 h-5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+          </svg>
+          <span className="text-[10px] mt-0.5 font-medium">Inventory</span>
         </button>
 
         <button

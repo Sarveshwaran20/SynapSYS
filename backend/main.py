@@ -4,7 +4,7 @@ SynapSYS Enterprise Architecture for PS-002: Real-World Industrial Telemetry & O
 """
 
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from collections import deque
 import sqlite3
 import os
@@ -26,6 +26,21 @@ try:
     from .two_factor import initiate_2fa_signup, verify_2fa_code, DESIGNATED_SECURITY_EMAIL
 except ImportError:
     from two_factor import initiate_2fa_signup, verify_2fa_code, DESIGNATED_SECURITY_EMAIL
+
+try:
+    from .procurement import (
+        DEFAULT_INVENTORY,
+        DEFAULT_SUPPLIERS,
+        _PURCHASE_ORDERS,
+        dispatch_supplier_po_email,
+    )
+except ImportError:
+    from procurement import (
+        DEFAULT_INVENTORY,
+        DEFAULT_SUPPLIERS,
+        _PURCHASE_ORDERS,
+        dispatch_supplier_po_email,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -2414,6 +2429,36 @@ def copilot_query(query: CopilotQuery):
             "Monitor live cycle delta on active work orders",
         ]
 
+    elif "inventory" in prompt or "stock" in prompt or "spare" in prompt or "part" in prompt or "supplier" in prompt:
+        low_items = [it for it in DEFAULT_INVENTORY if it["quantity"] <= it["min_safety_stock"]]
+        total_val = sum(it["quantity"] * it["unit_cost_usd"] for it in DEFAULT_INVENTORY)
+        if "supplier" in prompt or "vendor" in prompt or "seller" in prompt:
+            sup_list = ", ".join([f"{s['name']} (Lead time: {s['lead_time_days']}d, {s['email']})" for s in DEFAULT_SUPPLIERS])
+            ans = f"There are {len(DEFAULT_SUPPLIERS)} verified industrial vendors in your procurement network: {sup_list}. You can dispatch automated RFQ emails and POs directly from the Inventory tab."
+            citations = [f"Registered Suppliers: {len(DEFAULT_SUPPLIERS)}", "Delivery Terms: Net 15-45 Days"]
+            actions = ["Open Inventory -> Suppliers to draft a purchase order", "Verify supplier lead time SLAs"]
+        elif low_items:
+            low_str = "; ".join([f"{it['sku']} - {it['name']}: {it['quantity']}/{it['min_safety_stock']} {it['unit']} ({it['bin_location']})" for it in low_items[:3]])
+            ans = f"Warning: {len(low_items)} inventory items have fallen below minimum safety stock buffers: {low_str}. Automated reorder requisitions can be emailed to suppliers."
+            citations = [
+                f"Low Stock Alerts: {len(low_items)} items",
+                f"Warehouse Valuation: ${total_val:,.2f}",
+                f"Tooling Cribs: Crib A, Crib B, Raw Yard",
+            ]
+            actions = [
+                "Navigate to Inventory tab and click 'Dispatch Reorder'",
+                "Email Coimbatore Precision Tooling for carbide endmills",
+                "Review MRO replacement schedule for CNC-101 bearing kit",
+            ]
+        else:
+            ans = f"Warehouse stock is fully balanced. All {len(DEFAULT_INVENTORY)} catalog items are above safety buffers with total crib valuation of ${total_val:,.2f}."
+            citations = [
+                f"Total SKUs: {len(DEFAULT_INVENTORY)}",
+                f"Valuation: ${total_val:,.2f}",
+                "Safety Buffer: 100% compliant",
+            ]
+            actions = ["Audit high-turnover tooling wear on CNC machines"]
+
     elif "alarm" in prompt or "incident" in prompt or "alert" in prompt:
         active_a = dash.active_alarms or []
         if active_a:
@@ -2519,7 +2564,107 @@ def copilot_query(query: CopilotQuery):
 
     return CopilotResponse(answer=ans, citations=citations, suggested_actions=actions)
 
-    return CopilotResponse(answer=ans, citations=citations, suggested_actions=actions)
+
+class CreatePORequest(BaseModel):
+    supplier_id: str
+    items: List[Dict[str, Any]]
+    notes: Optional[str] = None
+    company_name: Optional[str] = "SynapSYS Industrial Operations"
+
+
+class AdjustStockRequest(BaseModel):
+    item_id: str
+    delta: int
+    reason: Optional[str] = "Floor maintenance checkout"
+
+
+@app.get("/api/inventory")
+def get_inventory():
+    total_val = sum(it["quantity"] * it["unit_cost_usd"] for it in DEFAULT_INVENTORY)
+    low_stock = [it for it in DEFAULT_INVENTORY if it["quantity"] <= it["min_safety_stock"]]
+    return {
+        "items": DEFAULT_INVENTORY,
+        "total_items": len(DEFAULT_INVENTORY),
+        "total_valuation_usd": round(total_val, 2),
+        "low_stock_count": len(low_stock),
+        "low_stock_items": low_stock,
+    }
+
+
+@app.get("/api/inventory/suppliers")
+def get_suppliers():
+    return DEFAULT_SUPPLIERS
+
+
+@app.get("/api/inventory/orders")
+def get_purchase_orders():
+    return _PURCHASE_ORDERS
+
+
+@app.post("/api/inventory/orders/create")
+def create_purchase_order(req: CreatePORequest):
+    sup = next((s for s in DEFAULT_SUPPLIERS if s["id"] == req.supplier_id), None)
+    if not sup:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+
+    po_num = f"PO-2026-{1000 + len(_PURCHASE_ORDERS) + 1}"
+    subtotal = sum(it.get("quantity", 1) * float(it.get("unit_price_usd") or it.get("unit_price") or 0.0) for it in req.items)
+    tax = subtotal * 0.09
+    total = subtotal + tax
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    po_data = {
+        "po_id": po_num,
+        "created_at": now_iso,
+        "supplier_id": sup["id"],
+        "supplier_name": sup["name"],
+        "supplier_email": sup["email"],
+        "status": "Emailed",
+        "items": req.items,
+        "subtotal_usd": round(subtotal, 2),
+        "tax_usd": round(tax, 2),
+        "total_usd": round(total, 2),
+        "estimated_delivery": datetime.now(timezone.utc).date().isoformat(),
+        "email_subject": f"Purchase Order {po_num} - {req.company_name}",
+        "email_dispatched_at": now_iso,
+        "notes": req.notes or "Automated requisition dispatch",
+    }
+
+    _PURCHASE_ORDERS.insert(0, po_data)
+    dispatch_supplier_po_email(po_data, company_name=req.company_name or "SynapSYS Operations")
+    return {"success": True, "po": po_data, "message": f"Purchase order {po_num} dispatched to {sup['email']}"}
+
+
+@app.post("/api/inventory/orders/{po_id}/receive")
+def receive_purchase_order(po_id: str):
+    po = next((p for p in _PURCHASE_ORDERS if p["po_id"] == po_id), None)
+    if not po:
+        raise HTTPException(status_code=404, detail="PO not found")
+    if po["status"] == "Received":
+        return {"success": True, "po": po, "message": "Order already received"}
+
+    po["status"] = "Received"
+    for it in po.get("items", []):
+        match_item = next(
+            (inv for inv in DEFAULT_INVENTORY if inv["id"] == it.get("item_id") or inv["sku"] == it.get("sku")),
+            None,
+        )
+        if match_item:
+            match_item["quantity"] += int(it.get("quantity", 0))
+            match_item["last_restocked_at"] = datetime.now(timezone.utc).isoformat()
+    return {"success": True, "po": po, "message": f"Received {po_id} and updated warehouse inventory"}
+
+
+@app.post("/api/inventory/adjust")
+def adjust_inventory_stock(req: AdjustStockRequest):
+    item = next((it for it in DEFAULT_INVENTORY if it["id"] == req.item_id), None)
+    if not item:
+        raise HTTPException(status_code=404, detail="Inventory item not found")
+    new_qty = max(0, item["quantity"] + req.delta)
+    item["quantity"] = new_qty
+    if req.delta > 0:
+        item["last_restocked_at"] = datetime.now(timezone.utc).isoformat()
+    return {"success": True, "item": item, "message": f"Updated stock for {item['sku']} to {new_qty} {item['unit']}"}
 
 
 def format_time_sec(sec: float) -> str:

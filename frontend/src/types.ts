@@ -228,3 +228,73 @@ export interface AuthSession {
   token: string;
   user: UserProfile;
 }
+
+// ---------------------------------------------------------------------------
+// Inventory & Procurement System Types
+// ---------------------------------------------------------------------------
+
+export type InventoryCategory =
+  | 'Machine Spares'
+  | 'Cutting Tools'
+  | 'Raw Materials'
+  | 'Fluids & Lubricants'
+  | 'Safety & PPE';
+
+export interface InventoryItem {
+  id: string;
+  sku: string;
+  name: string;
+  category: InventoryCategory;
+  quantity: number;
+  min_safety_stock: number;
+  reorder_quantity: number;
+  unit: string;
+  unit_cost_usd: number;
+  bin_location: string;
+  preferred_supplier_id: string;
+  preferred_supplier_name: string;
+  linked_machine_id?: string;
+  last_restocked_at?: string;
+}
+
+export interface SupplierVendor {
+  id: string;
+  name: string;
+  contact_person: string;
+  email: string;
+  phone: string;
+  categories: InventoryCategory[];
+  lead_time_days: number;
+  rating: number;
+  address: string;
+  payment_terms: string;
+}
+
+export type PurchaseOrderStatus = 'Draft' | 'Emailed' | 'Confirmed' | 'Received' | 'Cancelled';
+
+export interface PurchaseOrderItem {
+  item_id: string;
+  sku: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  unit_price_usd: number;
+  total_price_usd: number;
+}
+
+export interface PurchaseOrder {
+  po_id: string;
+  created_at: string;
+  supplier_id: string;
+  supplier_name: string;
+  supplier_email: string;
+  status: PurchaseOrderStatus;
+  items: PurchaseOrderItem[];
+  subtotal_usd: number;
+  tax_usd: number;
+  total_usd: number;
+  estimated_delivery: string;
+  email_subject?: string;
+  email_dispatched_at?: string;
+  notes?: string;
+}
