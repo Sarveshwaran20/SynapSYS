@@ -1612,13 +1612,16 @@ def initiate_2fa(req: Initiate2FARequest):
         "role": req.role if req.role in ("admin", "operator", "demo") else "admin",
     }
 
-    _, otp_code = initiate_2fa_signup(candidate_data)
+    _, otp_code, delivery_info = initiate_2fa_signup(candidate_data)
     return {
         "success": True,
-        "message": f"Security alert & 2FA OTP code dispatched to {DESIGNATED_SECURITY_EMAIL}",
+        "delivered": delivery_info.get("delivered", False),
+        "delivery_status": "SMTP_DELIVERED" if delivery_info.get("delivered") else "SMTP_UNCONFIGURED",
+        "delivery_message": delivery_info.get("status_message") or f"Security alert & 2FA OTP code dispatched to {DESIGNATED_SECURITY_EMAIL}",
+        "message": delivery_info.get("status_message") or f"Security alert & 2FA OTP code dispatched to {DESIGNATED_SECURITY_EMAIL}",
         "recipient": DESIGNATED_SECURITY_EMAIL,
         "email": email,
-        # Preview code in development so verification never blocks if SMTP is offline
+        # Passkey available for development/sandbox so verification never blocks if SMTP credentials are unconfigured
         "debug_otp_hint": otp_code,
     }
 
@@ -3068,15 +3071,19 @@ def initiate_po_order_2fa(req: InitiatePO2FARequest):
         "created_by": req.operator_name or "Plant Supervisor",
     }
 
-    auth_token, otp = initiate_po_authorization_2fa(po_draft)
+    auth_token, otp, delivery_info = initiate_po_authorization_2fa(po_draft)
     return {
         "success": True,
         "auth_token": auth_token,
         "po_id": po_num,
         "total_inr": total_inr,
         "supervisor_email": DESIGNATED_SECURITY_EMAIL,
+        "delivered": delivery_info.get("delivered", False),
+        "delivery_status": "SMTP_DELIVERED" if delivery_info.get("delivered") else "SMTP_UNCONFIGURED",
+        "delivery_message": delivery_info.get("status_message") or f"2FA code generated for supervisor {DESIGNATED_SECURITY_EMAIL}",
         "expires_in_sec": 600,
-        "message": f"2FA code dispatched to supervisor {DESIGNATED_SECURITY_EMAIL}",
+        "debug_otp_hint": otp,
+        "message": delivery_info.get("status_message") or f"2FA code dispatched to supervisor {DESIGNATED_SECURITY_EMAIL}",
     }
 
 

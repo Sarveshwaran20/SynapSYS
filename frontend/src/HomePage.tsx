@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import { AuthSession, UserRole } from './types';
 import {
   authenticateWorkspace,
@@ -517,6 +517,14 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [authError, setAuthError] = useState<string | null>(null);
   const [authSuccess, setAuthSuccess] = useState<string | null>(null);
 
+  const handleOpenLogin = useCallback(() => {
+    if (onOpenFullLogin) {
+      onOpenFullLogin();
+    } else {
+      setShowLoginModal(true);
+    }
+  }, [onOpenFullLogin]);
+
   const isDocVisible = useDocumentVisible();
   const shouldReduce = useReducedMotion();
 
@@ -804,7 +812,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             <MotionButton
               primary
               type="button"
-              onClick={() => setShowLoginModal(true)}
+              onClick={handleOpenLogin}
               className="h-10 px-4 sm:px-5 rounded-[8px] bg-g-blue hover:bg-g-blueHover text-white text-[14px] font-medium inline-flex items-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-g-blue"
             >
               <span>{DEMO_DATA.hero.primaryCta}</span>
@@ -938,7 +946,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                   <MotionButton
                     primary
                     type="button"
-                    onClick={() => setShowLoginModal(true)}
+                    onClick={handleOpenLogin}
                     className="h-12 px-6 rounded-[8px] bg-g-blue hover:bg-g-blueHover text-white text-[15px] font-medium inline-flex items-center gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-g-blue"
                   >
                     <span>{DEMO_DATA.hero.primaryCta}</span>
@@ -1434,7 +1442,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               <MotionButton
                 primary
                 type="button"
-                onClick={() => setShowLoginModal(true)}
+                onClick={handleOpenLogin}
                 className="h-12 px-7 rounded-[8px] bg-g-blue hover:bg-g-blueHover text-white text-[15px] font-medium cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-g-blue"
               >
                 <span>{DEMO_DATA.cta.primary}</span>
@@ -1806,21 +1814,6 @@ export const HomePage: React.FC<HomePageProps> = ({
                 {isLoading ? 'Signing in...' : 'Open dashboard'}
               </MotionButton>
             </form>
-          </div>
-        )}
-
-        {onOpenFullLogin && (
-          <div className="pt-4 text-center border-t border-g-border/50 mt-4">
-            <button
-              type="button"
-              onClick={() => {
-                setShowLoginModal(false);
-                onOpenFullLogin();
-              }}
-              className="text-[13px] text-g-textSecondary hover:text-g-blue transition-colors cursor-pointer underline-offset-4 hover:underline"
-            >
-              Open full sign-in page →
-            </button>
           </div>
         )}
       </MotionModal>

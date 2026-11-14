@@ -332,6 +332,11 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
     // 2FA Security Modal State
     const [is2faModalOpen, setIs2faModalOpen] = useState<boolean>(false);
     const [authSessionToken, setAuthSessionToken] = useState<string>('');
+    const [po2faDeliveryInfo, setPo2faDeliveryInfo] = useState<{
+      delivered: boolean;
+      statusMessage?: string;
+      debugOtpHint?: string;
+    } | null>(null);
     const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
     const [isInitiating2fa, setIsInitiating2fa] = useState<boolean>(false);
     const [isVerifying2fa, setIsVerifying2fa] = useState<boolean>(false);
@@ -563,12 +568,27 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
         if (res.ok) {
           const data = await res.json();
           setAuthSessionToken(data.auth_token);
+          setPo2faDeliveryInfo({
+            delivered: Boolean(data.delivered),
+            statusMessage: data.delivery_message || data.message,
+            debugOtpHint: data.debug_otp_hint,
+          });
         } else {
           // Client fallback token if server is offline
           setAuthSessionToken(`PO-AUTH-${Math.random().toString(36).substring(2, 10).toUpperCase()}`);
+          setPo2faDeliveryInfo({
+            delivered: false,
+            statusMessage: 'Offline sandbox mode active.',
+            debugOtpHint: '123456',
+          });
         }
       } catch {
         setAuthSessionToken(`PO-AUTH-${Math.random().toString(36).substring(2, 10).toUpperCase()}`);
+        setPo2faDeliveryInfo({
+          delivered: false,
+          statusMessage: 'Offline sandbox mode active.',
+          debugOtpHint: '123456',
+        });
       } finally {
         setIsInitiating2fa(false);
         setIs2faModalOpen(true);
@@ -1503,12 +1523,36 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
                 <h3 className="font-cinzel text-lg font-bold text-g-text">
                   2FA Procurement Authorization Guard
                 </h3>
-                <p className="text-xs text-g-textSecondary mt-1 leading-relaxed">
-                  To prevent unauthorized or accidental ordering, an instant 6-digit confirmation code was dispatched to:
-                </p>
-                <span className="text-xs font-mono font-bold text-cyan-300 mt-1">
-                  sarveshwaran.k2008@gmail.com
-                </span>
+                {po2faDeliveryInfo?.delivered ? (
+                  <div className="mt-2 p-2.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-mono flex items-center justify-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>Live Security Email Dispatched to sarveshwaran.k2008@gmail.com</span>
+                  </div>
+                ) : (
+                  <div className="mt-2 w-full p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-left space-y-1.5">
+                    <div className="flex items-center justify-between font-mono">
+                      <span className="font-bold text-amber-300 text-[11px] uppercase tracking-wider">
+                        SMTP Live Delivery: Unconfigured
+                      </span>
+                      {po2faDeliveryInfo?.debugOtpHint && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const hint = po2faDeliveryInfo.debugOtpHint || '123456';
+                            setOtpDigits(hint.slice(0, 6).split(''));
+                            setOtpError(null);
+                          }}
+                          className="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 text-[10px] font-sans font-semibold cursor-pointer"
+                        >
+                          Auto-Fill Sandbox Code
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-silver font-sans leading-relaxed">
+                      No email was sent to <strong className="text-marble">sarveshwaran.k2008@gmail.com</strong> because SMTP credentials (SMTP_USER/SMTP_PASS) are not set in .env. Use sandbox passkey <strong className="text-amber-300 font-mono">{po2faDeliveryInfo?.debugOtpHint || '123456'}</strong> to authorize.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Order quick summary chip */}

@@ -146,6 +146,9 @@ export async function initiate2FASignup(params: {
   message: string;
   recipient: string;
   email: string;
+  delivered?: boolean;
+  delivery_status?: string;
+  delivery_message?: string;
   debug_otp_hint?: string;
 }> {
   const { email, password, fullName, companyName, role = 'admin' } = params;
@@ -175,10 +178,13 @@ export async function initiate2FASignup(params: {
       // Local fallback mock OTP for offline development
       return {
         success: true,
-        message: 'Security alert & 2FA OTP code dispatched to sarveshwaran.k2008@gmail.com',
+        delivered: false,
+        delivery_status: 'OFFLINE_SANDBOX',
+        delivery_message: 'Backend server offline or unreachable. Sandbox development passcode active.',
+        message: 'Security challenge generated in offline sandbox mode.',
         recipient: 'sarveshwaran.k2008@gmail.com',
         email: submitEmail,
-        debug_otp_hint: '724915',
+        debug_otp_hint: '123456',
       };
     }
     throw err;

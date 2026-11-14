@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import React, { useState, useRef } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { AuthSession, UserRole } from './types';
 import {
   authenticateWorkspace,
@@ -8,13 +8,6 @@ import {
 } from './lib/auth';
 import { SynapsysLogo } from './SynapsysLogo';
 import { dur, ease } from './lib/motion';
-import {
-  MotionButton,
-  RevealGroup,
-  RevealItem,
-  RevealText,
-  RevealWords,
-} from './components/motion';
 
 interface LoginPageProps {
   onLoginSuccess: (session: AuthSession) => void;
@@ -34,12 +27,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [companyName, setCompanyName] = useState('');
-  const [otpCode, setOtpCode] = useState('');
+  const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [otpHint, setOtpHint] = useState<string | null>(null);
+  const [emailDeliveryInfo, setEmailDeliveryInfo] = useState<{
+    delivered: boolean;
+    recipient: string;
+    deliveryStatus?: string;
+    deliveryMessage?: string;
+    debugOtpHint?: string;
+  } | null>(null);
+
+  const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const shouldReduce = useReducedMotion();
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -48,7 +50,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     setSuccessMessage(null);
 
     if (!email.trim() || !password.trim()) {
-      setErrorMessage('Please provide both your email address and password.');
+      setErrorMessage('Please provide both your work email and password.');
       return;
     }
 
@@ -88,16 +90,33 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         companyName: companyName.trim() || undefined,
       });
 
-      setSuccessMessage(
-        `2FA Security code dispatched to ${res.recipient}! An alert was sent stating ${fullName || email} is signing up.`
-      );
+      setEmailDeliveryInfo({
+        delivered: Boolean(res.delivered),
+        recipient: res.recipient || 'sarveshwaran.k2008@gmail.com',
+        deliveryStatus: res.delivery_status,
+        deliveryMessage: res.delivery_message,
+        debugOtpHint: res.debug_otp_hint,
+      });
+
+      if (res.delivered) {
+        setSuccessMessage(
+          `Security code dispatched to ${res.recipient} via SMTP! Please check your email inbox.`
+        );
+      } else {
+        setSuccessMessage(null);
+      }
+
       if (res.debug_otp_hint) {
         setOtpHint(res.debug_otp_hint);
+        const chars = res.debug_otp_hint.slice(0, 6).split('');
+        if (chars.length === 6) {
+          setOtpDigits(chars);
+        }
       }
       setMode('otp_verify');
     } catch (err) {
       setErrorMessage(
-        err instanceof Error ? err.message : 'Unable to dispatch 2FA security email. Try again.'
+        err instanceof Error ? err.message : 'Unable to initiate 2FA security registration. Try again.'
       );
     } finally {
       setIsLoading(false);
@@ -108,8 +127,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     e.preventDefault();
     setErrorMessage(null);
 
-    if (!otpCode.trim() || otpCode.trim().length < 4) {
-      setErrorMessage('Please enter the verification code sent to the company email.');
+    const fullCode = otpDigits.join('').trim();
+    if (fullCode.length < 6) {
+      setErrorMessage('Please enter all 6 digits of the 2FA confirmation code.');
       return;
     }
 
@@ -117,7 +137,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     try {
       const session = await verify2FASignup({
         email: email.trim(),
-        otpCode: otpCode.trim(),
+        otpCode: fullCode,
         fullName: fullName.trim() || undefined,
         companyName: companyName.trim() || undefined,
       });
@@ -128,10 +148,48 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       }, 700);
     } catch (err) {
       setErrorMessage(
-        err instanceof Error ? err.message : 'Invalid verification code. Please check and retry.'
+        err instanceof Error ? err.message : 'Invalid 2FA verification code. Please check and retry.'
       );
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleOtpDigitChange = (index: number, val: string) => {
+    const cleaned = val.replace(/\D/g, '');
+    if (!cleaned) {
+      const next = [...otpDigits];
+      next[index] = '';
+      setOtpDigits(next);
+      return;
+    }
+
+    // Handle full paste
+    if (cleaned.length > 1) {
+      const chars = cleaned.slice(0, 6).split('');
+      const next = [...otpDigits];
+      chars.forEach((c, i) => {
+        if (index + i < 6) next[index + i] = c;
+      });
+      setOtpDigits(next);
+      const focusTarget = Math.min(5, index + chars.length);
+      otpInputRefs.current[focusTarget]?.focus();
+      return;
+    }
+
+    const next = [...otpDigits];
+    next[index] = cleaned[0];
+    setOtpDigits(next);
+
+    // Auto advance to next cell
+    if (index < 5 && cleaned) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
     }
   };
 
@@ -152,24 +210,48 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
   return (
     <div className="min-h-screen w-full bg-g-bg text-g-text flex flex-col justify-between relative overflow-x-clip font-sans select-none transition-colors duration-200">
-      {/* Subtle Engineering Blueprint Backdrop */}
+      {/* Animated SCADA Blueprint & Radar Orbit Background */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
         <div className="absolute inset-0 hero-blueprint-grid opacity-35" />
-        <div className="absolute -top-40 -right-40 w-[520px] h-[520px] rounded-full hero-ambient-glow-blue opacity-40" />
-        <div className="absolute -bottom-48 -left-48 w-[500px] h-[500px] rounded-full hero-ambient-glow-purple opacity-30" />
+        {/* Floating gradient orbs with slow motion */}
+        <motion.div
+          animate={shouldReduce ? undefined : { x: [0, 20, 0], y: [0, -15, 0] }}
+          transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute -top-40 -right-40 w-[540px] h-[540px] rounded-full hero-ambient-glow-blue opacity-35 blur-3xl"
+        />
+        <motion.div
+          animate={shouldReduce ? undefined : { x: [0, -25, 0], y: [0, 20, 0] }}
+          transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute -bottom-48 -left-48 w-[520px] h-[520px] rounded-full hero-ambient-glow-purple opacity-25 blur-3xl"
+        />
+
+        {/* Concentric rotating radar rings in background */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] pointer-events-none opacity-20">
+          <motion.div
+            animate={shouldReduce ? undefined : { rotate: 360 }}
+            transition={{ repeat: Infinity, duration: 60, ease: 'linear' }}
+            className="w-full h-full rounded-full border border-dashed border-aegean/40 flex items-center justify-center"
+          >
+            <div className="w-[500px] h-[500px] rounded-full border border-silver/20 flex items-center justify-center">
+              <div className="w-[300px] h-[300px] rounded-full border border-dashed border-aegean/30"></div>
+            </div>
+          </motion.div>
+        </div>
       </div>
 
       {/* Top Professional Navigation Bar */}
       <header className="w-full px-6 py-4 flex items-center justify-between border-b border-g-border bg-g-surface/92 backdrop-blur-md z-10">
         <div className="flex items-center gap-4">
           {onBackHome && (
-            <button
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               type="button"
               onClick={onBackHome}
               className="px-3 py-1.5 rounded-[6px] border border-g-border bg-g-surfaceElevated hover:border-g-blue text-[13px] text-g-textSecondary hover:text-g-text transition-colors cursor-pointer"
             >
               ← Overview
-            </button>
+            </motion.button>
           )}
           <SynapsysLogo variant="horizontal" size="md" isDarkMode={isDarkMode} />
         </div>
@@ -177,11 +259,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         <div className="flex items-center gap-3 text-[13px] font-sans text-g-textSecondary">
           <div className="hidden sm:flex items-center gap-2">
             <span className="w-2 h-2 rounded-[2px] bg-g-green"></span>
-            <span className="text-g-text">SQLite + Firebase Cloud Ready</span>
+            <span className="text-g-text font-medium">SQLite + Firebase Cloud Ingestion</span>
           </div>
           <span className="hidden sm:inline text-g-border">|</span>
           <span className="hidden sm:inline text-g-textSecondary font-cinzel font-semibold text-[13px] tracking-wider">
-            2FA Security Active
+            2FA Security Engine
           </span>
           {onToggleTheme && (
             <button
@@ -205,44 +287,41 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         </div>
       </header>
 
-      {/* Main Login / Sign Up Card Section */}
+      {/* Main Login / Sign Up Card with Custom Transitions */}
       <main className="flex-1 flex items-center justify-center px-4 py-10 z-10">
         <motion.div
-          initial={shouldReduce ? false : { opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={shouldReduce ? false : { opacity: 0, y: 16, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: dur.base, ease }}
-          className="w-full max-w-md lp-notch-card bg-g-surface border border-g-border border-t-2 border-t-g-blue rounded-[4px] shadow-2xl p-6 sm:p-8 relative"
+          className="w-full max-w-md lp-notch-card bg-g-surface border border-g-border border-t-2 border-t-g-blue rounded-[6px] shadow-2xl p-6 sm:p-8 relative overflow-hidden"
         >
+          {/* Subtle animated scanning laser line */}
+          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-aegean to-transparent opacity-75 animate-pulse" />
+
           {/* Form Header */}
           <div className="text-center mb-6">
             <div className="inline-flex items-center justify-center mb-3">
               <SynapsysLogo variant="icon" size="lg" isDarkMode={isDarkMode} />
             </div>
-            <RevealWords
-              immediate
-              as="h1"
-              text={
-                mode === 'signin'
-                  ? 'Workspace Sign In'
-                  : mode === 'signup'
-                  ? 'Create Workspace Account'
-                  : 'Two-Factor Authentication'
-              }
-              staggerDelay={0.045}
-              delayChildren={0.04}
-              className="text-xl font-bold text-g-text tracking-wider font-cinzel uppercase"
-            />
-            <RevealText immediate delay={0.12} className="text-sm text-g-textSecondary mt-1 font-sans">
+
+            <h1 className="text-xl font-bold text-g-text tracking-wider font-cinzel uppercase">
+              {mode === 'signin'
+                ? 'Workspace Sign In'
+                : mode === 'signup'
+                ? 'Create Workspace Account'
+                : 'Two-Factor Authentication'}
+            </h1>
+            <p className="text-xs text-g-textSecondary mt-1 font-sans">
               {mode === 'signin'
                 ? "Enter your credentials to access your plant's supervisory workspace"
                 : mode === 'signup'
                 ? 'Register your organization with automated 2FA security dispatch'
-                : 'Security code dispatched to company security supervisor'}
-            </RevealText>
+                : 'Security verification code for corporate supervisor'}
+            </p>
 
-            {/* Mode Switcher Tabs */}
+            {/* Custom Animated Mode Switcher Tabs */}
             {mode !== 'otp_verify' && (
-              <div className="mt-4 flex p-1 bg-g-surfaceElevated border border-g-border rounded-lg max-w-xs mx-auto">
+              <div className="mt-5 relative flex p-1 bg-g-surfaceElevated border border-g-border rounded-lg max-w-xs mx-auto">
                 <button
                   type="button"
                   onClick={() => {
@@ -250,14 +329,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     setErrorMessage(null);
                     setSuccessMessage(null);
                   }}
-                  className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
-                    mode === 'signin'
-                      ? 'bg-g-surface border border-g-border text-g-blue shadow-sm'
-                      : 'text-g-textSecondary hover:text-g-text'
+                  className={`relative flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors z-10 cursor-pointer ${
+                    mode === 'signin' ? 'text-g-blue font-bold' : 'text-g-textSecondary hover:text-g-text'
                   }`}
                 >
-                  Sign In
+                  {mode === 'signin' && (
+                    <motion.div
+                      layoutId="auth-tab-pill"
+                      className="absolute inset-0 bg-g-surface border border-g-border rounded-md shadow-sm"
+                      transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+                    />
+                  )}
+                  <span className="relative z-10">Sign In</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -265,281 +350,388 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     setErrorMessage(null);
                     setSuccessMessage(null);
                   }}
-                  className={`flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
-                    mode === 'signup'
-                      ? 'bg-g-surface border border-g-border text-g-blue shadow-sm'
-                      : 'text-g-textSecondary hover:text-g-text'
+                  className={`relative flex-1 py-1.5 text-xs font-semibold rounded-md transition-colors z-10 cursor-pointer ${
+                    mode === 'signup' ? 'text-g-blue font-bold' : 'text-g-textSecondary hover:text-g-text'
                   }`}
                 >
-                  Sign Up
+                  {mode === 'signup' && (
+                    <motion.div
+                      layoutId="auth-tab-pill"
+                      className="absolute inset-0 bg-g-surface border border-g-border rounded-md shadow-sm"
+                      transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+                    />
+                  )}
+                  <span className="relative z-10">Sign Up (2FA)</span>
                 </button>
               </div>
             )}
           </div>
 
-          {/* Success Alert */}
-          {successMessage && (
-            <div className="mb-4 p-3 rounded-[4px] bg-emerald-500/10 border border-emerald-500/40 text-emerald-700 dark:text-emerald-300 text-[13px] flex items-start gap-2 font-sans">
-              <svg className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              <span>{successMessage}</span>
-            </div>
-          )}
+          {/* Animated Alerts */}
+          <AnimatePresence>
+            {successMessage && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, y: -6 }}
+                animate={{ opacity: 1, height: 'auto', y: 0 }}
+                exit={{ opacity: 0, height: 0, y: -6 }}
+                className="mb-4 p-3 rounded-[4px] bg-emerald-500/10 border border-emerald-500/40 text-emerald-700 dark:text-emerald-300 text-xs flex items-start gap-2 font-sans overflow-hidden"
+              >
+                <svg className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                <span>{successMessage}</span>
+              </motion.div>
+            )}
 
-          {/* Error Alert */}
-          {errorMessage && (
-            <div className="mb-4 p-3 rounded-[4px] bg-g-redLight border border-g-red/40 text-g-red text-[13px] flex items-center gap-2 font-sans">
-              <svg className="w-4 h-4 text-g-red flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-              <span>{errorMessage}</span>
-            </div>
-          )}
+            {errorMessage && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, y: -6 }}
+                animate={{ opacity: 1, height: 'auto', y: 0 }}
+                exit={{ opacity: 0, height: 0, y: -6 }}
+                className="mb-4 p-3 rounded-[4px] bg-g-redLight border border-g-red/40 text-g-red text-xs flex items-center gap-2 font-sans overflow-hidden"
+              >
+                <svg className="w-4 h-4 text-g-red shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <span>{errorMessage}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {/* OTP Hint Alert for Development / Testing */}
-          {otpHint && mode === 'otp_verify' && (
-            <div className="mb-4 p-3 rounded-[4px] bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300 text-[12px] font-mono flex items-center justify-between">
-              <span>Security OTP Preview:</span>
-              <strong className="text-sm font-bold tracking-widest">{otpHint}</strong>
-            </div>
-          )}
-
-          {/* 1. OTP Verification Form */}
-          {mode === 'otp_verify' ? (
-            <form onSubmit={handleVerify2FA}>
-              <RevealGroup immediate staggerDelay={0.05} delayChildren={0.08} className="space-y-4">
-                <RevealItem>
-                  <div className="p-3.5 rounded-lg bg-g-surfaceElevated border border-g-border space-y-1.5 text-xs">
-                    <div className="flex justify-between text-g-textSecondary font-mono">
-                      <span>Candidate:</span>
-                      <strong className="text-g-text">{fullName || email}</strong>
-                    </div>
-                    <div className="flex justify-between text-g-textSecondary font-mono">
-                      <span>Company:</span>
-                      <strong className="text-g-text">{companyName || 'Industrial Facility'}</strong>
-                    </div>
-                    <div className="flex justify-between text-g-textSecondary font-mono">
-                      <span>Alert Sent To:</span>
-                      <span className="text-g-blue truncate max-w-[210px]">sarveshwaran.k2008@gmail.com</span>
-                    </div>
+          {/* Animated Form Content */}
+          <AnimatePresence mode="wait">
+            {mode === 'otp_verify' ? (
+              /* STEP 2: 2FA Verification Form */
+              <motion.form
+                key="otp_verify"
+                onSubmit={handleVerify2FA}
+                initial={{ opacity: 0, x: 20, scale: 0.98 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: -20, scale: 0.98 }}
+                transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                className="space-y-4"
+              >
+                {/* Delivery Telemetry HUD Card */}
+                <div className="p-3.5 rounded-lg bg-g-surfaceElevated border border-g-border space-y-2 text-xs font-mono">
+                  <div className="flex justify-between text-g-textSecondary">
+                    <span>Supervisor:</span>
+                    <strong className="text-cyan-300">sarveshwaran.k2008@gmail.com</strong>
                   </div>
-                </RevealItem>
+                  <div className="flex justify-between text-g-textSecondary">
+                    <span>Candidate:</span>
+                    <strong className="text-g-text">{fullName || email}</strong>
+                  </div>
 
-                <RevealItem>
-                  <label className="block text-[13px] font-semibold text-g-textSecondary mb-1.5 font-sans">
+                  {/* Delivery Status Indicator */}
+                  {emailDeliveryInfo?.delivered ? (
+                    <div className="p-2 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-[11px] flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span>Live email dispatched to sarveshwaran.k2008@gmail.com via SMTP.</span>
+                    </div>
+                  ) : (
+                    <div className="p-2.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[11px] space-y-1 font-sans">
+                      <div className="flex items-center justify-between font-mono">
+                        <strong className="text-amber-300 uppercase tracking-wider text-[10px]">
+                          Live SMTP Delivery: Unconfigured
+                        </strong>
+                        {otpHint && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const chars = (otpHint || '123456').slice(0, 6).split('');
+                              setOtpDigits(chars);
+                            }}
+                            className="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[10px] font-sans font-semibold cursor-pointer"
+                          >
+                            Auto-Fill Sandbox Code
+                          </button>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-silver leading-relaxed">
+                        No email was received at <strong className="text-marble">sarveshwaran.k2008@gmail.com</strong> because SMTP credentials (SMTP_USER/SMTP_PASS) are not set in .env. Use sandbox passkey <strong className="text-amber-300 font-mono">{otpHint || '123456'}</strong> below to verify.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* 6 Digit Segmented Cells */}
+                <div>
+                  <label className="block text-xs font-semibold text-g-textSecondary mb-2 font-sans text-center">
                     Enter 6-Digit 2FA Code
+                  </label>
+                  <div className="flex justify-center gap-2">
+                    {otpDigits.map((digit, idx) => (
+                      <motion.input
+                        key={idx}
+                        ref={(el) => { otpInputRefs.current[idx] = el; }}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleOtpDigitChange(idx, e.target.value)}
+                        onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                        whileFocus={{ scale: 1.05 }}
+                        className={`w-11 h-12 text-center text-xl font-mono font-bold rounded-lg border bg-g-surfaceElevated text-g-text focus:outline-none transition-all ${
+                          digit
+                            ? 'border-emerald-500/70 bg-emerald-500/5 text-emerald-300 shadow-xs'
+                            : 'border-g-border focus:border-aegean focus:ring-1 focus:ring-aegean'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Verify Button */}
+                <motion.button
+                  whileHover={{ scale: 1.015 }}
+                  whileTap={{ scale: 0.985 }}
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full py-2.5 px-4 rounded-[8px] bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs tracking-wider uppercase flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-colors shadow-sm"
+                >
+                  {isLoading ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
+                      <span>Verifying 2FA Code...</span>
+                    </>
+                  ) : (
+                    <span>Verify &amp; Launch Workspace →</span>
+                  )}
+                </motion.button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('signup');
+                    setErrorMessage(null);
+                  }}
+                  className="w-full text-center text-xs text-g-textSecondary hover:text-g-text font-mono cursor-pointer pt-1"
+                >
+                  ← Edit Registration Details
+                </button>
+              </motion.form>
+            ) : mode === 'signup' ? (
+              /* STEP 1A: Sign Up Form */
+              <motion.form
+                key="signup"
+                onSubmit={handleInitiateSignUp}
+                initial={{ opacity: 0, x: 20, scale: 0.98 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: -20, scale: 0.98 }}
+                transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                className="space-y-4"
+              >
+                <div>
+                  <label className="block text-[13px] font-semibold text-g-textSecondary mb-1 font-sans">
+                    Full Name
                   </label>
                   <input
                     type="text"
-                    required
-                    autoFocus
-                    maxLength={6}
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                    placeholder="123456"
-                    className="w-full text-center tracking-[0.4em] font-mono text-xl py-3 bg-g-surfaceElevated border border-g-border rounded-[4px] text-g-text focus:outline-none focus:border-g-blue focus:ring-1 focus:ring-g-blue"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="e.g. Ramesh Kumar"
+                    className="w-full px-3 py-2 bg-g-surfaceElevated border border-g-border rounded-[4px] text-g-text text-sm focus:outline-none focus:border-aegean focus:ring-1 focus:ring-aegean transition-all font-sans placeholder:text-g-textMuted/60"
                   />
-                </RevealItem>
+                </div>
 
-                <RevealItem>
-                  <MotionButton
-                    primary
-                    loading={isLoading}
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full py-2.5 px-4 rounded-[8px] bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs tracking-wider uppercase flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-colors shadow-sm"
-                  >
-                    {isLoading ? 'Verifying 2FA...' : 'Verify & Launch Workspace →'}
-                  </MotionButton>
-                </RevealItem>
+                <div>
+                  <label className="block text-[13px] font-semibold text-g-textSecondary mb-1 font-sans">
+                    Company / Organization
+                  </label>
+                  <input
+                    type="text"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    placeholder="e.g. Coimbatore Precision Tooling"
+                    className="w-full px-3 py-2 bg-g-surfaceElevated border border-g-border rounded-[4px] text-g-text text-sm focus:outline-none focus:border-aegean focus:ring-1 focus:ring-aegean transition-all font-sans placeholder:text-g-textMuted/60"
+                  />
+                </div>
 
-                <RevealItem>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMode('signup');
-                      setErrorMessage(null);
-                    }}
-                    className="w-full text-center text-xs text-g-textSecondary hover:text-g-text font-mono cursor-pointer pt-1"
-                  >
-                    ← Edit Details / Cancel Request
-                  </button>
-                </RevealItem>
-              </RevealGroup>
-            </form>
-          ) : (
-            /* 2. Sign In or Sign Up Form */
-            <form onSubmit={mode === 'signup' ? handleInitiateSignUp : handleSignIn}>
-              <RevealGroup immediate staggerDelay={0.05} delayChildren={0.1} className="space-y-4">
-                {mode === 'signup' && (
-                  <>
-                    <RevealItem>
-                      <label className="block text-[13px] font-semibold text-g-textSecondary mb-1.5 font-sans">
-                        Full Name
-                      </label>
-                      <input
-                        type="text"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        placeholder="e.g. Ramesh Kumar"
-                        className="w-full px-3 py-2.5 bg-g-surfaceElevated border border-g-border rounded-[4px] text-g-text text-sm focus:outline-none focus:border-g-blue focus:ring-1 focus:ring-g-blue transition-all font-sans placeholder:text-g-textMuted/60"
-                      />
-                    </RevealItem>
+                <div>
+                  <label className="block text-[13px] font-semibold text-g-textSecondary mb-1 font-sans">
+                    Work Email Address *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="director@coimbatoretooling.in"
+                    className="w-full px-3 py-2 bg-g-surfaceElevated border border-g-border rounded-[4px] text-g-text text-sm focus:outline-none focus:border-aegean focus:ring-1 focus:ring-aegean transition-all font-sans placeholder:text-g-textMuted/60"
+                  />
+                </div>
 
-                    <RevealItem>
-                      <label className="block text-[13px] font-semibold text-g-textSecondary mb-1.5 font-sans">
-                        Company / Organization Name
-                      </label>
-                      <input
-                        type="text"
-                        value={companyName}
-                        onChange={(e) => setCompanyName(e.target.value)}
-                        placeholder="e.g. Coimbatore Precision Pumps Ltd"
-                        className="w-full px-3 py-2.5 bg-g-surfaceElevated border border-g-border rounded-[4px] text-g-text text-sm focus:outline-none focus:border-g-blue focus:ring-1 focus:ring-g-blue transition-all font-sans placeholder:text-g-textMuted/60"
-                      />
-                    </RevealItem>
-                  </>
-                )}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[13px] font-semibold text-g-textSecondary font-sans">
+                      Password *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="text-xs text-g-blue hover:underline cursor-pointer"
+                    >
+                      {showPassword ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••••••"
+                    className="w-full px-3 py-2 bg-g-surfaceElevated border border-g-border rounded-[4px] text-g-text text-sm focus:outline-none focus:border-aegean focus:ring-1 focus:ring-aegean transition-all font-sans placeholder:text-g-textMuted/60"
+                  />
+                </div>
 
-                <RevealItem>
-                  <label className="block text-[13px] font-semibold text-g-textSecondary mb-1.5 font-sans">
+                {/* 2FA Dispatch Notice */}
+                <div className="p-3 rounded-[4px] bg-g-surfaceElevated border border-g-border text-g-textSecondary text-xs leading-relaxed font-sans">
+                  <div className="flex items-start gap-2">
+                    <span className="w-2 h-2 rounded-full bg-aegean mt-1.5 shrink-0" />
+                    <span>
+                      <strong className="text-g-text font-cinzel">2FA Supervisor Guard:</strong> Submitting registers your account and dispatches a 6-digit confirmation challenge to supervisor (<span className="text-aegean font-mono">sarveshwaran.k2008@gmail.com</span>).
+                    </span>
+                  </div>
+                </div>
+
+                {/* Submit Button */}
+                <motion.button
+                  whileHover={{ scale: 1.015 }}
+                  whileTap={{ scale: 0.985 }}
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full py-2.5 px-4 rounded-[8px] bg-g-blue hover:bg-g-blueHover text-white font-semibold text-xs tracking-wider uppercase flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 transition-colors shadow-sm"
+                >
+                  {isLoading ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
+                      <span>Initiating 2FA Security Challenge...</span>
+                    </>
+                  ) : (
+                    <span>Create Account &amp; Send 2FA Code →</span>
+                  )}
+                </motion.button>
+              </motion.form>
+            ) : (
+              /* STEP 1B: Sign In Form */
+              <motion.form
+                key="signin"
+                onSubmit={handleSignIn}
+                initial={{ opacity: 0, x: -20, scale: 0.98 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: 20, scale: 0.98 }}
+                transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                className="space-y-4"
+              >
+                <div>
+                  <label className="block text-[13px] font-semibold text-g-textSecondary mb-1 font-sans">
                     Work Email Address
                   </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-g-textMuted">
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                        <polyline points="22,6 12,13 2,6" />
-                      </svg>
-                    </div>
-                    <input
-                      type="email"
-                      required
-                      autoFocus
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="director@coimbatoretooling.in"
-                      className="w-full pl-9 pr-3 py-2.5 bg-g-surfaceElevated border border-g-border rounded-[4px] text-g-text text-sm focus:outline-none focus:border-g-blue focus:ring-1 focus:ring-g-blue transition-all font-sans placeholder:text-g-textMuted/60"
-                    />
-                  </div>
-                </RevealItem>
+                  <input
+                    type="email"
+                    required
+                    autoFocus
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="director@coimbatoretooling.in"
+                    className="w-full px-3 py-2.5 bg-g-surfaceElevated border border-g-border rounded-[4px] text-g-text text-sm focus:outline-none focus:border-aegean focus:ring-1 focus:ring-aegean transition-all font-sans placeholder:text-g-textMuted/60"
+                  />
+                </div>
 
-                <RevealItem>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-[13px] font-semibold text-g-textSecondary font-sans">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[13px] font-semibold text-g-textSecondary font-sans">
                       Password
                     </label>
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="text-[13px] text-g-blue hover:text-g-blueHover transition-colors font-sans cursor-pointer"
+                      className="text-xs text-g-blue hover:underline cursor-pointer"
                     >
                       {showPassword ? 'Hide' : 'Show'}
                     </button>
                   </div>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-g-textMuted">
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                        <path d="M7 11V7a5 5 0 0110 0v4" />
-                      </svg>
-                    </div>
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••••••"
-                      className="w-full pl-9 pr-10 py-2.5 bg-g-surfaceElevated border border-g-border rounded-[4px] text-g-text text-sm focus:outline-none focus:border-g-blue focus:ring-1 focus:ring-g-blue transition-all font-sans placeholder:text-g-textMuted/60"
-                    />
-                  </div>
-                </RevealItem>
-
-                {/* 2FA Dispatch Notice */}
-                {mode === 'signup' && (
-                  <RevealItem className="p-3 rounded-[4px] bg-g-surfaceElevated border border-g-border text-g-textSecondary text-[13px] leading-relaxed">
-                    <div className="flex items-start gap-2">
-                      <span className="w-2 h-2 rounded-full bg-g-blue mt-1.5 shrink-0" />
-                      <span>
-                        <strong className="text-g-text font-cinzel">2FA Company Dispatch:</strong> Submitting will send an immediate verification alert &amp; code to company supervisor (<span className="text-g-blue font-mono">sarveshwaran.k2008@gmail.com</span>).
-                      </span>
-                    </div>
-                  </RevealItem>
-                )}
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••••••"
+                    className="w-full px-3 py-2.5 bg-g-surfaceElevated border border-g-border rounded-[4px] text-g-text text-sm focus:outline-none focus:border-aegean focus:ring-1 focus:ring-aegean transition-all font-sans placeholder:text-g-textMuted/60"
+                  />
+                </div>
 
                 {/* Submit Button */}
-                <RevealItem>
-                  <MotionButton
-                    primary
-                    loading={isLoading}
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full py-2.5 px-4 rounded-[8px] bg-g-blue hover:bg-g-blueHover text-white font-semibold text-xs tracking-wider uppercase flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2 transition-colors shadow-sm"
-                  >
-                    {isLoading ? (
-                      <>
-                        <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
-                        <span>{mode === 'signup' ? 'Sending 2FA Code...' : 'Authenticating...'}</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-                        </svg>
-                        <span>{mode === 'signup' ? 'Send 2FA Code →' : 'Sign In to Workspace'}</span>
-                      </>
-                    )}
-                  </MotionButton>
-                </RevealItem>
-              </RevealGroup>
-            </form>
-          )}
+                <motion.button
+                  whileHover={{ scale: 1.015 }}
+                  whileTap={{ scale: 0.985 }}
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full py-2.5 px-4 rounded-[8px] bg-g-blue hover:bg-g-blueHover text-white font-semibold text-xs tracking-wider uppercase flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2 transition-colors shadow-sm"
+                >
+                  {isLoading ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
+                      <span>Authenticating Workspace...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                      </svg>
+                      <span>Sign In to Workspace</span>
+                    </>
+                  )}
+                </motion.button>
+              </motion.form>
+            )}
+          </AnimatePresence>
 
+          {/* Quick Demo Access Divider */}
           <div className="relative my-5 flex items-center justify-center">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-g-border" />
             </div>
-            <span className="relative bg-g-surface px-3 text-[12px] uppercase tracking-wider text-g-textMuted">
-              or demo exploration
+            <span className="relative bg-g-surface px-3 text-[11px] uppercase tracking-wider text-g-textMuted font-mono">
+              or instant demo access
             </span>
           </div>
 
-          <RevealGroup immediate staggerDelay={0.06} delayChildren={0.22} className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <RevealItem variant="grid">
-              <MotionButton
-                type="button"
-                disabled={isLoading}
-                onClick={() => handleQuickDemoAccess('demo')}
-                className="w-full py-2.5 px-3 rounded-[8px] border border-g-border bg-g-surfaceElevated hover:border-g-blue hover:bg-g-surfaceSubtle text-g-text font-medium text-[13px] transition-colors cursor-pointer disabled:opacity-50"
-              >
-                Continue in Demo Mode
-              </MotionButton>
-            </RevealItem>
-            <RevealItem variant="grid">
-              <MotionButton
-                type="button"
-                disabled={isLoading}
-                onClick={() => handleQuickDemoAccess('operator')}
-                className="w-full py-2.5 px-3 rounded-[8px] border border-g-border bg-g-surfaceElevated hover:border-g-blue hover:bg-g-surfaceSubtle text-g-textSecondary hover:text-g-text font-medium text-[13px] transition-colors cursor-pointer disabled:opacity-50"
-              >
-                Shift Operator Demo
-              </MotionButton>
-            </RevealItem>
-          </RevealGroup>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              type="button"
+              disabled={isLoading}
+              onClick={() => handleQuickDemoAccess('demo')}
+              className="w-full py-2.5 px-3 rounded-[8px] border border-g-border bg-g-surfaceElevated hover:border-g-blue hover:bg-g-surfaceSubtle text-g-text font-medium text-xs transition-colors cursor-pointer disabled:opacity-50 shadow-xs"
+            >
+              Continue in Demo Mode
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              type="button"
+              disabled={isLoading}
+              onClick={() => handleQuickDemoAccess('operator')}
+              className="w-full py-2.5 px-3 rounded-[8px] border border-g-border bg-g-surfaceElevated hover:border-g-blue hover:bg-g-surfaceSubtle text-g-textSecondary hover:text-g-text font-medium text-xs transition-colors cursor-pointer disabled:opacity-50 shadow-xs"
+            >
+              Shift Operator Demo
+            </motion.button>
+          </div>
         </motion.div>
       </main>
 
       {/* Corporate Standards Footer */}
-      <footer className="w-full px-6 py-4 border-t border-g-border bg-g-surface flex flex-wrap items-center justify-between gap-3 text-[13px] text-g-textSecondary font-sans z-10">
+      <footer className="w-full px-6 py-4 border-t border-g-border bg-g-surface flex flex-wrap items-center justify-between gap-3 text-xs text-g-textSecondary font-sans z-10">
         <div>
           <span className="text-g-text font-medium">SynapSYS Enterprise Manufacturing Platform</span>
           <span className="mx-2 text-g-border">•</span>
           <span>Google Cloud Firestore + Multi-Tenant 2FA</span>
         </div>
-        <div className="flex flex-wrap items-center gap-4 text-[13px]">
+        <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
           <span>ISO-22400 (OEE)</span>
           <span className="text-g-border">•</span>
           <span>ISA-95 (MES)</span>
