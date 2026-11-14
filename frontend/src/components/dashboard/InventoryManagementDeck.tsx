@@ -15,6 +15,8 @@ export interface InventoryManagementDeckProps {
   initialSuppliers?: SupplierVendor[];
   initialOrders?: PurchaseOrder[];
   currency?: SiteCurrency;
+  siteName?: string;
+  siteLocation?: string;
   onEvent?: (label: string, category: string, tone?: 'blue' | 'emerald' | 'amber' | 'rose') => void;
 }
 
@@ -221,6 +223,8 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
     initialSuppliers = DEFAULT_SUPPLIERS_FALLBACK,
     initialOrders = DEFAULT_ORDERS_FALLBACK,
     currency,
+    siteName,
+    siteLocation,
     onEvent,
   }) => {
     const shouldReduce = useReducedMotion();
@@ -277,7 +281,10 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
 
     // Purchase Order Modal State
     const [isCreatePoOpen, setIsCreatePoOpen] = useState<boolean>(false);
-    const [poSupplierId, setPoSupplierId] = useState<string>(suppliers[0]?.id || '');
+    const [poSupplierId, setPoSupplierId] = useState<string>(() => {
+      if (activeCurr.code === 'USD') return 'sup-002'; // Apex Industrial in Detroit, MI
+      return suppliers[0]?.id || 'sup-001';
+    });
     const [poLines, setPoLines] = useState<PurchaseOrderItem[]>([
       {
         item_id: items[0]?.id || '',
@@ -293,16 +300,33 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
     ]);
     const [poNotes, setPoNotes] = useState<string>('Standard replenishment delivery to Inbound Gate 02');
     const [poPriority, setPoPriority] = useState<string>('Standard');
-    const [poFacility, setPoFacility] = useState<string>(
-      () =>
-        activeCurr.code === 'INR'
-          ? 'Coimbatore Precision Unit - Inbound Crib A'
-          : activeCurr.code === 'EUR'
-          ? 'Stuttgart Tooling Bay 02'
-          : activeCurr.code === 'JPY'
-          ? 'Yokohama Cleanroom Stores'
-          : 'Detroit Plant Tooling Crib'
-    );
+    const [poFacility, setPoFacility] = useState<string>(() => {
+      if (siteName) return `${siteName.replace(/\s*\(Production Live\)/i, '').trim()} - Inbound Crib`;
+      if (siteLocation) return `${siteLocation} - Inbound Crib`;
+      return activeCurr.code === 'INR'
+        ? 'Coimbatore Precision Unit - Inbound Crib A'
+        : activeCurr.code === 'EUR'
+        ? 'Stuttgart Tooling Bay 02'
+        : activeCurr.code === 'JPY'
+        ? 'Yokohama Cleanroom Stores'
+        : 'Detroit Plant Tooling Crib';
+    });
+
+    useEffect(() => {
+      if (siteName || siteLocation) {
+        setPoFacility(`${(siteName || siteLocation || 'Plant').replace(/\s*\(Production Live\)/i, '').trim()} - Inbound Crib`);
+      }
+    }, [siteName, siteLocation]);
+
+    useEffect(() => {
+      if (activeCurr.code === 'USD') {
+        const detroitSup = suppliers.find((s) => s.id === 'sup-002');
+        if (detroitSup) setPoSupplierId(detroitSup.id);
+      } else if (activeCurr.code === 'INR') {
+        const indiaSup = suppliers.find((s) => s.id === 'sup-001');
+        if (indiaSup) setPoSupplierId(indiaSup.id);
+      }
+    }, [activeCurr.code, suppliers]);
     const [poOperatorName, setPoOperatorName] = useState<string>('Sarveshwaran K (Plant Supervisor)');
 
     // 2FA Security Modal State
@@ -746,11 +770,11 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
                 Inventory &amp; Procurement
               </h2>
               <span className="text-xs px-2.5 py-0.5 rounded border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 font-mono font-medium">
-                MRO &bull; Tooling Crib (India Operations)
+                MRO &bull; Tooling Crib ({siteName ? `${siteName.replace(/\s*\(Production Live\)/i, '').trim()} (${activeCurr.country})` : `${activeCurr.country} Operations`})
               </span>
             </div>
             <p className="text-sm text-g-textSecondary mt-1">
-              Tooling crib safety buffers, verified vendor seller directory, 2FA-secured Purchase Orders &amp; 18% GST calculation.
+              Tooling crib safety buffers, verified vendor seller directory, 2FA-secured Purchase Orders &amp; {isIndia ? '18% GST (CGST + SGST) calculation' : `${activeCurr.country} tax calculation`}.
             </p>
           </div>
 
@@ -796,7 +820,7 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
           </div>
         </div>
 
-        {/* 4 Metric Cards in Indian Rupees */}
+        {/* 4 Metric Cards in Active Facility Currency */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <SpotlightCard className="p-5 rounded-xl bg-g-surface border border-g-border">
             <span className="text-xs text-g-textMuted uppercase font-mono block">Total Crib Valuation</span>
@@ -1033,7 +1057,7 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
                     Purchase Order Tracking Ledger
                   </h3>
                   <p className="text-xs text-g-textSecondary">
-                    All dispatched orders are verified via 2FA and transmitted with GST invoice breakdown to supplier sales desks.
+                    All dispatched orders are verified via 2FA and transmitted with {isIndia ? 'GST invoice breakdown' : `${activeCurr.code} tax breakdown`} to supplier sales desks.
                   </p>
                 </div>
                 <span className="text-xs font-mono text-cyan-300 bg-cyan-500/10 px-2.5 py-1 rounded border border-cyan-500/30">
@@ -1265,9 +1289,16 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
                       onChange={(e) => setPoFacility(e.target.value)}
                       className="w-full bg-g-surfaceElevated border border-g-border rounded-lg text-xs text-g-text px-3 py-2 focus:outline-none focus:border-g-blue cursor-pointer"
                     >
-                      <option value="Coimbatore Spindle Unit - Inbound Crib A">Coimbatore Spindle Unit - Inbound Crib A</option>
-                      <option value="Detroit Plant C4 - Inbound Logistics Gate 02">Detroit Plant C4 - Inbound Gate 02</option>
-                      <option value="Bengaluru Peenya Precision Facility - Bay 01">Bengaluru Peenya Facility - Bay 01</option>
+                      {siteName && (
+                        <option value={`${siteName.replace(/\s*\(Production Live\)/i, '').trim()} - Inbound Crib`}>
+                          {siteName.replace(/\s*\(Production Live\)/i, '').trim()} - Inbound Crib ({activeCurr.country})
+                        </option>
+                      )}
+                      <option value="Detroit Plant C4 - Inbound Logistics Gate 02">Detroit Plant C4 - Inbound Gate 02 (USA)</option>
+                      <option value="Coimbatore Spindle Unit - Inbound Crib A">Coimbatore Spindle Unit - Inbound Crib A (India)</option>
+                      <option value="Stuttgart Plant 02 - Inbound Tooling Bay">Stuttgart Plant 02 - Inbound Tooling Bay (Germany)</option>
+                      <option value="Yokohama Optics Cleanroom Inbound">Yokohama Optics Cleanroom Inbound (Japan)</option>
+                      <option value="UK Midlands Plant 03 - Stores Gate 01">UK Midlands Plant 03 - Stores Gate 01 (UK)</option>
                     </select>
                   </div>
                 </div>
@@ -1602,7 +1633,7 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
                 </div>
                 <div>
                   <span className="text-gray-400 block uppercase text-[10px]">Destination Facility</span>
-                  <div className="text-white font-medium mt-0.5">{previewPo.facility || 'Coimbatore Spindle Unit - Inbound Crib A'}</div>
+                  <div className="text-white font-medium mt-0.5">{previewPo.facility || (siteName ? `${siteName.replace(/\s*\(Production Live\)/i, '').trim()} - Inbound Crib` : 'Plant Tooling Crib')}</div>
                   <div className="text-gray-400">Target ETA: {previewPo.estimated_delivery}</div>
                 </div>
               </div>

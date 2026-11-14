@@ -6301,7 +6301,11 @@ export default function DashboardWorkspace({
           {/* TAB 7: Inventory & Procurement MRO Deck */}
           {activeTab === 'inventory' && (
             <Suspense fallback={<ChunkPanelFallback label="Loading Inventory & Procurement Deck..." />}>
-              <LazyInventoryManagementDeck currency={siteCurrency} />
+              <LazyInventoryManagementDeck
+                currency={siteCurrency}
+                siteName={activeSite?.name}
+                siteLocation={activeSite?.location}
+              />
             </Suspense>
           )}
           </SlidingTabContent>
