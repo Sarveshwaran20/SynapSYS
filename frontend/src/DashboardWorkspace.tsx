@@ -48,6 +48,7 @@ import {
 } from './types';
 import { getCurrencyForSite, SiteCurrency } from './lib/currency';
 import { MANUFACTURING_HUBS } from './lib/manufacturingHubs';
+import { SingularityBackdrop } from './components/dashboard/SingularityBackdrop';
 
 const LazyGeoMapAssist = lazy(() => import('./GeoMapAssist'));
 const LazyDigitalTwinFloor = lazy(() =>
@@ -1927,6 +1928,13 @@ export default function DashboardWorkspace({
   const [simulatedAlarms, setSimulatedAlarms] = useState<AlarmEvent[]>([]);
   const [showCopilot, setShowCopilot] = useState<boolean>(false);
   const [copilotInput, setCopilotInput] = useState<string>('');
+  const [showVortexBg, setShowVortexBg] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('synapsys_vortex_bg');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
   const [copilotLoading, setCopilotLoading] = useState<boolean>(false);
   const [csvIsLoading, setCsvIsLoading] = useState<boolean>(false);
   const [csvFeedback, setCsvFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -4021,11 +4029,12 @@ export default function DashboardWorkspace({
     >
       <ScrollProgressBar showBackToTop={true} />
 
-      {/* Subtle Engineering Blueprint Backdrop & Ambient Corner Glows */}
+      {/* Subtle Engineering Blueprint Backdrop & Ambient Gravitational Singularity Vortex */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
-        <div className="absolute inset-0 hero-blueprint-grid opacity-30" />
-        <div className="absolute -top-40 -right-40 w-[540px] h-[540px] rounded-full hero-ambient-glow-blue opacity-35" />
-        <div className="absolute -bottom-48 -left-48 w-[520px] h-[520px] rounded-full hero-ambient-glow-purple opacity-30" />
+        <SingularityBackdrop isDarkMode={isDarkMode} enabled={showVortexBg} />
+        <div className="absolute inset-0 hero-blueprint-grid opacity-20" />
+        <div className="absolute -top-40 -right-40 w-[540px] h-[540px] rounded-full hero-ambient-glow-blue opacity-25" />
+        <div className="absolute -bottom-48 -left-48 w-[520px] h-[520px] rounded-full hero-ambient-glow-purple opacity-20" />
       </div>
 
       {/* SynapSYS SaaS Navigation Header */}
@@ -4204,6 +4213,33 @@ export default function DashboardWorkspace({
             )}
           </button>
 
+          {/* Gravitational Vortex Backdrop Toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              setShowVortexBg((prev) => {
+                const next = !prev;
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('synapsys_vortex_bg', String(next));
+                }
+                return next;
+              });
+            }}
+            className={`p-2 rounded-lg transition-all cursor-pointer border ${
+              showVortexBg
+                ? 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30 hover:bg-cyan-500/25 shadow-xs'
+                : 'text-g-textSecondary hover:text-g-text hover:bg-g-surfaceElevated border-transparent'
+            }`}
+            title={showVortexBg ? 'Gravitational Vortex FX: Active (click to pause/hide)' : 'Gravitational Vortex FX: Off (click to activate)'}
+            aria-label="Toggle Gravitational Vortex Background"
+          >
+            <svg className={`w-4 h-4 ${showVortexBg ? 'animate-[spin_16s_linear_infinite]' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="3" fill="currentColor" fillOpacity="0.25" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 2a10 10 0 0110 10c0 3.314-1.612 6.25-4.103 8.043M12 22A10 10 0 012 12c0-3.314 1.612-6.25 4.103-8.043" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7 12a5 5 0 018.66-3.5M17 12a5 5 0 01-8.66 3.5" />
+            </svg>
+          </button>
+
           {/* More Dropdown */}
           <div className="relative">
             <button
@@ -4257,6 +4293,33 @@ export default function DashboardWorkspace({
                     </span>
                   )}
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowVortexBg((prev) => {
+                      const next = !prev;
+                      if (typeof window !== 'undefined') {
+                        localStorage.setItem('synapsys_vortex_bg', String(next));
+                      }
+                      return next;
+                    });
+                    setShowMoreMenu(false);
+                  }}
+                  className="w-full text-left px-3.5 py-2.5 hover:bg-g-surfaceElevated text-g-text flex items-center justify-between cursor-pointer"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <svg className="w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M12 2a10 10 0 0110 10c0 3.314-1.612 6.25-4.103 8.043M12 22A10 10 0 012 12c0-3.314 1.612-6.25 4.103-8.043" />
+                    </svg>
+                    <span>Gravitational vortex FX</span>
+                  </span>
+                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${showVortexBg ? 'bg-cyan-500/20 text-cyan-300' : 'bg-g-surfaceSubtle text-g-textMuted'}`}>
+                    {showVortexBg ? 'ON' : 'OFF'}
+                  </span>
+                </button>
+
                 <div className="border-t border-g-border my-1" />
                 <div className="px-3.5 py-2 text-[13px] text-g-textSecondary flex items-center justify-between">
                   <span>Poll interval</span>
