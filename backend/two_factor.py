@@ -48,6 +48,12 @@ def send_security_alert_email(
     attempting to create an enterprise account, providing the 2FA code.
     Connects to SMTP if configured (e.g. Gmail SMTP), or reports unconfigured state with sandbox key.
     """
+    try:
+        load_dotenv(os.path.join(os.path.dirname(_BASE_DIR), ".env"), override=True)
+        load_dotenv(os.path.join(_BASE_DIR, ".env"), override=True)
+    except Exception:
+        pass
+
     smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
     smtp_port = int(os.getenv("SMTP_PORT", "587"))
     smtp_user = os.getenv("SMTP_USER")
@@ -231,6 +237,12 @@ def send_po_security_alert_email(
     Sends an immediate 2FA security challenge email to the supervisor alerting
     that an operator is requesting to dispatch a Purchase Order to an external seller.
     """
+    try:
+        load_dotenv(os.path.join(os.path.dirname(_BASE_DIR), ".env"), override=True)
+        load_dotenv(os.path.join(_BASE_DIR, ".env"), override=True)
+    except Exception:
+        pass
+
     smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
     smtp_port = int(os.getenv("SMTP_PORT", "587"))
     smtp_user = os.getenv("SMTP_USER")
