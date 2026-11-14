@@ -9,6 +9,8 @@ import {
 import { SiteCurrency } from '../../lib/currency';
 import { MotionButton, Reveal, SpotlightCard } from '../motion';
 import { dur, ease } from '../../lib/motion';
+import { SmartCribMatrix } from './inventory/SmartCribMatrix';
+import { AiDepletionHorizon } from './inventory/AiDepletionHorizon';
 
 export interface InventoryManagementDeckProps {
   initialItems?: InventoryItem[];
@@ -269,7 +271,7 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
       [activeCurr]
     );
 
-    const [deckTab, setDeckTab] = useState<'inventory' | 'orders' | 'suppliers'>('inventory');
+    const [deckTab, setDeckTab] = useState<'inventory' | 'orders' | 'suppliers' | 'crib_matrix' | 'depletion_ai'>('inventory');
     const [items, setItems] = useState<InventoryItem[]>(initialItems);
     const [suppliers] = useState<SupplierVendor[]>(initialSuppliers);
     const [orders, setOrders] = useState<PurchaseOrder[]>(initialOrders);
@@ -881,12 +883,12 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
           </SpotlightCard>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="flex items-center gap-2 border-b border-g-border pb-3">
+        {/* Tab Switcher with Fluid Motion */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-g-border pb-3">
           <button
             type="button"
             onClick={() => setDeckTab('inventory')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+            className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all cursor-pointer relative ${
               deckTab === 'inventory'
                 ? 'bg-g-surfaceElevated text-g-text border border-g-border font-semibold shadow-xs'
                 : 'text-g-textSecondary hover:text-g-text'
@@ -894,10 +896,43 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
           >
             Warehouse Stock &amp; Crib ({items.length})
           </button>
+
+          <button
+            type="button"
+            onClick={() => setDeckTab('crib_matrix')}
+            className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all cursor-pointer relative flex items-center gap-1.5 ${
+              deckTab === 'crib_matrix'
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-semibold shadow-xs'
+                : 'text-g-textSecondary hover:text-cyan-400'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+            <span>3D Smart Crib &amp; RFID Radar</span>
+            <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-cyan-500/30 text-cyan-200">
+              NEW
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setDeckTab('depletion_ai')}
+            className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all cursor-pointer relative flex items-center gap-1.5 ${
+              deckTab === 'depletion_ai'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold shadow-xs'
+                : 'text-g-textSecondary hover:text-amber-400'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+            <span>AI Depletion Horizon</span>
+            <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-amber-500/30 text-amber-200">
+              WEIBULL
+            </span>
+          </button>
+
           <button
             type="button"
             onClick={() => setDeckTab('orders')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer relative ${
+            className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all cursor-pointer relative ${
               deckTab === 'orders'
                 ? 'bg-g-surfaceElevated text-g-text border border-g-border font-semibold shadow-xs'
                 : 'text-g-textSecondary hover:text-g-text'
@@ -910,10 +945,11 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
               </span>
             )}
           </button>
+
           <button
             type="button"
             onClick={() => setDeckTab('suppliers')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+            className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all cursor-pointer ${
               deckTab === 'suppliers'
                 ? 'bg-g-surfaceElevated text-g-text border border-g-border font-semibold shadow-xs'
                 : 'text-g-textSecondary hover:text-g-text'
@@ -1226,6 +1262,30 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
                 </SpotlightCard>
               ))}
             </div>
+          </Reveal>
+        )}
+
+        {/* TAB 4: 3D SMART CRIB & RFID RADAR */}
+        {deckTab === 'crib_matrix' && (
+          <Reveal immediate>
+            <SmartCribMatrix
+              items={items}
+              onStockAdjust={handleAdjustStock}
+              formatCurrency={(inr, usd) => formatCurrencyAmount(inr || (usd * activeCurr.fxRate))}
+            />
+          </Reveal>
+        )}
+
+        {/* TAB 5: AI MTBF DEPLETION HORIZON */}
+        {deckTab === 'depletion_ai' && (
+          <Reveal immediate>
+            <AiDepletionHorizon
+              items={items}
+              onOpenReorderModal={(item) => {
+                handleQuickOrder(item);
+              }}
+              formatCurrency={(inr, usd) => formatCurrencyAmount(inr || (usd * activeCurr.fxRate))}
+            />
           </Reveal>
         )}
 

@@ -75,6 +75,11 @@ const LazyInventoryManagementDeck = lazy(() =>
     default: m.InventoryManagementDeck,
   }))
 );
+const LazyAcousticResonanceLab = lazy(() =>
+  import('./components/dashboard/AcousticResonanceLab').then((m) => ({
+    default: m.AcousticResonanceLab,
+  }))
+);
 
 // Initial baseline data for immediate presentation
 const INITIAL_DASHBOARD: DashboardResponse = {
@@ -1874,7 +1879,7 @@ export default function DashboardWorkspace({
   const [data, setData] = useState<DashboardResponse>(() => {
     return getMockDataForSite(currentProject, activeSite?.name, activeSite);
   });
-  const [activeTab, setActiveTab] = useState<'overview' | 'connectors' | 'twin' | 'losses' | 'workorders' | 'alarms' | 'inventory'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'connectors' | 'twin' | 'losses' | 'workorders' | 'alarms' | 'inventory' | 'acoustic_ai'>('overview');
   const [statusFilter, setStatusFilter] = useState<'all' | 'running' | 'idle' | 'down'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
@@ -4465,6 +4470,13 @@ export default function DashboardWorkspace({
                   label: 'Inventory & MRO',
                   subtitle: 'Tooling & Procurement',
                 },
+                {
+                  id: 'acoustic_ai',
+                  numeral: '08',
+                  label: 'Acoustic AI Twin',
+                  subtitle: 'Ultrasonic Stethoscope',
+                  badge: 'NEW',
+                },
               ].map((tab) => {
                 const isActive = activeTab === tab.id;
                 return (
@@ -4701,7 +4713,14 @@ export default function DashboardWorkspace({
 
           {/* TAB 1: Fleet Overview */}
           {activeTab === 'overview' && (
-            <div className="flex flex-col gap-6 font-sans">
+            <motion.div
+              key="tab-overview"
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+              className="flex flex-col gap-6 font-sans"
+            >
               {/* Quiet Shift Toolbar Line with Organization Branding */}
               <Reveal immediate>
                 <div className="relative bg-g-surface border border-g-border rounded-xl px-4 sm:px-5 py-3.5 flex flex-wrap items-center justify-between gap-3 text-[13px] text-g-textSecondary grid-container-surface">
@@ -5436,12 +5455,19 @@ export default function DashboardWorkspace({
               )}
               </SlidingTabContent>
               )}
-            </div>
+            </motion.div>
           )}
 
           {/* TAB: Field Connectors & Real Industrial Data Ingestion */}
           {activeTab === 'connectors' && (
-            <div className="flex flex-col gap-7">
+            <motion.div
+              key="tab-connectors"
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+              className="flex flex-col gap-7"
+            >
               {/* Top Operational Status & Mode Bar */}
               <Reveal immediate>
                 <div className="bg-g-surface border border-g-border rounded-xl p-6 shadow-sm flex flex-col xl:flex-row items-start xl:items-center justify-between gap-5 grid-container-surface">
@@ -5775,27 +5801,42 @@ export default function DashboardWorkspace({
                 </div>
               </div>
               </Reveal>
-            </div>
+            </motion.div>
           )}
 
           {/* TAB 2: INNOVATION - Interactive 2D Digital Twin Shop Floor Layout */}
           {activeTab === 'twin' && (
-            <Suspense fallback={<ChunkPanelFallback label="Loading 2D spatial digital twin chunk..." minHeight={440} />}>
-              <LazyDigitalTwinFloor
-                machines={data.machines}
-                siteName={activeSite?.name || 'Active Facility'}
-                siteLocation={activeSite?.location}
-                lastSync={lastSync}
-                onAddAsset={() => setShowAddMachineModal(true)}
-                onInspectSupervisory={(machine) => setSelectedMachine(machine)}
-                onOpenWorkOrder={handleOpenWorkOrder}
-              />
-            </Suspense>
+            <motion.div
+              key="tab-twin"
+              initial={{ opacity: 0, scale: 0.99, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <Suspense fallback={<ChunkPanelFallback label="Loading 2D spatial digital twin chunk..." minHeight={440} />}>
+                <LazyDigitalTwinFloor
+                  machines={data.machines}
+                  siteName={activeSite?.name || 'Active Facility'}
+                  siteLocation={activeSite?.location}
+                  lastSync={lastSync}
+                  onAddAsset={() => setShowAddMachineModal(true)}
+                  onInspectSupervisory={(machine) => setSelectedMachine(machine)}
+                  onOpenWorkOrder={handleOpenWorkOrder}
+                />
+              </Suspense>
+            </motion.div>
           )}
 
           {/* TAB 3: Six Big Losses Analysis */}
           {activeTab === 'losses' && (
-            <div className="bg-g-surface border border-g-border rounded-xl p-6 sm:p-7 shadow-sm flex flex-col gap-6 grid-container-surface">
+            <motion.div
+              key="tab-losses"
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+              className="bg-g-surface border border-g-border rounded-xl p-6 sm:p-7 shadow-sm flex flex-col gap-6 grid-container-surface"
+            >
               <Reveal immediate>
                 <RevealWords
                   immediate
@@ -5973,12 +6014,19 @@ export default function DashboardWorkspace({
                   </span>
                 </div>
               </Reveal>
-            </div>
+            </motion.div>
           )}
 
           {/* TAB 4: Active Work Orders */}
           {activeTab === 'workorders' && (
-            <div className="bg-g-surface border border-g-border rounded-xl p-6 sm:p-7 shadow-sm flex flex-col gap-5 grid-container-surface">
+            <motion.div
+              key="tab-workorders"
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+              className="bg-g-surface border border-g-border rounded-xl p-6 sm:p-7 shadow-sm flex flex-col gap-5 grid-container-surface"
+            >
               <Reveal immediate className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-g-border pb-4">
                 <div>
                   <RevealWords
@@ -6113,7 +6161,7 @@ export default function DashboardWorkspace({
                   </MotionTableBody>
                 </table>
               </div>
-            </div>
+            </motion.div>
           )}
 
           {/* TAB 5: Alarms & Incidents */}
@@ -6122,7 +6170,14 @@ export default function DashboardWorkspace({
             const acknowledgedHistory = (data.active_alarms || []).filter((a) => a.acknowledged);
 
             return (
-              <div className="bg-g-surface border border-g-border rounded-xl p-6 sm:p-7 shadow-sm flex flex-col gap-6 grid-container-surface">
+              <motion.div
+                key="tab-alarms"
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+                className="bg-g-surface border border-g-border rounded-xl p-6 sm:p-7 shadow-sm flex flex-col gap-6 grid-container-surface"
+              >
                 <Reveal immediate className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-g-border pb-4">
                   <div>
                     <RevealWords
@@ -6311,19 +6366,45 @@ export default function DashboardWorkspace({
                     <span>Logged to ISO-22400</span>
                   </div>
                 )}
-              </div>
+              </motion.div>
             );
           })()}
 
           {/* TAB 7: Inventory & Procurement MRO Deck */}
           {activeTab === 'inventory' && (
-            <Suspense fallback={<ChunkPanelFallback label="Loading Inventory & Procurement Deck..." />}>
-              <LazyInventoryManagementDeck
-                currency={siteCurrency}
-                siteName={activeSite?.name}
-                siteLocation={activeSite?.location}
-              />
-            </Suspense>
+            <motion.div
+              key="tab-inventory"
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <Suspense fallback={<ChunkPanelFallback label="Loading Inventory & Procurement Deck..." />}>
+                <LazyInventoryManagementDeck
+                  currency={siteCurrency}
+                  siteName={activeSite?.name}
+                  siteLocation={activeSite?.location}
+                />
+              </Suspense>
+            </motion.div>
+          )}
+
+          {/* TAB 8: Acoustic AI Harmonic Resonance Twin & Ultrasonic Stethoscope */}
+          {activeTab === 'acoustic_ai' && (
+            <motion.div
+              key="tab-acoustic_ai"
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <Suspense fallback={<ChunkPanelFallback label="Initializing Acoustic AI Harmonic Twin & Heterodyne Synthesizer..." />}>
+                <LazyAcousticResonanceLab
+                  machines={data.machines}
+                  isDarkMode={isDarkMode}
+                />
+              </Suspense>
+            </motion.div>
           )}
           </SlidingTabContent>
 
@@ -8277,6 +8358,20 @@ export default function DashboardWorkspace({
                         </span>
                         <span className="text-xs font-mono text-emerald-500 font-bold">MRO</span>
                       </button>
+
+                      <button
+                        onClick={() => { setActiveTab('acoustic_ai'); setSidebarOpen(false); }}
+                        className={`w-full px-3 py-2.5 rounded-lg text-left font-medium flex items-center justify-between transition-colors ${activeTab === 'acoustic_ai' ? 'bg-g-blue text-white shadow-sm' : 'text-g-text hover:bg-g-surfaceElevated'
+                          }`}
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <svg className="w-4 h-4 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.757 3.63 8.25 4.51 8.25H6.75z" />
+                          </svg>
+                          <span>Acoustic AI Twin</span>
+                        </span>
+                        <span className="text-xs font-mono text-purple-400 font-bold">NEW</span>
+                      </button>
                     </div>
                   </div>
 
@@ -9382,6 +9477,22 @@ export default function DashboardWorkspace({
             <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
           </svg>
           <span className="text-[10px] mt-0.5 font-medium">Inventory</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('acoustic_ai')}
+          className={`flex flex-col items-center justify-center py-1 px-3 rounded-lg transition-colors cursor-pointer ${activeTab === 'acoustic_ai' ? 'text-purple-400 font-semibold' : 'text-g-textSecondary hover:text-g-text'
+            }`}
+        >
+          <div className="relative">
+            <svg className="w-5 h-5 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.757 3.63 8.25 4.51 8.25H6.75z" />
+            </svg>
+            <span className="absolute -top-1 -right-2 text-[8px] font-mono font-bold bg-purple-500 text-white rounded px-0.5">
+              AI
+            </span>
+          </div>
+          <span className="text-[10px] mt-0.5 font-medium">Acoustic</span>
         </button>
 
         <button
