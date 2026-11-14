@@ -313,6 +313,94 @@ export interface RegionViewboxConfig {
   continent: 'India/South Asia' | 'Americas' | 'Europe' | 'East Asia & APAC';
 }
 
+export interface RegionGeoBound {
+  bounds: [[number, number], [number, number]]; // [[southLat, westLon], [northLat, eastLon]]
+  center: [number, number]; // [lat, lon]
+  zoom: number;
+  title: string;
+  continent: 'India/South Asia' | 'Americas' | 'Europe' | 'East Asia & APAC';
+}
+
+export const REGION_GEO_BOUNDS: Record<string, RegionGeoBound> = {
+  'asia-south1': {
+    bounds: [[8.0, 68.0], [35.0, 92.0]],
+    center: [20.5937, 78.9629],
+    zoom: 5,
+    title: 'India & South Asia Corridor (asia-south1)',
+    continent: 'India/South Asia',
+  },
+  'asia-northeast1': {
+    bounds: [[30.5, 127.5], [42.0, 143.5]],
+    center: [36.2048, 138.2529],
+    zoom: 6,
+    title: 'Japan & Korea Archipelagos (asia-northeast1)',
+    continent: 'East Asia & APAC',
+  },
+  'asia-southeast1': {
+    bounds: [[-1.0, 102.5], [6.5, 105.5]],
+    center: [1.3521, 103.8198],
+    zoom: 7,
+    title: 'Singapore & Malacca Straits (asia-southeast1)',
+    continent: 'East Asia & APAC',
+  },
+  'asia-east1': {
+    bounds: [[21.5, 119.5], [25.5, 122.5]],
+    center: [23.6978, 120.9605],
+    zoom: 8,
+    title: 'Taiwan Silicon Corridor (asia-east1)',
+    continent: 'East Asia & APAC',
+  },
+  'europe-west3': {
+    bounds: [[46.8, 5.8], [54.5, 16.5]],
+    center: [50.5, 10.5],
+    zoom: 6,
+    title: 'Germany & Central Europe (europe-west3)',
+    continent: 'Europe',
+  },
+  'europe-west1': {
+    bounds: [[42.5, -4.8], [51.2, 8.5]],
+    center: [47.0, 2.5],
+    zoom: 6,
+    title: 'Western Europe & France (europe-west1)',
+    continent: 'Europe',
+  },
+  'europe-west2': {
+    bounds: [[49.9, -6.5], [56.2, 1.8]],
+    center: [52.5, -1.8],
+    zoom: 6,
+    title: 'UK & Midlands Corridor (europe-west2)',
+    continent: 'Europe',
+  },
+  'us-east4': {
+    bounds: [[37.0, -86.5], [45.5, -73.5]],
+    center: [41.5, -81.0],
+    zoom: 6,
+    title: 'US East & Great Lakes (us-east4)',
+    continent: 'Americas',
+  },
+  'us-south1': {
+    bounds: [[23.5, -103.5], [34.5, -93.0]],
+    center: [28.5, -98.0],
+    zoom: 6,
+    title: 'US South & Texas Triangle (us-south1)',
+    continent: 'Americas',
+  },
+  'us-west1': {
+    bounds: [[32.0, -125.0], [42.5, -114.5]],
+    center: [37.0, -120.0],
+    zoom: 6,
+    title: 'US Pacific Coast Corridor (us-west1)',
+    continent: 'Americas',
+  },
+  'us-central1': {
+    bounds: [[36.0, -100.0], [45.0, -89.0]],
+    center: [41.5, -93.5],
+    zoom: 6,
+    title: 'US Central Corridor (us-central1)',
+    continent: 'Americas',
+  },
+};
+
 export const REGION_VIEWBOXES: Record<string, RegionViewboxConfig> = {
   'asia-south1': { x: 520, y: 120, w: 100, h: 90, title: 'India & South Asia Corridor (asia-south1)', continent: 'India/South Asia' },
   'asia-northeast1': { x: 665, y: 95, w: 70, h: 60, title: 'Japan & Korea Archipelagos (asia-northeast1)', continent: 'East Asia & APAC' },
