@@ -1621,8 +1621,8 @@ def initiate_2fa(req: Initiate2FARequest):
         "message": delivery_info.get("status_message") or f"Security alert & 2FA OTP code dispatched to {DESIGNATED_SECURITY_EMAIL}",
         "recipient": DESIGNATED_SECURITY_EMAIL,
         "email": email,
-        # Passkey available for development/sandbox so verification never blocks if SMTP credentials are unconfigured
-        "debug_otp_hint": otp_code,
+        # Only provide sandbox fallback hint if SMTP delivery is unconfigured or failed
+        "debug_otp_hint": None if delivery_info.get("delivered") else otp_code,
     }
 
 
@@ -3082,7 +3082,7 @@ def initiate_po_order_2fa(req: InitiatePO2FARequest):
         "delivery_status": "SMTP_DELIVERED" if delivery_info.get("delivered") else "SMTP_UNCONFIGURED",
         "delivery_message": delivery_info.get("status_message") or f"2FA code generated for supervisor {DESIGNATED_SECURITY_EMAIL}",
         "expires_in_sec": 600,
-        "debug_otp_hint": otp,
+        "debug_otp_hint": None if delivery_info.get("delivered") else otp,
         "message": delivery_info.get("status_message") or f"2FA code dispatched to supervisor {DESIGNATED_SECURITY_EMAIL}",
     }
 

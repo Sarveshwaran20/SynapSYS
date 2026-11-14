@@ -289,6 +289,9 @@ export const FirebaseCloudPanel: React.FC<FirebaseCloudPanelProps> = React.memo(
                   <input
                     id="firebase-api-key-input"
                     type="password"
+                    autoComplete="off"
+                    data-lpignore="true"
+                    data-1p-ignore="true"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
                     placeholder="AIzaSy..."

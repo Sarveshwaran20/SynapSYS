@@ -32,7 +32,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [otpHint, setOtpHint] = useState<string | null>(null);
   const [emailDeliveryInfo, setEmailDeliveryInfo] = useState<{
     delivered: boolean;
     recipient: string;
@@ -106,13 +105,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         setSuccessMessage(null);
       }
 
-      if (res.debug_otp_hint) {
-        setOtpHint(res.debug_otp_hint);
-        const chars = res.debug_otp_hint.slice(0, 6).split('');
-        if (chars.length === 6) {
-          setOtpDigits(chars);
-        }
-      }
+      // Explicitly reset OTP digits: autofill disabled so admin must enter manually from email
+      setOtpDigits(['', '', '', '', '', '']);
       setMode('otp_verify');
     } catch (err) {
       setErrorMessage(
@@ -436,37 +430,35 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                         <strong className="text-amber-300 uppercase tracking-wider text-[10px]">
                           Live SMTP Delivery: Unconfigured
                         </strong>
-                        {otpHint && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const chars = (otpHint || '123456').slice(0, 6).split('');
-                              setOtpDigits(chars);
-                            }}
-                            className="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[10px] font-sans font-semibold cursor-pointer"
-                          >
-                            Auto-Fill Sandbox Code
-                          </button>
-                        )}
                       </div>
                       <p className="text-[11px] text-silver leading-relaxed">
-                        No email was received at <strong className="text-marble">sarveshwaran.k2008@gmail.com</strong> because SMTP credentials (SMTP_USER/SMTP_PASS) are not set in .env. Use sandbox passkey <strong className="text-amber-300 font-mono">{otpHint || '123456'}</strong> below to verify.
+                        No email was received at <strong className="text-marble">sarveshwaran.k2008@gmail.com</strong> because SMTP credentials (SMTP_USER/SMTP_PASS) are not set in .env. Enter verification code manually.
                       </p>
                     </div>
                   )}
                 </div>
 
-                {/* 6 Digit Segmented Cells */}
+                {/* 6 Digit Segmented Cells with Autofill Disabled */}
                 <div>
-                  <label className="block text-xs font-semibold text-g-textSecondary mb-2 font-sans text-center">
-                    Enter 6-Digit 2FA Code
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-semibold text-g-textSecondary font-sans">
+                      Enter 6-Digit 2FA Code
+                    </label>
+                    <span className="text-[10px] font-mono text-silver/80">
+                      Autofill Disabled &bull; Manual Entry Required
+                    </span>
+                  </div>
                   <div className="flex justify-center gap-2">
                     {otpDigits.map((digit, idx) => (
                       <motion.input
                         key={idx}
                         ref={(el) => { otpInputRefs.current[idx] = el; }}
                         type="text"
+                        name={`scada_2fa_digit_${idx}`}
+                        autoComplete="off"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        data-form-type="other"
                         inputMode="numeric"
                         maxLength={1}
                         value={digit}
@@ -581,6 +573,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="new-password"
+                    data-lpignore="true"
+                    data-1p-ignore="true"
                     placeholder="••••••••••••"
                     className="w-full px-3 py-2 bg-g-surfaceElevated border border-g-border rounded-[4px] text-g-text text-sm focus:outline-none focus:border-aegean focus:ring-1 focus:ring-aegean transition-all font-sans placeholder:text-g-textMuted/60"
                   />
@@ -658,6 +653,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="off"
+                    data-lpignore="true"
+                    data-1p-ignore="true"
                     placeholder="••••••••••••"
                     className="w-full px-3 py-2.5 bg-g-surfaceElevated border border-g-border rounded-[4px] text-g-text text-sm focus:outline-none focus:border-aegean focus:ring-1 focus:ring-aegean transition-all font-sans placeholder:text-g-textMuted/60"
                   />

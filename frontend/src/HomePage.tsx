@@ -512,7 +512,6 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [fullName, setFullName] = useState<string>('');
   const [companyName, setCompanyName] = useState<string>('');
   const [otpCode, setOtpCode] = useState<string>('');
-  const [otpHint, setOtpHint] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authSuccess, setAuthSuccess] = useState<string | null>(null);
@@ -615,7 +614,6 @@ export const HomePage: React.FC<HomePageProps> = ({
           companyName: companyName.trim() || undefined,
         });
         setAuthSuccess(`2FA security code dispatched to ${res.recipient}! An alert was sent to supervisor.`);
-        if (res.debug_otp_hint) setOtpHint(res.debug_otp_hint);
         setModalAuthMode('otp_verify');
       } catch (err) {
         setAuthError(err instanceof Error ? err.message : 'Failed to initiate 2FA registration.');
@@ -1602,26 +1600,21 @@ export const HomePage: React.FC<HomePageProps> = ({
               for company <strong className="text-g-text">{companyName || 'SynapSYS Enterprise'}</strong>.
             </div>
 
-            {otpHint && (
-              <div className="p-2.5 rounded-[6px] bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] font-mono flex items-center justify-between">
-                <span>Security Alert / OTP: <strong>{otpHint}</strong></span>
-                <button
-                  type="button"
-                  onClick={() => setOtpCode(otpHint)}
-                  className="underline hover:text-white cursor-pointer ml-2"
-                >
-                  Autofill
-                </button>
-              </div>
-            )}
-
             <div>
-              <label htmlFor="modal-otp" className="block text-[13px] font-medium text-g-textSecondary mb-1.5">
-                6-Digit Verification Code
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label htmlFor="modal-otp" className="text-[13px] font-medium text-g-textSecondary">
+                  6-Digit Verification Code
+                </label>
+                <span className="text-[10px] font-mono text-silver/80">
+                  Manual Entry &bull; Autofill Disabled
+                </span>
+              </div>
               <input
                 id="modal-otp"
                 type="text"
+                autoComplete="off"
+                data-lpignore="true"
+                data-1p-ignore="true"
                 maxLength={6}
                 value={otpCode}
                 onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
@@ -1710,6 +1703,9 @@ export const HomePage: React.FC<HomePageProps> = ({
               <input
                 id="modal-signup-password"
                 type="password"
+                autoComplete="new-password"
+                data-lpignore="true"
+                data-1p-ignore="true"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2 rounded-[4px] bg-g-surfaceElevated border border-g-border text-g-text text-[14px] focus:outline-none focus:border-g-blue focus:ring-1 focus:ring-g-blue"
@@ -1796,6 +1792,9 @@ export const HomePage: React.FC<HomePageProps> = ({
                 <input
                   id="login-password"
                   type="password"
+                  autoComplete="off"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-[4px] bg-g-surfaceElevated border border-g-border text-g-text text-[14px] focus:outline-none focus:border-g-blue focus:ring-1 focus:ring-g-blue"

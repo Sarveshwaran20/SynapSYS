@@ -1534,22 +1534,9 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
                       <span className="font-bold text-amber-300 text-[11px] uppercase tracking-wider">
                         SMTP Live Delivery: Unconfigured
                       </span>
-                      {po2faDeliveryInfo?.debugOtpHint && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const hint = po2faDeliveryInfo.debugOtpHint || '123456';
-                            setOtpDigits(hint.slice(0, 6).split(''));
-                            setOtpError(null);
-                          }}
-                          className="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 text-[10px] font-sans font-semibold cursor-pointer"
-                        >
-                          Auto-Fill Sandbox Code
-                        </button>
-                      )}
                     </div>
                     <p className="text-[11px] text-silver font-sans leading-relaxed">
-                      No email was sent to <strong className="text-marble">sarveshwaran.k2008@gmail.com</strong> because SMTP credentials (SMTP_USER/SMTP_PASS) are not set in .env. Use sandbox passkey <strong className="text-amber-300 font-mono">{po2faDeliveryInfo?.debugOtpHint || '123456'}</strong> to authorize.
+                      No email was sent to <strong className="text-marble">sarveshwaran.k2008@gmail.com</strong> because SMTP credentials (SMTP_USER/SMTP_PASS) are not set in .env. Enter verification code manually.
                     </p>
                   </div>
                 )}
@@ -1571,28 +1558,43 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
                 </div>
               </div>
 
-              {/* 6 Digit Code Input Boxes */}
+              {/* 6 Digit Code Input Boxes with Autofill Disabled */}
               <form onSubmit={handleVerifyOtpAndDispatch} className="space-y-4">
-                <div className="flex justify-center gap-2">
-                  {otpDigits.map((digit, idx) => (
-                    <input
-                      key={idx}
-                      ref={(el) => { otpInputRefs.current[idx] = el; }}
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleOtpChange(idx, e.target.value)}
-                      onKeyDown={(e) => handleOtpKeyDown(idx, e)}
-                      className={`w-11 h-12 text-center text-xl font-mono font-bold rounded-lg border bg-g-surfaceElevated text-g-text focus:outline-none transition-all ${
-                        otpError
-                          ? 'border-rose-500/70 focus:border-rose-500'
-                          : digit
-                          ? 'border-emerald-500/60 bg-emerald-500/5 text-emerald-300'
-                          : 'border-g-border focus:border-cyan-400'
-                      }`}
-                    />
-                  ))}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-g-textSecondary font-sans">
+                      Enter 6-Digit Procurement Code
+                    </span>
+                    <span className="text-[10px] font-mono text-silver/80">
+                      Manual Admin Entry &bull; Autofill Disabled
+                    </span>
+                  </div>
+                  <div className="flex justify-center gap-2">
+                    {otpDigits.map((digit, idx) => (
+                      <input
+                        key={idx}
+                        ref={(el) => { otpInputRefs.current[idx] = el; }}
+                        type="text"
+                        name={`po_2fa_digit_${idx}`}
+                        autoComplete="off"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        data-form-type="other"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleOtpChange(idx, e.target.value)}
+                        onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                        className={`w-11 h-12 text-center text-xl font-mono font-bold rounded-lg border bg-g-surfaceElevated text-g-text focus:outline-none transition-all ${
+                          otpError
+                            ? 'border-rose-500/70 focus:border-rose-500'
+                            : digit
+                            ? 'border-emerald-500/60 bg-emerald-500/5 text-emerald-300'
+                            : 'border-g-border focus:border-cyan-400'
+                        }`}
+                      />
+                    ))}
+                  </div>
                 </div>
 
                 {otpError && (
