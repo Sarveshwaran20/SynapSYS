@@ -8,10 +8,11 @@ export interface OeeWaterfallCardProps {
   machines: MachineDashboardState[];
   overallOeePct: number;
   netShiftValueUsd: number;
+  currencySymbol?: string;
 }
 
 export const OeeWaterfallCard: React.FC<OeeWaterfallCardProps> = React.memo(
-  ({ machines, overallOeePct, netShiftValueUsd }) => {
+  ({ machines, overallOeePct, netShiftValueUsd, currencySymbol = '$' }) => {
     const shouldReduce = useReducedMotion();
     const [hoveredKey, setHoveredKey] = useState<string | null>(null);
 
@@ -85,7 +86,7 @@ export const OeeWaterfallCard: React.FC<OeeWaterfallCardProps> = React.memo(
 
           <span className="text-xs font-mono text-g-textSecondary px-2.5 py-1 rounded bg-g-surface border border-g-border">
             {activeSegment
-              ? `${activeSegment.label}: -${activeSegment.lossPct.toFixed(1)}% (~$${activeSegment.valueUsd.toLocaleString()})`
+              ? `${activeSegment.label}: -${activeSegment.lossPct.toFixed(1)}% (~${currencySymbol}${activeSegment.valueUsd.toLocaleString()})`
               : `Total Recoverable Opportunity: ${totalLossPct.toFixed(1)}%`}
           </span>
         </div>

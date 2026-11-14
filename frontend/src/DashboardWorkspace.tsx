@@ -46,6 +46,8 @@ import {
   ProductionSite,
   UserProfile,
 } from './types';
+import { getCurrencyForSite, SiteCurrency } from './lib/currency';
+import { MANUFACTURING_HUBS } from './lib/manufacturingHubs';
 
 const LazyGeoMapAssist = lazy(() => import('./GeoMapAssist'));
 const LazyDigitalTwinFloor = lazy(() =>
@@ -103,11 +105,16 @@ const INITIAL_DASHBOARD: DashboardResponse = {
       green_energy_pct: 44.5,
     },
     financial_roi: {
-      revenue_generated_usd: 240210.0,
-      downtime_cost_usd: 343.2,
-      scrap_waste_cost_usd: 3195.0,
-      net_shift_value_usd: 236671.8,
-      potential_savings_usd: 2780.0,
+      revenue_generated_usd: 27880.0,
+      downtime_cost_usd: 435.67,
+      scrap_waste_cost_usd: 135.0,
+      net_shift_value_usd: 27309.33,
+      potential_savings_usd: 390.0,
+      currency_symbol: '$',
+      currency_code: 'USD',
+      unit_baseline: 85,
+      downtime_hourly_rate: 1200,
+      scrap_unit_cost: 45,
     },
   },
   machines: [
@@ -444,6 +451,11 @@ const STUTTGART_SITE_DATA: DashboardResponse = {
       scrap_waste_cost_usd: 2160.0,
       net_shift_value_usd: 119898.0,
       potential_savings_usd: 1850.0,
+      currency_symbol: '€',
+      currency_code: 'EUR',
+      unit_baseline: 78,
+      downtime_hourly_rate: 1100,
+      scrap_unit_cost: 42,
     },
   },
   machines: [
@@ -741,11 +753,16 @@ const YOKOHAMA_SITE_DATA: DashboardResponse = {
       green_energy_pct: 51.8,
     },
     financial_roi: {
-      revenue_generated_usd: 214030.0,
-      downtime_cost_usd: 210.0,
-      scrap_waste_cost_usd: 1890.0,
-      net_shift_value_usd: 211930.0,
-      potential_savings_usd: 1980.0,
+      revenue_generated_usd: 32734000.0,
+      downtime_cost_usd: 35000.0,
+      scrap_waste_cost_usd: 294000.0,
+      net_shift_value_usd: 32405000.0,
+      potential_savings_usd: 280000.0,
+      currency_symbol: '¥',
+      currency_code: 'JPY',
+      unit_baseline: 13000,
+      downtime_hourly_rate: 180000,
+      scrap_unit_cost: 7000,
     },
   },
   machines: [
@@ -1016,6 +1033,11 @@ const YOKOHAMA_SITE_DATA: DashboardResponse = {
 function generateCustomSiteMockData(siteId: string, siteName: string = 'Production Facility'): DashboardResponse {
   const slug = siteId.replace('synapsys-mfg-', '').replace('site-', '').replace(/-/g, ' ').trim().toUpperCase();
   const prefix = siteId.split('-').pop()?.slice(0, 3).toUpperCase() || 'AST';
+  const siteCur = getCurrencyForSite({ id: siteId, name: siteName });
+  const revGen = Math.round(1318 * siteCur.unitBaseline);
+  const dtCost = Math.round((140 / 3600) * siteCur.downtimeHourlyRate * 100) / 100;
+  const scrapCost = Math.round(32 * siteCur.scrapUnitCost);
+  const netShift = Math.round((revGen - dtCost - scrapCost) * 100) / 100;
 
   return {
     site_id: siteId,
@@ -1047,11 +1069,16 @@ function generateCustomSiteMockData(siteId: string, siteName: string = 'Producti
         green_energy_pct: 55.0,
       },
       financial_roi: {
-        revenue_generated_usd: 112030.0,
-        downtime_cost_usd: 240.0,
-        scrap_waste_cost_usd: 1440.0,
-        net_shift_value_usd: 110350.0,
-        potential_savings_usd: 1250.0,
+        revenue_generated_usd: revGen,
+        downtime_cost_usd: dtCost,
+        scrap_waste_cost_usd: scrapCost,
+        net_shift_value_usd: netShift,
+        potential_savings_usd: Math.round((dtCost * 0.65 + scrapCost * 0.8) * 100) / 100,
+        currency_symbol: siteCur.symbol,
+        currency_code: siteCur.code,
+        unit_baseline: siteCur.unitBaseline,
+        downtime_hourly_rate: siteCur.downtimeHourlyRate,
+        scrap_unit_cost: siteCur.scrapUnitCost,
       },
     },
     machines: [
@@ -1250,7 +1277,253 @@ function generateCustomSiteMockData(siteId: string, siteName: string = 'Producti
   };
 }
 
+const COIMBATORE_SITE_DATA: DashboardResponse = {
+  site_id: 'synapsys-mfg-in-coimbatore',
+  site_name: 'Coimbatore Precision 01 (Precision Tooling & Motors)',
+  summary: {
+    overall_plant_oee: 88.2,
+    overall_availability: 95.4,
+    overall_performance: 94.1,
+    overall_quality: 98.2,
+    total_output: 418,
+    total_target: 450,
+    total_good: 412,
+    total_scrap: 6,
+    total_machines: 3,
+    running_machines: 3,
+    idle_machines: 0,
+    down_machines: 0,
+    active_alarms_count: 0,
+    last_updated: new Date().toISOString(),
+    takt_time_sec: 11.5,
+    mean_line_speed_sec: 10.8,
+    shift_name: 'Shift 1 (Day)',
+    shift_elapsed_pct: 70.0,
+    energy: {
+      total_power_kw: 68.4,
+      specific_energy_kwh_per_unit: 0.38,
+      carbon_intensity_gco2_per_unit: 148.0,
+      energy_cost_usd: 54.8,
+      green_energy_pct: 58.5,
+    },
+    financial_roi: {
+      revenue_generated_usd: 2966400.0,
+      downtime_cost_usd: 1187.5,
+      scrap_waste_cost_usd: 22800.0,
+      net_shift_value_usd: 2942412.5,
+      potential_savings_usd: 19000.0,
+      currency_symbol: '₹',
+      currency_code: 'INR',
+      unit_baseline: 7200,
+      downtime_hourly_rate: 95000,
+      scrap_unit_cost: 3800,
+    },
+  },
+  machines: [
+    {
+      machine_id: 'CBE-101',
+      machine_name: '5-Axis Precision Vertical Machining Center',
+      site_id: 'synapsys-mfg-in-coimbatore',
+      status: 'Running',
+      timestamp: new Date().toISOString(),
+      location: 'Bay 01 - High-Precision Milling Line',
+      operator: 'S. Ramanathan [Shift 1]',
+      output_count: 148,
+      target_output: 150,
+      good_count: 146,
+      scrap_count: 2,
+      cycle_time_sec: 11.8,
+      ideal_cycle_time_sec: 11.5,
+      uptime_seconds: 5200.0,
+      downtime_seconds: 35.0,
+      oee_metrics: {
+        availability: 0.985,
+        performance: 0.965,
+        quality: 0.986,
+        oee: 0.938,
+        oee_percentage: 93.8,
+        benchmark_status: 'World-Class',
+      },
+      active_alarm: null,
+      alarm_severity: 'None',
+      alarm_acknowledged: false,
+      alarm_duration_sec: 0,
+      recent_cycle_times: [11.8, 11.6, 11.7, 11.9, 11.8],
+      sensors: {
+        temperature_c: 49.2,
+        vibration_mm_s: 1.15,
+        power_kw: 21.8,
+        pressure_bar: 6.8,
+      },
+      predictive: {
+        anomaly_score: 9.4,
+        health_status: 'Optimal',
+        remaining_useful_life_hrs: 480,
+        component_at_risk: 'Spindle Roller Thrust Bearings',
+        root_cause_analysis: 'Acoustic vibration nominal. Hydrodynamic lubrication within optimal ISO-VG68 bounds.',
+      },
+      work_order: {
+        order_id: 'WO-CBE-701',
+        part_number: 'PN-EV-ROTOR-55',
+        part_name: 'Traction Motor High-Torque Rotor Shaft',
+        customer: 'Ather Energy & Tata EV Powertrain',
+        batch_target: 150,
+        batch_completed: 148,
+        start_time: '06:00 IST',
+        estimated_completion: '14:00 IST',
+      },
+      losses: {
+        equipment_failure_sec: 0.0,
+        setup_adjustment_sec: 12.0,
+        idling_minor_stops_sec: 8.0,
+        reduced_speed_sec: 5.0,
+        process_defects_units: 1,
+        startup_rejects_units: 0,
+      },
+    },
+    {
+      machine_id: 'CBE-202',
+      machine_name: 'Automated Sub-Micron Cylindrical Grinder',
+      site_id: 'synapsys-mfg-in-coimbatore',
+      status: 'Running',
+      timestamp: new Date().toISOString(),
+      location: 'Bay 02 - Micro-Finishing Cell',
+      operator: 'M. Anand [Shift 1]',
+      output_count: 140,
+      target_output: 150,
+      good_count: 138,
+      scrap_count: 2,
+      cycle_time_sec: 12.2,
+      ideal_cycle_time_sec: 12.0,
+      uptime_seconds: 5120.0,
+      downtime_seconds: 40.0,
+      oee_metrics: {
+        availability: 0.980,
+        performance: 0.955,
+        quality: 0.985,
+        oee: 0.922,
+        oee_percentage: 92.2,
+        benchmark_status: 'World-Class',
+      },
+      active_alarm: null,
+      alarm_severity: 'None',
+      alarm_acknowledged: false,
+      alarm_duration_sec: 0,
+      recent_cycle_times: [12.2, 12.1, 12.3, 12.2, 12.1],
+      sensors: {
+        temperature_c: 46.5,
+        vibration_mm_s: 0.95,
+        power_kw: 18.4,
+        pressure_bar: 5.8,
+      },
+      predictive: {
+        anomaly_score: 8.8,
+        health_status: 'Optimal',
+        remaining_useful_life_hrs: 520,
+        component_at_risk: 'Diamond Dressing Roll',
+        root_cause_analysis: 'Grinding wheel surface geometry calibrated. Dressing interval nominal.',
+      },
+      work_order: {
+        order_id: 'WO-CBE-702',
+        part_number: 'PN-HYD-SPOOL-12',
+        part_name: 'Servo Proportional Valve Spool',
+        customer: 'L&T Heavy Engineering',
+        batch_target: 150,
+        batch_completed: 140,
+        start_time: '06:00 IST',
+        estimated_completion: '14:30 IST',
+      },
+      losses: {
+        equipment_failure_sec: 0.0,
+        setup_adjustment_sec: 10.0,
+        idling_minor_stops_sec: 10.0,
+        reduced_speed_sec: 6.0,
+        process_defects_units: 1,
+        startup_rejects_units: 0,
+      },
+    },
+    {
+      machine_id: 'CBE-303',
+      machine_name: 'Laser Precision Welder & Inspection Cell',
+      site_id: 'synapsys-mfg-in-coimbatore',
+      status: 'Running',
+      timestamp: new Date().toISOString(),
+      location: 'Bay 03 - Laser Cell',
+      operator: 'V. Sundaram [Shift 1]',
+      output_count: 130,
+      target_output: 150,
+      good_count: 128,
+      scrap_count: 2,
+      cycle_time_sec: 11.2,
+      ideal_cycle_time_sec: 11.0,
+      uptime_seconds: 5300.0,
+      downtime_seconds: 25.0,
+      oee_metrics: {
+        availability: 0.990,
+        performance: 0.970,
+        quality: 0.984,
+        oee: 0.945,
+        oee_percentage: 94.5,
+        benchmark_status: 'World-Class',
+      },
+      active_alarm: null,
+      alarm_severity: 'None',
+      alarm_acknowledged: false,
+      alarm_duration_sec: 0,
+      recent_cycle_times: [11.2, 11.1, 11.3, 11.2, 11.0],
+      sensors: {
+        temperature_c: 44.8,
+        vibration_mm_s: 0.85,
+        power_kw: 28.2,
+        pressure_bar: 7.2,
+      },
+      predictive: {
+        anomaly_score: 7.2,
+        health_status: 'Optimal',
+        remaining_useful_life_hrs: 600,
+        component_at_risk: 'Beam Collimating Optics',
+        root_cause_analysis: 'Laser cavity thermal stability verified. Optic transmission 99.8%.',
+      },
+      work_order: {
+        order_id: 'WO-CBE-703',
+        part_number: 'PN-BATT-BUSBAR-04',
+        part_name: 'High-Current EV Battery Busbar Link',
+        customer: 'Ola Electric Megaplant',
+        batch_target: 150,
+        batch_completed: 130,
+        start_time: '06:00 IST',
+        estimated_completion: '14:15 IST',
+      },
+      losses: {
+        equipment_failure_sec: 0.0,
+        setup_adjustment_sec: 8.0,
+        idling_minor_stops_sec: 6.0,
+        reduced_speed_sec: 4.0,
+        process_defects_units: 1,
+        startup_rejects_units: 0,
+      },
+    },
+  ],
+  active_alarms: [],
+  connectors: [
+    {
+      id: 'opc_ua_cbe',
+      name: 'Coimbatore Plant Fieldbus OPC-UA (Tamil Nadu)',
+      protocol: 'OPC-UA',
+      endpoint: 'opc.tcp://10.24.10.10:4840',
+      status: 'Connected',
+      packet_rate_hz: 2.0,
+      last_heartbeat: 'Live (Subscribed)',
+      nodes_mapped: 48,
+      security_policy: 'Basic256Sha256 / SignAndEncrypt',
+    },
+  ],
+};
+
 function getMockDataForSite(siteId: string, siteName?: string): DashboardResponse {
+  if (siteId === 'synapsys-mfg-in-coimbatore' || siteId.includes('coimbatore') || siteId.includes('chennai') || siteId.includes('india') || siteId.includes('in-')) {
+    return COIMBATORE_SITE_DATA;
+  }
   if (siteId === 'synapsys-mfg-eu-frankfurt') return STUTTGART_SITE_DATA;
   if (siteId === 'synapsys-mfg-apac-tokyo') return YOKOHAMA_SITE_DATA;
   if (siteId === 'synapsys-mfg-prod-us') return INITIAL_DASHBOARD;
@@ -1258,6 +1531,19 @@ function getMockDataForSite(siteId: string, siteName?: string): DashboardRespons
 }
 
 const DEFAULT_PRODUCTION_SITES: ProductionSite[] = [
+  {
+    id: 'synapsys-mfg-in-coimbatore',
+    name: 'Coimbatore Precision 01 (Precision Tooling & Motors)',
+    region: 'asia-south1',
+    location: 'Coimbatore, Tamil Nadu, India',
+    latitude: 11.0168,
+    longitude: 76.9558,
+    facility_type: 'Automotive Components, Precision Motors & Textile Machinery',
+    active_lines: 10,
+    target_capacity: 4500,
+    nominal_oee: 88.2,
+    status: 'active',
+  },
   {
     id: 'synapsys-mfg-prod-us',
     name: 'Detroit Site 04 (Production Live)',
@@ -1543,6 +1829,10 @@ export default function DashboardWorkspace({
   const activeSite = useMemo(() => {
     return productionSites.find((s) => s.id === currentProject) || productionSites[0] || DEFAULT_PRODUCTION_SITES[0];
   }, [productionSites, currentProject]);
+
+  const siteCurrency: SiteCurrency = useMemo(() => {
+    return getCurrencyForSite(activeSite);
+  }, [activeSite]);
 
   const [data, setData] = useState<DashboardResponse>(() => {
     return getMockDataForSite(currentProject);
@@ -2897,11 +3187,11 @@ export default function DashboardWorkspace({
       } else if (pLower.includes('financial') || pLower.includes('cost') || pLower.includes('roi') || pLower.includes('revenue')) {
         const roi = data.summary?.financial_roi;
         fallbackText = roi
-          ? `Current shift at ${data.site_name || 'Facility'} has generated ₹${(roi.revenue_generated_usd || 0).toLocaleString()} in gross production value across ${data.summary?.total_good || 0} conforming parts. Unplanned downtime losses total -₹${(roi.downtime_cost_usd || 0).toLocaleString()} and scrap waste is -₹${(roi.scrap_waste_cost_usd || 0).toLocaleString()}. Net shift economic yield stands at ₹${(roi.net_shift_value_usd || 0).toLocaleString()}.`
+          ? `Current shift at ${data.site_name || 'Facility'} has generated ${siteCurrency.symbol}${(roi.revenue_generated_usd || 0).toLocaleString()} in gross production value across ${data.summary?.total_good || 0} conforming parts. Unplanned downtime losses total -${siteCurrency.symbol}${(roi.downtime_cost_usd || 0).toLocaleString()} and scrap waste is -${siteCurrency.symbol}${(roi.scrap_waste_cost_usd || 0).toLocaleString()}. Net shift economic yield stands at ${siteCurrency.symbol}${(roi.net_shift_value_usd || 0).toLocaleString()}.`
           : `Economic metrics: Overall OEE ${data.summary?.overall_plant_oee || 0}%, output ${data.summary?.total_output || 0} parts.`;
         fallbackCitations = [
-          `Gross Value: ₹${(roi?.revenue_generated_usd || 0).toLocaleString()}`,
-          `Downtime Cost: -₹${(roi?.downtime_cost_usd || 0).toLocaleString()}`,
+          `Gross Value: ${siteCurrency.symbol}${(roi?.revenue_generated_usd || 0).toLocaleString()}`,
+          `Downtime Cost: -${siteCurrency.symbol}${(roi?.downtime_cost_usd || 0).toLocaleString()}`,
           `Conforming Parts: ${data.summary?.total_good || 0} / ${data.summary?.total_target || 0}`,
         ];
       } else {
@@ -3305,7 +3595,7 @@ export default function DashboardWorkspace({
         id: 'kpi-financial',
         category: 'Action',
         title: 'Shift Economic Yield & ROI Ledger',
-        subtitle: `₹${(data.summary.financial_roi?.net_shift_value_usd || 0).toLocaleString()} realized net value`,
+        subtitle: `${siteCurrency.symbol}${(data.summary.financial_roi?.net_shift_value_usd || 0).toLocaleString()} realized net value`,
         badge: 'KPI',
         badgeTone: 'emerald',
         keywords: 'financial roi revenue downtime cost yield ledger money kpi',
@@ -4278,14 +4568,14 @@ export default function DashboardWorkspace({
                     <RomanMedallion numeral="03" size="md" active />
                     <span className="font-cinzel tracking-wider font-semibold truncate">SHIFT ECONOMIC YIELD</span>
                   </div>
-                  <span className="text-xs font-mono text-laurel px-2 py-0.5 rounded bg-laurel/10 border border-laurel/25 shrink-0">+₹7,200/unit</span>
+                  <span className="text-xs font-mono text-laurel px-2 py-0.5 rounded bg-laurel/10 border border-laurel/25 shrink-0">+{siteCurrency.symbol}{siteCurrency.unitBaseline.toLocaleString()}/unit</span>
                 </div>
                 <div className="my-4 flex items-center justify-between gap-3">
                   <div className="flex flex-col gap-1">
                     <AnimatedNumber
                       value={data.summary.financial_roi?.net_shift_value_usd || 14970}
                       decimals={2}
-                      prefix="₹"
+                      prefix={siteCurrency.symbol}
                       className="font-cinzel text-3xl sm:text-4xl xl:text-[40px] font-bold text-marble tracking-tight leading-none"
                     />
                     <span className="text-xs text-silver font-sans">Realized Net Shift Value</span>
@@ -4305,9 +4595,9 @@ export default function DashboardWorkspace({
                   </div>
                 </div>
                 <div className="text-[13px] text-silver pt-3.5 border-t border-line flex items-center justify-between font-mono">
-                  <span className="text-crimson">Downtime: -<AnimatedNumber value={data.summary.financial_roi?.downtime_cost_usd || 0} decimals={0} prefix="₹" /></span>
+                  <span className="text-crimson">Downtime: -<AnimatedNumber value={data.summary.financial_roi?.downtime_cost_usd || 0} decimals={0} prefix={siteCurrency.symbol} /></span>
                   <span className="text-line">|</span>
-                  <span>Gross: <strong className="text-marble font-semibold"><AnimatedNumber value={data.summary.financial_roi?.revenue_generated_usd || 0} decimals={0} prefix="₹" /></strong></span>
+                  <span>Gross: <strong className="text-marble font-semibold"><AnimatedNumber value={data.summary.financial_roi?.revenue_generated_usd || 0} decimals={0} prefix={siteCurrency.symbol} /></strong></span>
                 </div>
               </SpotlightCard>
             </RevealItem>
@@ -5512,6 +5802,7 @@ export default function DashboardWorkspace({
                   machines={data.machines}
                   overallOeePct={data.summary.overall_plant_oee}
                   netShiftValueUsd={data.summary.financial_roi?.net_shift_value_usd || 27309}
+                  currencySymbol={siteCurrency.symbol}
                 />
               </Suspense>
 
@@ -5619,7 +5910,7 @@ export default function DashboardWorkspace({
                 <div className="bg-g-surfaceElevated p-5 rounded-xl border border-g-border flex items-center justify-between text-[13px] sm:text-sm font-mono grid-container-surface">
                   <span className="text-g-textSecondary">Total recoverable variance:</span>
                   <span className="text-emerald-700 dark:text-emerald-400 font-semibold text-base">
-                    <AnimatedNumber value={100 - data.summary.overall_plant_oee} decimals={1} suffix="%" /> (<AnimatedNumber value={data.summary.financial_roi?.net_shift_value_usd || 14970} decimals={0} prefix="₹" /> net yield)
+                    <AnimatedNumber value={100 - data.summary.overall_plant_oee} decimals={1} suffix="%" /> (<AnimatedNumber value={data.summary.financial_roi?.net_shift_value_usd || 14970} decimals={0} prefix={siteCurrency.symbol} /> net yield)
                   </span>
                 </div>
               </Reveal>
@@ -5968,7 +6259,7 @@ export default function DashboardWorkspace({
           {/* TAB 7: Inventory & Procurement MRO Deck */}
           {activeTab === 'inventory' && (
             <Suspense fallback={<ChunkPanelFallback label="Loading Inventory & Procurement Deck..." />}>
-              <LazyInventoryManagementDeck />
+              <LazyInventoryManagementDeck currency={siteCurrency} />
             </Suspense>
           )}
           </SlidingTabContent>
@@ -6953,7 +7244,7 @@ export default function DashboardWorkspace({
                     Shift Economic Yield & Operational ROI Breakdown
                   </h3>
                   <p className="text-xs text-g-textSecondary font-mono mt-0.5">
-                    Unit Contract Baseline: +₹7,200 / finished part • Downtime Cost Penalty: ₹95,000 / hr per asset
+                    Unit Contract Baseline: +{siteCurrency.symbol}{siteCurrency.unitBaseline.toLocaleString()} / finished part • Downtime Cost Penalty: {siteCurrency.symbol}{siteCurrency.downtimeHourlyRate.toLocaleString()} / hr per asset
                   </p>
                 </div>
                 <button
@@ -6970,22 +7261,22 @@ export default function DashboardWorkspace({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 font-mono">
                 <div className="bg-g-surfaceElevated p-4 rounded-xl border border-g-border">
                   <span className="text-[10px] text-g-textSecondary uppercase block">Net Shift Yield</span>
-                  <div className="text-2xl font-bold text-g-text mt-1">₹{data.summary.financial_roi?.net_shift_value_usd.toLocaleString()}</div>
+                  <div className="text-2xl font-bold text-g-text mt-1">{siteCurrency.symbol}{data.summary.financial_roi?.net_shift_value_usd.toLocaleString()}</div>
                   <span className="text-[10px] text-emerald-700 dark:text-emerald-400 mt-1 block">Net Realized Value</span>
                 </div>
                 <div className="bg-g-surfaceElevated p-4 rounded-xl border border-g-border">
                   <span className="text-[10px] text-g-textSecondary uppercase block">Gross Contract Output</span>
-                  <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">₹{data.summary.financial_roi?.revenue_generated_usd.toLocaleString()}</div>
+                  <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">{siteCurrency.symbol}{data.summary.financial_roi?.revenue_generated_usd.toLocaleString()}</div>
                   <span className="text-[10px] text-g-textSecondary mt-1 block">Total Delivered Output</span>
                 </div>
                 <div className="bg-g-surfaceElevated p-4 rounded-xl border border-g-border">
                   <span className="text-[10px] text-g-textSecondary uppercase block">Downtime Cost Penalty</span>
-                  <div className="text-2xl font-bold text-rose-600 dark:text-rose-500 mt-1">-₹{data.summary.financial_roi?.downtime_cost_usd}</div>
+                  <div className="text-2xl font-bold text-rose-600 dark:text-rose-500 mt-1">-{siteCurrency.symbol}{data.summary.financial_roi?.downtime_cost_usd}</div>
                   <span className="text-[10px] text-rose-700 dark:text-rose-400 mt-1 block">Unplanned Stoppages</span>
                 </div>
                 <div className="bg-g-surfaceElevated p-4 rounded-xl border border-g-border">
                   <span className="text-[10px] text-g-textSecondary uppercase block">AI Recoverable Savings</span>
-                  <div className="text-2xl font-bold text-g-blue mt-1">+₹{data.summary.financial_roi?.potential_savings_usd}</div>
+                  <div className="text-2xl font-bold text-g-blue mt-1">+{siteCurrency.symbol}{data.summary.financial_roi?.potential_savings_usd}</div>
                   <span className="text-[10px] text-g-blue mt-1 block">Via Gemini Diagnostics</span>
                 </div>
               </div>
@@ -6997,20 +7288,20 @@ export default function DashboardWorkspace({
                 </span>
                 <div className="space-y-2 text-xs font-mono">
                   <div className="flex justify-between py-1 border-b border-g-borderSubtle/50">
-                    <span className="text-g-textSecondary">Gross Value from Conforming Output ({data.summary.total_good} units × ₹7,200):</span>
-                    <span className="font-bold text-emerald-700 dark:text-emerald-400">+₹{(data.summary.total_good * 7200).toLocaleString()}</span>
+                    <span className="text-g-textSecondary">Gross Value from Conforming Output ({data.summary.total_good} units × {siteCurrency.symbol}{siteCurrency.unitBaseline.toLocaleString()}):</span>
+                    <span className="font-bold text-emerald-700 dark:text-emerald-400">+{siteCurrency.symbol}{(data.summary.total_good * siteCurrency.unitBaseline).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-g-borderSubtle/50">
                     <span className="text-g-textSecondary">Unplanned Machine Downtime Labor & Capital Penalty:</span>
-                    <span className="font-bold text-rose-700 dark:text-rose-400">-₹{data.summary.financial_roi?.downtime_cost_usd}</span>
+                    <span className="font-bold text-rose-700 dark:text-rose-400">-{siteCurrency.symbol}{data.summary.financial_roi?.downtime_cost_usd}</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-g-borderSubtle/50">
-                    <span className="text-g-textSecondary">Scrap Rejection Material Loss ({data.summary.total_scrap} units × ₹3,800 scrap cost):</span>
-                    <span className="font-bold text-rose-700 dark:text-rose-400">-₹{(data.summary.total_scrap * 3800).toLocaleString()}</span>
+                    <span className="text-g-textSecondary">Scrap Rejection Material Loss ({data.summary.total_scrap} units × {siteCurrency.symbol}{siteCurrency.scrapUnitCost.toLocaleString()} scrap cost):</span>
+                    <span className="font-bold text-rose-700 dark:text-rose-400">-{siteCurrency.symbol}{(data.summary.total_scrap * siteCurrency.scrapUnitCost).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between py-1.5 font-bold text-sm bg-g-surface p-2.5 rounded border border-g-border">
                     <span className="text-g-text">Net Realized Economic Value for {activeSite?.name.replace(/\s*\(Production Live\)/i, '') || 'Active Facility'}:</span>
-                    <span className="text-emerald-700 dark:text-emerald-400">₹{data.summary.financial_roi?.net_shift_value_usd.toLocaleString()}</span>
+                    <span className="text-emerald-700 dark:text-emerald-400">{siteCurrency.symbol}{data.summary.financial_roi?.net_shift_value_usd.toLocaleString()}</span>
                   </div>
 
                 </div>
@@ -7088,8 +7379,8 @@ export default function DashboardWorkspace({
                 </div>
                 <div className="bg-g-surfaceElevated p-4 rounded-xl border border-g-border">
                   <span className="text-[10px] text-g-textSecondary uppercase block">Shift Energy Cost</span>
-                  <div className="text-2xl font-bold text-g-text mt-1">₹{Math.round((data.summary.energy?.energy_cost_usd || 69.78) * 86).toLocaleString()}</div>
-                  <span className="text-[10px] text-g-textSecondary mt-1 block">@ ₹11.50 / kWh Tariff</span>
+                  <div className="text-2xl font-bold text-g-text mt-1">{siteCurrency.symbol}{Math.round((data.summary.energy?.energy_cost_usd || 69.78) * siteCurrency.fxRate).toLocaleString()}</div>
+                  <span className="text-[10px] text-g-textSecondary mt-1 block">@ {siteCurrency.powerTariffLabel}</span>
                 </div>
               </div>
 
@@ -7198,8 +7489,8 @@ export default function DashboardWorkspace({
                 </div>
                 <div className="bg-g-surfaceElevated p-3.5 rounded-xl border border-g-border">
                   <span className="text-[10px] text-g-textSecondary uppercase block font-sans">Net Economic Yield</span>
-                  <span className="text-2xl font-bold text-g-text mt-1 block">₹{data.summary.financial_roi?.net_shift_value_usd.toLocaleString()}</span>
-                  <span className="text-[10px] text-rose-700 dark:text-rose-400 mt-0.5 block">Downtime: -₹{data.summary.financial_roi?.downtime_cost_usd}</span>
+                  <span className="text-2xl font-bold text-g-text mt-1 block">{siteCurrency.symbol}{data.summary.financial_roi?.net_shift_value_usd.toLocaleString()}</span>
+                  <span className="text-[10px] text-rose-700 dark:text-rose-400 mt-0.5 block">Downtime: -{siteCurrency.symbol}{data.summary.financial_roi?.downtime_cost_usd}</span>
                 </div>
                 <div className="bg-g-surfaceElevated p-3.5 rounded-xl border border-g-border">
                   <span className="text-[10px] text-g-textSecondary uppercase block font-sans">Fleet Energy</span>
@@ -8188,7 +8479,24 @@ export default function DashboardWorkspace({
                         <label className="block text-g-textSecondary font-medium mb-1">Regional Edge Gateway *</label>
                         <select
                           value={newSiteForm.region}
-                          onChange={(e) => setNewSiteForm({ ...newSiteForm, region: e.target.value })}
+                          onChange={(e) => {
+                            const reg = e.target.value;
+                            const primaryHub = MANUFACTURING_HUBS.find((h) => h.gateway_region === reg);
+                            if (primaryHub) {
+                              setNewSiteForm((prev) => ({
+                                ...prev,
+                                region: reg,
+                                location: primaryHub.full_location,
+                                latitude: primaryHub.lat,
+                                longitude: primaryHub.lon,
+                                facility_type: primaryHub.facility_type,
+                                name: prev.name.endsWith('Facility') || !prev.name ? `${primaryHub.city} Facility` : prev.name,
+                                id: prev.id.startsWith('synapsys-mfg-') || !prev.id ? `synapsys-mfg-${primaryHub.city.toLowerCase().replace(/[^a-z0-9]/g, '-')}` : prev.id,
+                              }));
+                            } else {
+                              setNewSiteForm((prev) => ({ ...prev, region: reg }));
+                            }
+                          }}
                           className="w-full px-3 py-1.5 rounded-lg bg-g-surface border border-g-border text-g-text focus:outline-none focus:border-g-blue text-xs cursor-pointer"
                         >
                           <option value="asia-south1">asia-south1 (Mumbai / Chennai / Coimbatore, India)</option>
@@ -8245,6 +8553,7 @@ export default function DashboardWorkspace({
                               currentLocation={newSiteForm.location}
                               currentLatitude={newSiteForm.latitude}
                               currentLongitude={newSiteForm.longitude}
+                              selectedRegion={newSiteForm.region}
                               onSelectLocation={(geo: GeoLocationData) => {
                                 handleGeoLocationSelect(geo);
                               }}

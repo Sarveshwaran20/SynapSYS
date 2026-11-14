@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { motion, useReducedMotion, AnimatePresence } from 'framer-motion';
 import {
   InventoryItem,
@@ -6,6 +6,7 @@ import {
   PurchaseOrder,
   PurchaseOrderItem,
 } from '../../types';
+import { SiteCurrency } from '../../lib/currency';
 import { MotionButton, Reveal, SpotlightCard } from '../motion';
 import { dur, ease } from '../../lib/motion';
 
@@ -13,6 +14,7 @@ export interface InventoryManagementDeckProps {
   initialItems?: InventoryItem[];
   initialSuppliers?: SupplierVendor[];
   initialOrders?: PurchaseOrder[];
+  currency?: SiteCurrency;
   onEvent?: (label: string, category: string, tone?: 'blue' | 'emerald' | 'amber' | 'rose') => void;
 }
 
@@ -218,9 +220,51 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
     initialItems = DEFAULT_INVENTORY_FALLBACK,
     initialSuppliers = DEFAULT_SUPPLIERS_FALLBACK,
     initialOrders = DEFAULT_ORDERS_FALLBACK,
+    currency,
     onEvent,
   }) => {
     const shouldReduce = useReducedMotion();
+    const activeCurr: SiteCurrency = useMemo(
+      () =>
+        currency || {
+          code: 'INR',
+          symbol: '₹',
+          name: 'Indian Rupee',
+          unitBaseline: 7200,
+          downtimeHourlyRate: 95000,
+          scrapUnitCost: 3800,
+          powerTariff: 11.5,
+          powerTariffLabel: '₹11.50 / kWh',
+          fxRate: 86.0,
+        },
+      [currency]
+    );
+
+    const isIndia = activeCurr.code === 'INR';
+
+    const getItemUnitCost = useCallback(
+      (item: { unit_cost_inr?: number; unit_cost_usd: number }): number => {
+        if (activeCurr.code === 'USD') return item.unit_cost_usd || (item.unit_cost_inr ? item.unit_cost_inr / 86.0 : 50);
+        if (activeCurr.code === 'EUR') return Math.round((item.unit_cost_usd || 50) * 0.92 * 100) / 100;
+        if (activeCurr.code === 'JPY') return Math.round((item.unit_cost_usd || 50) * 155.0);
+        if (activeCurr.code === 'GBP') return Math.round((item.unit_cost_usd || 50) * 0.79 * 100) / 100;
+        if (activeCurr.code === 'SGD') return Math.round((item.unit_cost_usd || 50) * 1.35 * 100) / 100;
+        return item.unit_cost_inr || item.unit_cost_usd * 86.0;
+      },
+      [activeCurr]
+    );
+
+    const formatCurrencyAmount = useCallback(
+      (amount: number): string => {
+        const dec = activeCurr.code === 'JPY' || activeCurr.code === 'INR' ? 0 : 2;
+        return `${activeCurr.symbol}${amount.toLocaleString(undefined, {
+          minimumFractionDigits: dec,
+          maximumFractionDigits: dec,
+        })}`;
+      },
+      [activeCurr]
+    );
+
     const [deckTab, setDeckTab] = useState<'inventory' | 'orders' | 'suppliers'>('inventory');
     const [items, setItems] = useState<InventoryItem[]>(initialItems);
     const [suppliers] = useState<SupplierVendor[]>(initialSuppliers);
@@ -249,7 +293,16 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
     ]);
     const [poNotes, setPoNotes] = useState<string>('Standard replenishment delivery to Inbound Gate 02');
     const [poPriority, setPoPriority] = useState<string>('Standard');
-    const [poFacility, setPoFacility] = useState<string>('Coimbatore Spindle Unit - Inbound Crib A');
+    const [poFacility, setPoFacility] = useState<string>(
+      () =>
+        activeCurr.code === 'INR'
+          ? 'Coimbatore Precision Unit - Inbound Crib A'
+          : activeCurr.code === 'EUR'
+          ? 'Stuttgart Tooling Bay 02'
+          : activeCurr.code === 'JPY'
+          ? 'Yokohama Cleanroom Stores'
+          : 'Detroit Plant Tooling Crib'
+    );
     const [poOperatorName, setPoOperatorName] = useState<string>('Sarveshwaran K (Plant Supervisor)');
 
     // 2FA Security Modal State
@@ -294,10 +347,10 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
       }
     }, [is2faModalOpen]);
 
-    // Valuation calculations in Indian Rupees (₹)
-    const totalValuationInr = useMemo(
-      () => items.reduce((acc, it) => acc + it.quantity * (it.unit_cost_inr || it.unit_cost_usd * 86.0), 0),
-      [items]
+    // Valuation calculations in active facility currency
+    const totalValuation = useMemo(
+      () => items.reduce((acc, it) => acc + it.quantity * getItemUnitCost(it), 0),
+      [items, getItemUnitCost]
     );
 
     const lowStockItems = useMemo(
@@ -423,15 +476,21 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
       setPoLines((prev) => prev.filter((_, i) => i !== idx));
     };
 
-    // Calculate live totals for the draft
-    const currentSubtotalInr = useMemo(
-      () => poLines.reduce((acc, l) => acc + (l.total_price_inr || l.total_price_usd * 86.0), 0),
-      [poLines]
+    // Calculate live totals for the draft in active facility currency
+    const currentSubtotal = useMemo(
+      () => poLines.reduce((acc, l) => acc + (l.total_price_inr || l.total_price_usd * activeCurr.fxRate), 0),
+      [poLines, activeCurr.fxRate]
     );
-    const currentCgstInr = Math.round(currentSubtotalInr * 0.09 * 100) / 100;
-    const currentSgstInr = Math.round(currentSubtotalInr * 0.09 * 100) / 100;
-    const currentTaxInr = currentCgstInr + currentSgstInr;
-    const currentTotalInr = currentSubtotalInr + currentTaxInr;
+    const taxRate = isIndia ? 0.18 : (activeCurr.code === 'USD' ? 0.0825 : (activeCurr.code === 'EUR' ? 0.19 : (activeCurr.code === 'JPY' ? 0.10 : (activeCurr.code === 'GBP' ? 0.20 : 0.09))));
+    const currentCgst = isIndia ? Math.round(currentSubtotal * 0.09 * 100) / 100 : 0;
+    const currentSgst = isIndia ? Math.round(currentSubtotal * 0.09 * 100) / 100 : 0;
+    const currentTax = isIndia ? currentCgst + currentSgst : Math.round(currentSubtotal * taxRate * 100) / 100;
+    const currentTotal = currentSubtotal + currentTax;
+    const currentSubtotalInr = currentSubtotal;
+    const currentCgstInr = currentCgst;
+    const currentSgstInr = currentSgst;
+    const currentTaxInr = currentTax;
+    const currentTotalInr = currentTotal;
 
     // STEP 1 OF ORDERING: Trigger 2FA Challenge
     const handleInitiate2Fa = async (e: React.FormEvent) => {
@@ -521,7 +580,7 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
           setOrders((prev) => [approvedPo, ...prev]);
           setIs2faSuccess(true);
           onEvent?.(
-            `2FA Authorized: Dispatched ${approvedPo.po_id} (₹${approvedPo.total_inr?.toLocaleString() || approvedPo.total_usd}) to ${approvedPo.supplier_name}`,
+            `2FA Authorized: Dispatched ${approvedPo.po_id} (${formatCurrencyAmount(approvedPo.total_inr || approvedPo.total_usd * activeCurr.fxRate)}) to ${approvedPo.supplier_name}`,
             'Procurement',
             'emerald'
           );
@@ -567,7 +626,7 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
         };
         setOrders((prev) => [newPo, ...prev]);
         setIs2faSuccess(true);
-        onEvent?.(`2FA Authorized: Dispatched ${newPo.po_id} (₹${newPo.total_inr?.toLocaleString()}) to ${sup.name}`, 'Procurement', 'emerald');
+        onEvent?.(`2FA Authorized: Dispatched ${newPo.po_id} (${formatCurrencyAmount(newPo.total_inr || newPo.total_usd * activeCurr.fxRate)}) to ${sup.name}`, 'Procurement', 'emerald');
         setToastMessage(`PO ${newPo.po_id} authorized & emailed to seller (${sup.email})!`);
 
         setTimeout(() => {
@@ -742,7 +801,7 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
           <SpotlightCard className="p-5 rounded-xl bg-g-surface border border-g-border">
             <span className="text-xs text-g-textMuted uppercase font-mono block">Total Crib Valuation</span>
             <span className="text-2xl font-bold text-g-text mt-1 block tabular-nums">
-              ₹{totalValuationInr.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {formatCurrencyAmount(totalValuation)}
             </span>
             <span className="text-xs text-g-textSecondary mt-1 block">{items.length} active SKUs in catalogue</span>
           </SpotlightCard>
@@ -871,7 +930,7 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
                       <th className="p-3.5">SKU / Item Description</th>
                       <th className="p-3.5">Category</th>
                       <th className="p-3.5">Stock vs Buffer</th>
-                      <th className="p-3.5">Unit Rate (INR)</th>
+                      <th className="p-3.5">Unit Rate ({activeCurr.code})</th>
                       <th className="p-3.5">Storage Bin</th>
                       <th className="p-3.5">Preferred Supplier</th>
                       <th className="p-3.5 text-right">Floor Actions</th>
@@ -881,7 +940,7 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
                     {filteredItems.map((item) => {
                       const isLow = item.quantity <= item.min_safety_stock;
                       const ratio = Math.min(1, item.quantity / (item.min_safety_stock * 2));
-                      const unitRate = item.unit_cost_inr || item.unit_cost_usd * 86.0;
+                      const unitRate = getItemUnitCost(item);
 
                       return (
                         <tr key={item.id} className="hover:bg-g-surfaceSubtle/40 transition-colors">
@@ -922,7 +981,7 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
                           </td>
 
                           <td className="p-3.5 font-bold text-g-text tabular-nums text-sm">
-                            ₹{unitRate.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            {formatCurrencyAmount(unitRate)}
                           </td>
 
                           <td className="p-3.5 text-g-textSecondary">{item.bin_location}</td>
@@ -1029,9 +1088,9 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
 
                       <div className="flex items-center gap-3 flex-shrink-0">
                         <div className="text-right">
-                          <span className="text-[10px] text-g-textMuted font-mono block">PO Total (INR)</span>
+                          <span className="text-[10px] text-g-textMuted font-mono block">PO Total ({activeCurr.code})</span>
                           <span className="text-base font-bold text-g-text tabular-nums">
-                            ₹{totalInr.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            {formatCurrencyAmount(totalInr)}
                           </span>
                         </div>
 
@@ -1291,7 +1350,7 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
                       </div>
 
                       <div className="col-span-2 text-right font-mono text-xs font-semibold text-g-text tabular-nums">
-                        ₹{(line.total_price_inr || line.total_price_usd * 86.0).toLocaleString()}
+                        {formatCurrencyAmount(line.total_price_inr || line.total_price_usd * activeCurr.fxRate)}
                       </div>
 
                       <div className="col-span-1 text-right">
@@ -1308,23 +1367,32 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
                     </div>
                   ))}
 
-                  {/* GST Tax Breakdown */}
+                  {/* Tax Breakdown */}
                   <div className="pt-2 border-t border-g-border/50 space-y-1 text-xs font-mono text-g-textSecondary">
                     <div className="flex justify-between">
                       <span>Taxable Subtotal:</span>
-                      <span className="text-g-text font-semibold">₹{currentSubtotalInr.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      <span className="text-g-text font-semibold">{formatCurrencyAmount(currentSubtotal)}</span>
                     </div>
-                    <div className="flex justify-between text-[11px]">
-                      <span>CGST (9.0%):</span>
-                      <span>₹{currentCgstInr.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="flex justify-between text-[11px]">
-                      <span>SGST (9.0%):</span>
-                      <span>₹{currentSgstInr.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                    </div>
+                    {isIndia ? (
+                      <>
+                        <div className="flex justify-between text-[11px]">
+                          <span>CGST (9.0%):</span>
+                          <span>{formatCurrencyAmount(currentCgst)}</span>
+                        </div>
+                        <div className="flex justify-between text-[11px]">
+                          <span>SGST (9.0%):</span>
+                          <span>{formatCurrencyAmount(currentSgst)}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex justify-between text-[11px]">
+                        <span>Regional Tax ({(taxRate * 100).toFixed(1)}%):</span>
+                        <span>{formatCurrencyAmount(currentTax)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-sm font-bold text-cyan-300 pt-1 border-t border-g-border/40">
-                      <span>Total Requisition (INR):</span>
-                      <span>₹{currentTotalInr.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                      <span>Total Requisition ({activeCurr.code}):</span>
+                      <span>{formatCurrencyAmount(currentTotal)}</span>
                     </div>
                   </div>
                 </div>
@@ -1419,8 +1487,8 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
                   <span className="text-g-text font-semibold">{pendingPoDraft?.supplier_name}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-g-textMuted">Total (18% GST incl.):</span>
-                  <span className="text-emerald-400 font-bold">₹{pendingPoDraft?.total_inr?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                  <span className="text-g-textMuted">{isIndia ? 'Total (18% GST incl.):' : `Total (${activeCurr.code}):`}</span>
+                  <span className="text-emerald-400 font-bold">{formatCurrencyAmount(pendingPoDraft?.total_inr || 0)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-g-textMuted">Line Items:</span>
@@ -1556,24 +1624,32 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
                     <tr>
                       <th className="p-2.5">SKU / Item</th>
                       <th className="p-2.5 text-center">Qty</th>
-                      <th className="p-2.5 text-right">Unit Rate (INR)</th>
+                      <th className="p-2.5 text-right">Unit Rate ({activeCurr.code})</th>
                       <th className="p-2.5 text-right">Subtotal</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-800">
-                    {previewPo.items.map((line, i) => (
-                      <tr key={i}>
-                        <td className="p-2.5">
-                          <div className="font-bold text-cyan-300">{line.sku}</div>
-                          <div className="text-gray-300 text-[11px] font-sans">{line.name}</div>
-                        </td>
-                        <td className="p-2.5 text-center font-bold">{line.quantity} {line.unit}</td>
-                        <td className="p-2.5 text-right">₹{(line.unit_price_inr || line.unit_price_usd * 86.0).toLocaleString()}</td>
-                        <td className="p-2.5 text-right font-bold text-white">
-                          ₹{(line.total_price_inr || line.total_price_usd * 86.0).toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
+                    {previewPo.items.map((line, i) => {
+                      const unitRate = isIndia
+                        ? (line.unit_price_inr || line.unit_price_usd * 86.0)
+                        : activeCurr.code === 'USD'
+                        ? (line.unit_price_usd || (line.unit_price_inr ? line.unit_price_inr / 86.0 : 50))
+                        : (line.unit_price_usd || 50) * activeCurr.fxRate;
+                      const lineTotal = unitRate * line.quantity;
+                      return (
+                        <tr key={i}>
+                          <td className="p-2.5">
+                            <div className="font-bold text-cyan-300">{line.sku}</div>
+                            <div className="text-gray-300 text-[11px] font-sans">{line.name}</div>
+                          </td>
+                          <td className="p-2.5 text-center font-bold">{line.quantity} {line.unit}</td>
+                          <td className="p-2.5 text-right">{formatCurrencyAmount(unitRate)}</td>
+                          <td className="p-2.5 text-right font-bold text-white">
+                            {formatCurrencyAmount(lineTotal)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1581,16 +1657,24 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
               {/* Tax totals */}
               <div className="bg-gray-900/40 p-3 rounded-lg border border-gray-800 space-y-1 text-xs font-mono text-right">
                 <div className="text-gray-400">
-                  Taxable Subtotal: <strong className="text-white">₹{(previewPo.subtotal_inr || previewPo.subtotal_usd * 86.0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>
+                  Taxable Subtotal: <strong className="text-white">{formatCurrencyAmount(previewPo.subtotal_inr || previewPo.subtotal_usd * activeCurr.fxRate)}</strong>
                 </div>
-                <div className="text-gray-400 text-[11px]">
-                  CGST (9.0%): ₹{((previewPo.cgst_inr || (previewPo.tax_inr ? previewPo.tax_inr / 2 : (previewPo.tax_usd * 86.0) / 2))).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </div>
-                <div className="text-gray-400 text-[11px]">
-                  SGST (9.0%): ₹{((previewPo.sgst_inr || (previewPo.tax_inr ? previewPo.tax_inr / 2 : (previewPo.tax_usd * 86.0) / 2))).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </div>
+                {isIndia ? (
+                  <>
+                    <div className="text-gray-400 text-[11px]">
+                      CGST (9.0%): {formatCurrencyAmount(previewPo.cgst_inr || (previewPo.tax_inr ? previewPo.tax_inr / 2 : (previewPo.tax_usd * 86.0) / 2))}
+                    </div>
+                    <div className="text-gray-400 text-[11px]">
+                      SGST (9.0%): {formatCurrencyAmount(previewPo.sgst_inr || (previewPo.tax_inr ? previewPo.tax_inr / 2 : (previewPo.tax_usd * 86.0) / 2))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-gray-400 text-[11px]">
+                    Regional Tax / VAT (8.25%): {formatCurrencyAmount(previewPo.tax_usd ? previewPo.tax_usd * activeCurr.fxRate : ((previewPo.subtotal_inr || 0) / 86.0) * 0.0825 * activeCurr.fxRate)}
+                  </div>
+                )}
                 <div className="text-base font-bold text-cyan-300 pt-1 border-t border-gray-800">
-                  Total Amount (INR): ₹{(previewPo.total_inr || previewPo.total_usd * 86.0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  Total Amount ({activeCurr.code}): {formatCurrencyAmount(previewPo.total_inr || previewPo.total_usd * activeCurr.fxRate)}
                 </div>
               </div>
 

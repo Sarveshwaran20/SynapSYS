@@ -150,6 +150,11 @@ export interface FinancialROI {
   scrap_waste_cost_usd: number;
   net_shift_value_usd: number;
   potential_savings_usd: number;
+  currency_symbol?: string;
+  currency_code?: string;
+  unit_baseline?: number;
+  downtime_hourly_rate?: number;
+  scrap_unit_cost?: number;
 }
 
 export interface CopilotMessage {

@@ -1,5 +1,25 @@
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { ProductionSite } from './types';
+import {
+  ManufacturingHub,
+  MANUFACTURING_HUBS,
+  latLonToMapXY,
+  mapXYToLatLon,
+  findClosestManufacturingHub,
+  suggestRegionFromCoordinates,
+  RegionViewboxConfig,
+  REGION_VIEWBOXES,
+} from './lib/manufacturingHubs';
+
+export type { ManufacturingHub, RegionViewboxConfig };
+export {
+  MANUFACTURING_HUBS,
+  latLonToMapXY,
+  mapXYToLatLon,
+  findClosestManufacturingHub,
+  suggestRegionFromCoordinates,
+  REGION_VIEWBOXES,
+};
 
 export interface GeoLocationData {
   location: string;
@@ -14,6 +34,7 @@ export interface GeoMapAssistProps {
   currentLocation: string;
   currentLatitude?: number;
   currentLongitude?: number;
+  selectedRegion?: string;
   onSelectLocation: (data: GeoLocationData) => void;
   deployedSites?: ProductionSite[];
   onSelectSite?: (siteId: string) => void;
@@ -22,306 +43,13 @@ export interface GeoMapAssistProps {
   onClose?: () => void;
 }
 
-export interface ManufacturingHub {
-  id: string;
-  city: string;
-  region_name: string;
-  full_location: string;
-  lat: number;
-  lon: number;
-  gateway_region: string;
-  facility_type: string;
-  cluster_desc: string;
-  continent: 'India/South Asia' | 'Americas' | 'Europe' | 'East Asia & APAC';
-}
 
-export const MANUFACTURING_HUBS: ManufacturingHub[] = [
-  // India & South Asia
-  {
-    id: 'in-cbe',
-    city: 'Coimbatore',
-    region_name: 'Tamil Nadu, India',
-    full_location: 'Coimbatore, Tamil Nadu, India',
-    lat: 11.0168,
-    lon: 76.9558,
-    gateway_region: 'asia-south1',
-    facility_type: 'Automotive Components, Precision Motors & Textile Machinery',
-    cluster_desc: 'Tier-1 Auto Engineering, Electric Motors & Sub-Micron Tooling Hub',
-    continent: 'India/South Asia',
-  },
-  {
-    id: 'in-maa',
-    city: 'Chennai',
-    region_name: 'Tamil Nadu, India',
-    full_location: 'Chennai, Tamil Nadu, India',
-    lat: 13.0827,
-    lon: 80.2707,
-    gateway_region: 'asia-south1',
-    facility_type: 'Automotive Powertrain & EV Manufacturing Corridor',
-    cluster_desc: 'Detroit of South Asia — Major Automobile & EV Assembly Plants',
-    continent: 'India/South Asia',
-  },
-  {
-    id: 'in-blr',
-    city: 'Bengaluru',
-    region_name: 'Karnataka, India',
-    full_location: 'Bengaluru, Karnataka, India',
-    lat: 12.9716,
-    lon: 77.5946,
-    gateway_region: 'asia-south1',
-    facility_type: 'Aerospace Machining & Precision Electronics Fab',
-    cluster_desc: 'Defense Aerostructures, ISRO Aerospace & Microelectronics Hub',
-    continent: 'India/South Asia',
-  },
-  {
-    id: 'in-pnq',
-    city: 'Pune',
-    region_name: 'Maharashtra, India',
-    full_location: 'Pune, Maharashtra, India',
-    lat: 18.5204,
-    lon: 73.8567,
-    gateway_region: 'asia-south1',
-    facility_type: 'Heavy Industrial Machinery & Chassis Fabrication',
-    cluster_desc: 'Commercial Vehicle Foundry, Forging & Powertrain Ecosystem',
-    continent: 'India/South Asia',
-  },
-  {
-    id: 'in-amd',
-    city: 'Sanand / Ahmedabad',
-    region_name: 'Gujarat, India',
-    full_location: 'Sanand, Gujarat, India',
-    lat: 23.0225,
-    lon: 72.5714,
-    gateway_region: 'asia-south1',
-    facility_type: 'Semiconductor ATMP Fab & High-Speed EV Assembly',
-    cluster_desc: 'Advanced Semiconductor Assembly & Automotive Megaplant Cluster',
-    continent: 'India/South Asia',
-  },
-  {
-    id: 'in-del',
-    city: 'Gurugram / Manesar',
-    region_name: 'Haryana, India',
-    full_location: 'Gurugram, Haryana, India',
-    lat: 28.4595,
-    lon: 77.0266,
-    gateway_region: 'asia-south1',
-    facility_type: 'Automotive Assembly & Robotics Automation',
-    cluster_desc: 'Northern Industrial Corridor — High-Volume Passenger Vehicle Plants',
-    continent: 'India/South Asia',
-  },
-
-  // Americas
-  {
-    id: 'us-det',
-    city: 'Detroit',
-    region_name: 'Michigan, USA',
-    full_location: 'Detroit, MI, USA',
-    lat: 42.3314,
-    lon: -83.0458,
-    gateway_region: 'us-east4',
-    facility_type: 'Automotive Powertrain & Battery Cell',
-    cluster_desc: 'Global Automotive Powertrain & Battery Cell Innovation Corridor',
-    continent: 'Americas',
-  },
-  {
-    id: 'us-atx',
-    city: 'Austin',
-    region_name: 'Texas, USA',
-    full_location: 'Austin, TX, USA',
-    lat: 30.2672,
-    lon: -97.7431,
-    gateway_region: 'us-south1',
-    facility_type: 'EV Powertrain & Battery Cell',
-    cluster_desc: 'Next-Gen EV Gigafactory & Silicon Semiconductor Foundry Hub',
-    continent: 'Americas',
-  },
-  {
-    id: 'us-fmt',
-    city: 'Fremont',
-    region_name: 'California, USA',
-    full_location: 'Fremont, CA, USA',
-    lat: 37.5485,
-    lon: -121.9886,
-    gateway_region: 'us-west1',
-    facility_type: 'Robotics Assembly & Testing Cell',
-    cluster_desc: 'Silicon Valley Advanced Hardware & Autonomous Robotics Fab',
-    continent: 'Americas',
-  },
-  {
-    id: 'mx-mty',
-    city: 'Monterrey',
-    region_name: 'Nuevo León, Mexico',
-    full_location: 'Monterrey, Mexico',
-    lat: 25.6866,
-    lon: -100.3161,
-    gateway_region: 'us-south1',
-    facility_type: 'Precision Stamping & Tier-1 Heavy Castings',
-    cluster_desc: 'Nearshoring Automotive Megacluster & High-Tonnage Forging',
-    continent: 'Americas',
-  },
-
-  // Europe
-  {
-    id: 'de-str',
-    city: 'Stuttgart',
-    region_name: 'Baden-Württemberg, Germany',
-    full_location: 'Stuttgart, Germany',
-    lat: 48.7758,
-    lon: 9.1829,
-    gateway_region: 'europe-west3',
-    facility_type: 'Precision Stamping & BiW Assembly',
-    cluster_desc: 'Baden-Württemberg High-Precision Automotive Engineering & Tooling',
-    continent: 'Europe',
-  },
-  {
-    id: 'de-muc',
-    city: 'Munich',
-    region_name: 'Bavaria, Germany',
-    full_location: 'Munich, Germany',
-    lat: 48.1351,
-    lon: 11.5820,
-    gateway_region: 'europe-west3',
-    facility_type: 'Automotive Powertrain & Smart Robotics',
-    cluster_desc: 'Bavarian Advanced Mobility, Mechatronics & Autonomous Drives',
-    continent: 'Europe',
-  },
-  {
-    id: 'fr-tls',
-    city: 'Toulouse',
-    region_name: 'Occitanie, France',
-    full_location: 'Toulouse, France',
-    lat: 43.6047,
-    lon: 1.4442,
-    gateway_region: 'europe-west1',
-    facility_type: 'Aerospace Machining & Turbine Impeller',
-    cluster_desc: 'European Aerospace Capital — Airbus Final Assembly & Avionics',
-    continent: 'Europe',
-  },
-  {
-    id: 'at-grz',
-    city: 'Graz',
-    region_name: 'Styria, Austria',
-    full_location: 'Graz, Austria',
-    lat: 47.0707,
-    lon: 15.4395,
-    gateway_region: 'europe-west3',
-    facility_type: 'Specialty Contract Vehicle Manufacturing',
-    cluster_desc: 'Magna Steyr Complete Vehicle Stamping, Assembly & Paint Center',
-    continent: 'Europe',
-  },
-
-  // East Asia & APAC
-  {
-    id: 'jp-yok',
-    city: 'Yokohama',
-    region_name: 'Kanagawa, Japan',
-    full_location: 'Yokohama, Japan',
-    lat: 35.4437,
-    lon: 139.6380,
-    gateway_region: 'asia-northeast1',
-    facility_type: 'Semiconductor & Precision Optics',
-    cluster_desc: 'Sub-Micron Metrology, LiDAR Sensors & Cleanroom Optics Cell',
-    continent: 'East Asia & APAC',
-  },
-  {
-    id: 'sg-jur',
-    city: 'Jurong',
-    region_name: 'Singapore',
-    full_location: 'Jurong, Singapore',
-    lat: 1.3329,
-    lon: 103.7436,
-    gateway_region: 'asia-southeast1',
-    facility_type: 'Semiconductor Fab & Cleanroom',
-    cluster_desc: 'Advanced 300mm Wafer Cleanroom Fab & Silicon Photon Packaging',
-    continent: 'East Asia & APAC',
-  },
-  {
-    id: 'tw-hsc',
-    city: 'Hsinchu',
-    region_name: 'Taiwan',
-    full_location: 'Hsinchu Science Park, Taiwan',
-    lat: 24.7820,
-    lon: 120.9997,
-    gateway_region: 'asia-east1',
-    facility_type: 'Semiconductor Fab & Cleanroom',
-    cluster_desc: 'World Silicon Center — Advanced EUV Lithography Semiconductor Fabs',
-    continent: 'East Asia & APAC',
-  },
-  {
-    id: 'kr-uls',
-    city: 'Ulsan',
-    region_name: 'South Korea',
-    full_location: 'Ulsan, South Korea',
-    lat: 35.5384,
-    lon: 129.3114,
-    gateway_region: 'asia-northeast1',
-    facility_type: 'Automotive Powertrain & Battery Cell',
-    cluster_desc: 'World Largest Single Automobile Manufacturing Complex & Battery Packs',
-    continent: 'East Asia & APAC',
-  },
-];
-
-export function latLonToMapXY(lat: number, lon: number, width: number = 800, height: number = 400): { x: number; y: number } {
-  // Equirectangular projection
-  const clampedLon = Math.max(-180, Math.min(180, lon));
-  const clampedLat = Math.max(-85, Math.min(85, lat));
-  const x = ((clampedLon + 180.0) / 360.0) * width;
-  const y = ((90.0 - clampedLat) / 180.0) * height;
-  return { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
-}
-
-export function mapXYToLatLon(x: number, y: number, width: number = 800, height: number = 400): { lat: number; lon: number } {
-  const lon = (x / width) * 360.0 - 180.0;
-  const lat = 90.0 - (y / height) * 180.0;
-  return {
-    lat: Math.round(Math.max(-85, Math.min(85, lat)) * 10000) / 10000,
-    lon: Math.round(Math.max(-180, Math.min(180, lon)) * 10000) / 10000,
-  };
-}
-
-export function findClosestManufacturingHub(lat: number, lon: number): ManufacturingHub {
-  let closest = MANUFACTURING_HUBS[0];
-  let minDistance = Infinity;
-
-  for (const hub of MANUFACTURING_HUBS) {
-    const dLat = hub.lat - lat;
-    const dLon = (hub.lon - lon) * Math.cos(((lat + hub.lat) / 2) * (Math.PI / 180));
-    const distSq = dLat * dLat + dLon * dLon;
-    if (distSq < minDistance) {
-      minDistance = distSq;
-      closest = hub;
-    }
-  }
-
-  return closest;
-}
-
-export function suggestRegionFromCoordinates(lat: number, lon: number): string {
-  // Rough geographic bounding box heuristics for regional edge gateways
-  if (lon >= 65 && lon <= 95 && lat >= 5 && lat <= 38) {
-    return 'asia-south1'; // India / South Asia
-  }
-  if (lon >= 95 && lon <= 150 && lat >= -12 && lat <= 48) {
-    if (lat >= 25 && lon >= 125) return 'asia-northeast1'; // Japan/Korea
-    if (lon >= 115 && lon <= 125 && lat >= 20 && lat <= 26) return 'asia-east1'; // Taiwan
-    return 'asia-southeast1'; // Singapore / Southeast Asia
-  }
-  if (lon >= -15 && lon <= 45 && lat >= 35 && lat <= 70) {
-    if (lon >= 5 && lon <= 20) return 'europe-west3'; // Germany / Central EU
-    return 'europe-west1'; // Western Europe
-  }
-  if (lon >= -130 && lon <= -60 && lat >= 15 && lat <= 60) {
-    if (lat <= 36 && lon >= -108 && lon <= -88) return 'us-south1'; // Texas / South
-    if (lon <= -115) return 'us-west1'; // California / West
-    return 'us-east4'; // Detroit / East
-  }
-  return 'us-central1';
-}
 
 export const GeoMapAssist: React.FC<GeoMapAssistProps> = ({
   currentLocation,
   currentLatitude = 11.0168,
   currentLongitude = 76.9558,
+  selectedRegion,
   onSelectLocation,
   deployedSites = [],
   onSelectSite,
@@ -336,8 +64,52 @@ export const GeoMapAssist: React.FC<GeoMapAssistProps> = ({
     lat: currentLatitude,
     lon: currentLongitude,
   });
+  const [viewMode, setViewMode] = useState<'regional' | 'global'>('regional');
 
   const svgRef = useRef<SVGSVGElement | null>(null);
+
+  // Sync selected region when prop changes: snap to primary hub of that region if current coords are in another region
+  useEffect(() => {
+    if (selectedRegion) {
+      const regHubs = MANUFACTURING_HUBS.filter((h) => h.gateway_region === selectedRegion);
+      if (regHubs.length > 0) {
+        const closest = findClosestManufacturingHub(selectedCoords.lat, selectedCoords.lon);
+        if (closest.gateway_region !== selectedRegion) {
+          const primary = regHubs[0];
+          setSelectedCoords({ lat: primary.lat, lon: primary.lon });
+          onSelectLocation({
+            location: primary.full_location,
+            latitude: primary.lat,
+            longitude: primary.lon,
+            suggestedRegion: primary.gateway_region,
+            suggestedFacilityType: primary.facility_type,
+            suggestedName: `${primary.city} Facility`,
+          });
+        }
+      }
+      const vb = REGION_VIEWBOXES[selectedRegion];
+      if (vb) {
+        setContinentFilter(vb.continent);
+      }
+    }
+  }, [selectedRegion]);
+
+  // Compute active SVG viewport and scale factor
+  const currentVb = useMemo(() => {
+    if (viewMode === 'regional' && selectedRegion && REGION_VIEWBOXES[selectedRegion]) {
+      return REGION_VIEWBOXES[selectedRegion];
+    }
+    return {
+      x: 0,
+      y: 0,
+      w: 800,
+      h: 400,
+      title: 'WGS-84 Global Map Projection',
+      continent: 'All' as const,
+    };
+  }, [viewMode, selectedRegion]);
+
+  const scale = currentVb.w / 800;
 
   // Filter hubs based on search input & continent tab
   const filteredHubs = useMemo(() => {
@@ -359,21 +131,63 @@ export const GeoMapAssist: React.FC<GeoMapAssistProps> = ({
     return list;
   }, [searchTerm, continentFilter]);
 
+  // Displayed hubs: when regional view is active with selectedRegion, ONLY show hubs of that region
+  const displayedHubs = useMemo(() => {
+    if (viewMode === 'regional' && selectedRegion) {
+      let regList = MANUFACTURING_HUBS.filter((h) => h.gateway_region === selectedRegion);
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase();
+        regList = regList.filter(
+          (h) =>
+            h.city.toLowerCase().includes(q) ||
+            h.region_name.toLowerCase().includes(q) ||
+            h.full_location.toLowerCase().includes(q) ||
+            h.facility_type.toLowerCase().includes(q)
+        );
+      }
+      return regList;
+    }
+    return filteredHubs;
+  }, [viewMode, selectedRegion, searchTerm, filteredHubs]);
+
+  // Deployed production facilities visible on map
+  const displayedSites = useMemo(() => {
+    if (viewMode === 'regional' && selectedRegion) {
+      return deployedSites.filter((s) => s.region === selectedRegion);
+    }
+    return deployedSites;
+  }, [deployedSites, selectedRegion, viewMode]);
+
   // Handle map click to place pin
   const handleMapClick = useCallback(
     (e: React.MouseEvent<SVGSVGElement>) => {
       if (!svgRef.current) return;
       const rect = svgRef.current.getBoundingClientRect();
-      const clickX = ((e.clientX - rect.left) / rect.width) * 800;
-      const clickY = ((e.clientY - rect.top) / rect.height) * 400;
+      const clickX = currentVb.x + ((e.clientX - rect.left) / rect.width) * currentVb.w;
+      const clickY = currentVb.y + ((e.clientY - rect.top) / rect.height) * currentVb.h;
 
       const { lat, lon } = mapXYToLatLon(clickX, clickY);
       setSelectedCoords({ lat, lon });
 
-      const closest = findClosestManufacturingHub(lat, lon);
-      const suggestedReg = suggestRegionFromCoordinates(lat, lon);
+      // In regional mode, prioritize closest hub within this regional cluster
+      const regionalPool =
+        viewMode === 'regional' && selectedRegion
+          ? MANUFACTURING_HUBS.filter((h) => h.gateway_region === selectedRegion)
+          : MANUFACTURING_HUBS;
+      const pool = regionalPool.length > 0 ? regionalPool : MANUFACTURING_HUBS;
 
-      // If clicked very close to a known hub (< 4 degrees), snap to that hub name
+      let closest = pool[0];
+      let minDistance = Infinity;
+      for (const hub of pool) {
+        const dLat = hub.lat - lat;
+        const dLon = (hub.lon - lon) * Math.cos(((lat + hub.lat) / 2) * (Math.PI / 180));
+        const distSq = dLat * dLat + dLon * dLon;
+        if (distSq < minDistance) {
+          minDistance = distSq;
+          closest = hub;
+        }
+      }
+
       const distToHub = Math.hypot(closest.lat - lat, closest.lon - lon);
       let locName: string;
       if (distToHub < 4.0) {
@@ -388,23 +202,26 @@ export const GeoMapAssist: React.FC<GeoMapAssistProps> = ({
         location: locName,
         latitude: lat,
         longitude: lon,
-        suggestedRegion: suggestedReg || closest.gateway_region,
+        suggestedRegion: selectedRegion || closest.gateway_region,
         suggestedFacilityType: closest.facility_type,
         suggestedName: `${closest.city} Facility`,
       });
     },
-    [onSelectLocation]
+    [currentVb, viewMode, selectedRegion, onSelectLocation]
   );
 
   // Mouse move over map for live coordinate telemetry
-  const handleMapMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    if (!svgRef.current) return;
-    const rect = svgRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 800;
-    const y = ((e.clientY - rect.top) / rect.height) * 400;
-    const { lat, lon } = mapXYToLatLon(x, y);
-    setHoverCoords({ lat, lon, x, y });
-  }, []);
+  const handleMapMouseMove = useCallback(
+    (e: React.MouseEvent<SVGSVGElement>) => {
+      if (!svgRef.current) return;
+      const rect = svgRef.current.getBoundingClientRect();
+      const x = currentVb.x + ((e.clientX - rect.left) / rect.width) * currentVb.w;
+      const y = currentVb.y + ((e.clientY - rect.top) / rect.height) * currentVb.h;
+      const { lat, lon } = mapXYToLatLon(x, y);
+      setHoverCoords({ lat, lon, x, y });
+    },
+    [currentVb]
+  );
 
   const handleMapMouseLeave = useCallback(() => {
     setHoverCoords(null);
@@ -469,9 +286,21 @@ export const GeoMapAssist: React.FC<GeoMapAssistProps> = ({
 
       {/* Main Interactive Vector Map Canvas */}
       <div className="relative bg-obsidian border-b border-line overflow-hidden select-none">
-        {/* Map Coordinates Banner */}
-        <div className="absolute top-2.5 left-3 z-10 pointer-events-none font-sans text-[13px] text-silver tracking-wide">
-          WGS-84 Global Map Projection
+        {/* Map Coordinates & Region Mode Banner */}
+        <div className="absolute top-2.5 left-3 z-10 flex flex-wrap items-center gap-2 pointer-events-auto">
+          <span className="font-sans text-[12px] sm:text-[13px] text-silver tracking-wide font-medium">
+            {currentVb.title}
+          </span>
+          {selectedRegion && (
+            <button
+              type="button"
+              onClick={() => setViewMode(viewMode === 'regional' ? 'global' : 'regional')}
+              className="px-2 py-0.5 rounded text-[11px] font-mono border border-line bg-graphite/90 hover:bg-basalt text-marble transition-colors cursor-pointer"
+              title={viewMode === 'regional' ? 'Switch to WGS-84 Global View' : 'Focus on Regional Edge Gateway'}
+            >
+              {viewMode === 'regional' ? 'Global View ⛶' : `Focus ${selectedRegion} ⌖`}
+            </button>
+          )}
         </div>
         <div className="absolute top-2.5 right-3 z-10 pointer-events-none font-mono text-[13px] text-marble">
           {hoverCoords ? (
@@ -485,7 +314,7 @@ export const GeoMapAssist: React.FC<GeoMapAssistProps> = ({
 
         <svg
           ref={svgRef}
-          viewBox="0 0 800 400"
+          viewBox={`${currentVb.x} ${currentVb.y} ${currentVb.w} ${currentVb.h}`}
           className="w-full h-auto max-h-[300px] sm:max-h-[340px] cursor-crosshair block"
           onClick={handleMapClick}
           onMouseMove={handleMapMouseMove}
@@ -503,24 +332,24 @@ export const GeoMapAssist: React.FC<GeoMapAssistProps> = ({
           <rect width="800" height="400" fill="url(#tacGrid)" />
 
           {/* Graticule Latitude / Longitude Lines */}
-          <g stroke="rgba(52, 61, 73, 0.45)" strokeWidth="0.8" strokeDasharray="3 3">
+          <g stroke="rgba(52, 61, 73, 0.45)" strokeWidth={Math.max(0.3, 0.8 * scale)} strokeDasharray={`${Math.max(1, 3 * scale)} ${Math.max(1, 3 * scale)}`}>
             {/* Longitude meridians */}
             <line x1="133.3" y1="0" x2="133.3" y2="400" />
             <line x1="266.6" y1="0" x2="266.6" y2="400" />
-            <line x1="400.0" y1="0" x2="400.0" y2="400" stroke="rgba(169, 178, 190, 0.25)" strokeWidth="1" strokeDasharray="4 2" />
+            <line x1="400.0" y1="0" x2="400.0" y2="400" stroke="rgba(169, 178, 190, 0.25)" strokeWidth={Math.max(0.35, 1 * scale)} strokeDasharray={`${Math.max(1.2, 4 * scale)} ${Math.max(0.6, 2 * scale)}`} />
             <line x1="533.3" y1="0" x2="533.3" y2="400" />
             <line x1="666.6" y1="0" x2="666.6" y2="400" />
 
             {/* Latitude parallels */}
             <line x1="0" y1="66.6" x2="800" y2="66.6" />
             <line x1="0" y1="133.3" x2="800" y2="133.3" stroke="rgba(52, 61, 73, 0.65)" />
-            <line x1="0" y1="200.0" x2="800" y2="200.0" stroke="rgba(169, 178, 190, 0.35)" strokeWidth="1.2" strokeDasharray="6 3" />
+            <line x1="0" y1="200.0" x2="800" y2="200.0" stroke="rgba(169, 178, 190, 0.35)" strokeWidth={Math.max(0.4, 1.2 * scale)} strokeDasharray={`${Math.max(1.5, 6 * scale)} ${Math.max(0.8, 3 * scale)}`} />
             <line x1="0" y1="266.6" x2="800" y2="266.6" stroke="rgba(52, 61, 73, 0.65)" />
             <line x1="0" y1="333.3" x2="800" y2="333.3" />
           </g>
 
           {/* Continental Landmasses (Slate & Line Stone Carving) */}
-          <g fill="#181D24" stroke="#343D49" strokeWidth="1.2">
+          <g fill="#181D24" stroke="#343D49" strokeWidth={Math.max(0.4, 1.2 * scale)}>
             {/* North America */}
             <path d="M 60,30 L 120,25 L 180,25 L 230,45 L 260,85 L 245,100 L 260,125 L 240,150 L 205,170 L 180,185 L 185,210 L 200,230 L 195,245 L 175,235 L 160,200 L 140,180 L 115,165 L 110,140 L 95,120 L 70,85 L 50,60 Z" />
 
@@ -550,15 +379,15 @@ export const GeoMapAssist: React.FC<GeoMapAssistProps> = ({
               d="M 545,150 L 575,150 L 595,165 L 585,185 L 572,215 L 558,185 L 545,165 Z"
               fill="#212831"
               stroke="#A9B2BE"
-              strokeWidth="1.2"
-              strokeDasharray="4 1"
+              strokeWidth={Math.max(0.4, 1.2 * scale)}
+              strokeDasharray={`${Math.max(1, 4 * scale)} ${Math.max(0.4, 1 * scale)}`}
             />
 
             {/* Sri Lanka */}
             <path d="M 575,220 L 580,223 L 577,232 L 572,228 Z" fill="#A9B2BE" fillOpacity="0.4" />
 
             {/* Japan Archipelago */}
-            <path d="M 700,115 L 720,110 L 715,135 L 695,140 Z" fill="#212831" stroke="#A9B2BE" strokeWidth="1" />
+            <path d="M 700,115 L 720,110 L 715,135 L 695,140 Z" fill="#212831" stroke="#A9B2BE" strokeWidth={Math.max(0.35, 1 * scale)} />
 
             {/* Southeast Asia & Indonesia */}
             <path d="M 610,205 L 640,210 L 660,240 L 640,260 L 610,245 Z" />
@@ -571,8 +400,8 @@ export const GeoMapAssist: React.FC<GeoMapAssistProps> = ({
             <path d="M 770,360 L 780,355 L 775,390 L 765,385 Z" />
           </g>
 
-          {/* Verified Manufacturing Hubs Scatter Pings on Map */}
-          {MANUFACTURING_HUBS.map((hub) => {
+          {/* Verified Manufacturing Hubs Scatter Pings on Map (Strictly filtered in regional mode) */}
+          {displayedHubs.map((hub) => {
             const pt = latLonToMapXY(hub.lat, hub.lon);
             const isSelected = Math.hypot(hub.lat - selectedCoords.lat, hub.lon - selectedCoords.lon) < 0.5;
             return (
@@ -587,31 +416,31 @@ export const GeoMapAssist: React.FC<GeoMapAssistProps> = ({
                 <circle
                   cx={pt.x}
                   cy={pt.y}
-                  r={isSelected ? '6.5' : '4'}
+                  r={isSelected ? Math.max(2.4, 6.5 * scale) : Math.max(1.8, 4 * scale)}
                   fill={isSelected ? '#3B7DD8' : '#A9B2BE'}
-                  fillOpacity={isSelected ? 1 : 0.75}
+                  fillOpacity={isSelected ? 1 : 0.8}
                   stroke="#0A0C0F"
-                  strokeWidth="1.5"
+                  strokeWidth={Math.max(0.4, 1.5 * scale)}
                 />
                 {isSelected && (
                   <circle
                     cx={pt.x}
                     cy={pt.y}
-                    r="11"
+                    r={Math.max(4.5, 11 * scale)}
                     fill="none"
                     stroke="#3B7DD8"
-                    strokeWidth="1.5"
-                    strokeDasharray="2 2"
+                    strokeWidth={Math.max(0.4, 1.5 * scale)}
+                    strokeDasharray={`${Math.max(0.8, 2 * scale)} ${Math.max(0.8, 2 * scale)}`}
                   />
                 )}
                 <text
-                  x={pt.x + 7}
-                  y={pt.y + 3}
-                  fontSize="9"
+                  x={pt.x + Math.max(2.5, 7 * scale)}
+                  y={pt.y + Math.max(1.0, 3 * scale)}
+                  fontSize={Math.max(2.8, 9 * scale)}
                   fontFamily="'Inter', sans-serif"
                   fontWeight="600"
                   fill={isSelected ? '#ECEFF3' : '#A9B2BE'}
-                  className="pointer-events-none select-none opacity-85 group-hover:opacity-100"
+                  className="pointer-events-none select-none opacity-90 group-hover:opacity-100"
                 >
                   {hub.city}
                 </text>
@@ -620,11 +449,12 @@ export const GeoMapAssist: React.FC<GeoMapAssistProps> = ({
           })}
 
           {/* Deployed Production Facilities Pins */}
-          {deployedSites.map((site) => {
+          {displayedSites.map((site) => {
             const sLat = site.latitude ?? (site.id.includes('us') ? 42.3314 : site.id.includes('eu') ? 48.7758 : 35.4437);
             const sLon = site.longitude ?? (site.id.includes('us') ? -83.0458 : site.id.includes('eu') ? 9.1829 : 139.638);
             const sPt = latLonToMapXY(sLat, sLon);
             const isCurrentActive = activeSiteId === site.id;
+            const pS = Math.max(2.6, 8 * scale);
 
             return (
               <g
@@ -637,17 +467,17 @@ export const GeoMapAssist: React.FC<GeoMapAssistProps> = ({
                 }}
               >
                 <polygon
-                  points={`${sPt.x},${sPt.y - 8} ${sPt.x + 8},${sPt.y} ${sPt.x},${sPt.y + 8} ${sPt.x - 8},${sPt.y}`}
+                  points={`${sPt.x},${sPt.y - pS} ${sPt.x + pS},${sPt.y} ${sPt.x},${sPt.y + pS} ${sPt.x - pS},${sPt.y}`}
                   fill={isCurrentActive ? '#3FA56B' : '#3B7DD8'}
                   fillOpacity="0.9"
                   stroke="#ECEFF3"
-                  strokeWidth="1"
+                  strokeWidth={Math.max(0.3, 1 * scale)}
                 />
-                <circle cx={sPt.x} cy={sPt.y} r="2" fill="#ECEFF3" />
+                <circle cx={sPt.x} cy={sPt.y} r={Math.max(0.8, 2 * scale)} fill="#ECEFF3" />
                 <text
                   x={sPt.x}
-                  y={sPt.y - 11}
-                  fontSize="10"
+                  y={sPt.y - Math.max(3.5, 11 * scale)}
+                  fontSize={Math.max(3.0, 10 * scale)}
                   fontFamily="'Cinzel', serif"
                   fontWeight="bold"
                   textAnchor="middle"
@@ -662,21 +492,21 @@ export const GeoMapAssist: React.FC<GeoMapAssistProps> = ({
 
           {/* Active Target Reticle at selected coordinates */}
           <g transform={`translate(${pinPos.x}, ${pinPos.y})`} className="pointer-events-none">
-            <circle cx="0" cy="0" r="15" fill="rgba(59, 125, 216, 0.14)" stroke="#3B7DD8" strokeWidth="1" strokeDasharray="3 3" />
-            <circle cx="0" cy="0" r="8" fill="none" stroke="#ECEFF3" strokeWidth="1.2" />
-            <circle cx="0" cy="0" r="2.5" fill="#3B7DD8" />
-            <line x1="-12" y1="0" x2="-5" y2="0" stroke="#3B7DD8" strokeWidth="1.5" />
-            <line x1="5" y1="0" x2="12" y2="0" stroke="#3B7DD8" strokeWidth="1.5" />
-            <line x1="0" y1="-12" x2="0" y2="-5" stroke="#3B7DD8" strokeWidth="1.5" />
-            <line x1="0" y1="5" x2="0" y2="12" stroke="#3B7DD8" strokeWidth="1.5" />
+            <circle cx="0" cy="0" r={Math.max(4.5, 15 * scale)} fill="rgba(59, 125, 216, 0.14)" stroke="#3B7DD8" strokeWidth={Math.max(0.35, 1 * scale)} strokeDasharray={`${Math.max(1, 3 * scale)} ${Math.max(1, 3 * scale)}`} />
+            <circle cx="0" cy="0" r={Math.max(2.5, 8 * scale)} fill="none" stroke="#ECEFF3" strokeWidth={Math.max(0.35, 1.2 * scale)} />
+            <circle cx="0" cy="0" r={Math.max(0.8, 2.5 * scale)} fill="#3B7DD8" />
+            <line x1={-Math.max(3.5, 12 * scale)} y1="0" x2={-Math.max(1.5, 5 * scale)} y2="0" stroke="#3B7DD8" strokeWidth={Math.max(0.4, 1.5 * scale)} />
+            <line x1={Math.max(1.5, 5 * scale)} y1="0" x2={Math.max(3.5, 12 * scale)} y2="0" stroke="#3B7DD8" strokeWidth={Math.max(0.4, 1.5 * scale)} />
+            <line x1="0" y1={-Math.max(3.5, 12 * scale)} x2="0" y2={-Math.max(1.5, 5 * scale)} stroke="#3B7DD8" strokeWidth={Math.max(0.4, 1.5 * scale)} />
+            <line x1="0" y1={Math.max(1.5, 5 * scale)} x2="0" y2={Math.max(3.5, 12 * scale)} stroke="#3B7DD8" strokeWidth={Math.max(0.4, 1.5 * scale)} />
           </g>
 
           {/* Live mouse hover cursor reticle */}
           {hoverCoords && (
             <g transform={`translate(${hoverCoords.x}, ${hoverCoords.y})`} className="pointer-events-none opacity-75">
-              <circle cx="0" cy="0" r="5" fill="none" stroke="#A9B2BE" strokeWidth="1" strokeDasharray="2 2" />
-              <line x1="-8" y1="0" x2="8" y2="0" stroke="#A9B2BE" strokeWidth="0.8" />
-              <line x1="0" y1="-8" x2="0" y2="8" stroke="#A9B2BE" strokeWidth="0.8" />
+              <circle cx="0" cy="0" r={Math.max(1.8, 5 * scale)} fill="none" stroke="#A9B2BE" strokeWidth={Math.max(0.3, 1 * scale)} strokeDasharray={`${Math.max(0.8, 2 * scale)} ${Math.max(0.8, 2 * scale)}`} />
+              <line x1={-Math.max(2.5, 8 * scale)} y1="0" x2={Math.max(2.5, 8 * scale)} y2="0" stroke="#A9B2BE" strokeWidth={Math.max(0.25, 0.8 * scale)} />
+              <line x1="0" y1={-Math.max(2.5, 8 * scale)} x2="0" y2={Math.max(2.5, 8 * scale)} stroke="#A9B2BE" strokeWidth={Math.max(0.25, 0.8 * scale)} />
             </g>
           )}
         </svg>
@@ -705,6 +535,22 @@ export const GeoMapAssist: React.FC<GeoMapAssistProps> = ({
 
       {/* Interactive Hub Search, Continent Filter & Rapid Selection Chips */}
       <div className="p-4 space-y-3 bg-slate">
+        {/* Regional Filter Banner if isolated */}
+        {viewMode === 'regional' && selectedRegion && (
+          <div className="px-3 py-2 rounded-[2px] bg-graphite border border-line flex items-center justify-between gap-2 text-xs font-mono">
+            <span className="text-silver">
+              Gateway Isolation Active: Showing verified manufacturing hubs in <strong className="text-aegean">{selectedRegion}</strong> ({displayedHubs.length} available).
+            </span>
+            <button
+              type="button"
+              onClick={() => setViewMode('global')}
+              className="text-aegean hover:underline cursor-pointer shrink-0"
+            >
+              Show All Global Corridors
+            </button>
+          </div>
+        )}
+
         {/* Search bar & Continent Filter Tabs */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           {/* Search Input */}
@@ -743,7 +589,10 @@ export const GeoMapAssist: React.FC<GeoMapAssistProps> = ({
               <button
                 key={c}
                 type="button"
-                onClick={() => setContinentFilter(c)}
+                onClick={() => {
+                  setContinentFilter(c);
+                  if (viewMode === 'regional') setViewMode('global');
+                }}
                 className={`px-3 py-1.5 rounded-[2px] transition-all cursor-pointer ${
                   continentFilter === c
                     ? 'btn-aegean text-marble'
@@ -758,7 +607,7 @@ export const GeoMapAssist: React.FC<GeoMapAssistProps> = ({
 
         {/* Quick Hub Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[200px] overflow-y-auto no-scrollbar pr-1">
-          {filteredHubs.map((hub) => {
+          {displayedHubs.map((hub) => {
             const isSelected = Math.hypot(hub.lat - selectedCoords.lat, hub.lon - selectedCoords.lon) < 0.5;
             return (
               <div

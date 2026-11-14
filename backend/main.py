@@ -209,6 +209,11 @@ class FinancialROI(BaseModel):
     scrap_waste_cost_usd: float
     net_shift_value_usd: float
     potential_savings_usd: float
+    currency_symbol: str = "$"
+    currency_code: str = "USD"
+    unit_baseline: float = 85.0
+    downtime_hourly_rate: float = 1200.0
+    scrap_unit_cost: float = 45.0
 
 
 class DashboardSummary(BaseModel):
@@ -705,9 +710,86 @@ production_sites: Dict[str, ProductionSite] = {
         latitude=35.4437,
         longitude=139.6380,
     ),
+    "synapsys-mfg-in-coimbatore": ProductionSite(
+        id="synapsys-mfg-in-coimbatore",
+        name="Coimbatore Precision 01 (Precision Tooling & Motors)",
+        region="asia-south1",
+        location="Coimbatore, Tamil Nadu, India",
+        facility_type="Automotive Components, Precision Motors & Textile Machinery",
+        active_lines=10,
+        target_capacity=4500,
+        nominal_oee=88.2,
+        status="active",
+        created_at=datetime.now(timezone.utc).isoformat(),
+        latitude=11.0168,
+        longitude=76.9558,
+    ),
 }
 
 MACHINE_METADATA: Dict[str, Dict[str, Any]] = {
+    # -----------------------------------------------------------------------
+    # Coimbatore Precision 01 (synapsys-mfg-in-coimbatore) - Tamil Nadu, India
+    # -----------------------------------------------------------------------
+    "CBE-101": {
+        "site_id": "synapsys-mfg-in-coimbatore",
+        "name": "5-Axis Precision Vertical Machining Center",
+        "location": "Bay 01 - High-Precision Milling Line",
+        "operator": "S. Ramanathan [Shift 1]",
+        "ideal_cycle": 11.5,
+        "default_target": 150,
+        "component": "Spindle Roller Thrust Bearings",
+        "plc_controller": "Siemens S7-1500 / Fanuc 31i-B5",
+        "ip_address": "10.24.10.11",
+        "opc_node_id": "ns=2;s=CBE101.SpindleLoad",
+        "work_order": {
+            "order_id": "WO-CBE-701",
+            "part_number": "PN-EV-ROTOR-55",
+            "part_name": "Traction Motor High-Torque Rotor Shaft",
+            "customer": "Ather Energy & Tata EV Powertrain",
+            "start_time": "06:00 IST",
+            "estimated_completion": "14:00 IST",
+        },
+    },
+    "CBE-202": {
+        "site_id": "synapsys-mfg-in-coimbatore",
+        "name": "Automated Sub-Micron Cylindrical Grinder",
+        "location": "Bay 02 - Micro-Finishing Cell",
+        "operator": "M. Anand [Shift 1]",
+        "ideal_cycle": 12.0,
+        "default_target": 150,
+        "component": "Diamond Dressing Roll",
+        "plc_controller": "Beckhoff TwinCAT 3 PLC",
+        "ip_address": "10.24.10.12",
+        "opc_node_id": "ns=2;s=CBE202.GrindWheel",
+        "work_order": {
+            "order_id": "WO-CBE-702",
+            "part_number": "PN-HYD-SPOOL-12",
+            "part_name": "Servo Proportional Valve Spool",
+            "customer": "L&T Heavy Engineering",
+            "start_time": "06:00 IST",
+            "estimated_completion": "14:30 IST",
+        },
+    },
+    "CBE-303": {
+        "site_id": "synapsys-mfg-in-coimbatore",
+        "name": "Laser Precision Welder & Inspection Cell",
+        "location": "Bay 03 - Laser Cell",
+        "operator": "V. Sundaram [Shift 1]",
+        "ideal_cycle": 11.0,
+        "default_target": 150,
+        "component": "Beam Collimating Optics",
+        "plc_controller": "Mitsubishi Electric iQ-R Series PLC",
+        "ip_address": "10.24.10.13",
+        "opc_node_id": "ns=2;s=CBE303.LaserCavity",
+        "work_order": {
+            "order_id": "WO-CBE-703",
+            "part_number": "PN-BATT-BUSBAR-04",
+            "part_name": "High-Current EV Battery Busbar Link",
+            "customer": "Ola Electric Megaplant",
+            "start_time": "06:00 IST",
+            "estimated_completion": "14:15 IST",
+        },
+    },
     # -----------------------------------------------------------------------
     # Detroit Site 04 (synapsys-mfg-prod-us) - Automotive Powertrain & Battery Cell
     # -----------------------------------------------------------------------
@@ -2324,18 +2406,99 @@ def get_dashboard(site_id: Optional[str] = Query(default=None), company_domain: 
     divisor = max(1, num_machines)
     overall_oee_pct = round((accumulated_oee / divisor) * 100, 2)
 
-    rev_gen = total_good * 7200.0
-    dt_cost = round((total_downtime_sec / 3600.0) * 95000.0, 2)
-    scrap_cost = total_scrap * 3800.0
+    site_reg = (current_site_info.region if current_site_info else "").lower()
+    site_loc = (current_site_info.location if current_site_info else "").lower()
+    site_lower = site_id.lower()
+
+    if (
+        site_reg == "asia-south1"
+        or "india" in site_loc
+        or "coimbatore" in site_loc
+        or "chennai" in site_loc
+        or "pune" in site_loc
+        or "sanand" in site_loc
+        or "gurugram" in site_loc
+        or "in-" in site_lower
+        or "coimbatore" in site_lower
+        or "chennai" in site_lower
+    ):
+        curr_sym = "₹"
+        curr_code = "INR"
+        unit_base = 7200.0
+        dt_rate = 95000.0
+        scrap_rate = 3800.0
+        power_rate = 11.50
+    elif (
+        site_reg.startswith("europe")
+        or "germany" in site_loc
+        or "stuttgart" in site_loc
+        or "munich" in site_loc
+        or "france" in site_loc
+        or "toulouse" in site_loc
+        or "eu-" in site_lower
+    ):
+        if site_reg == "europe-west2" or "uk" in site_loc or "london" in site_loc or "birmingham" in site_loc:
+            curr_sym = "£"
+            curr_code = "GBP"
+            unit_base = 68.0
+            dt_rate = 960.0
+            scrap_rate = 36.0
+            power_rate = 0.24
+        else:
+            curr_sym = "€"
+            curr_code = "EUR"
+            unit_base = 78.0
+            dt_rate = 1100.0
+            scrap_rate = 42.0
+            power_rate = 0.28
+    elif (
+        site_reg in ("asia-northeast1", "asia-east1")
+        or "japan" in site_loc
+        or "tokyo" in site_loc
+        or "yokohama" in site_loc
+        or "korea" in site_loc
+        or "ulsan" in site_loc
+        or "apac" in site_lower
+    ):
+        curr_sym = "¥"
+        curr_code = "JPY"
+        unit_base = 13000.0
+        dt_rate = 180000.0
+        scrap_rate = 7000.0
+        power_rate = 28.00
+    elif site_reg == "asia-southeast1" or "singapore" in site_loc or "jurong" in site_loc:
+        curr_sym = "S$"
+        curr_code = "SGD"
+        unit_base = 115.0
+        dt_rate = 1600.0
+        scrap_rate = 60.0
+        power_rate = 0.32
+    else:
+        # Americas / US Default
+        curr_sym = "$"
+        curr_code = "USD"
+        unit_base = 85.0
+        dt_rate = 1200.0
+        scrap_rate = 45.0
+        power_rate = 0.14
+
+    rev_gen = round(total_good * unit_base, 2)
+    dt_cost = round((total_downtime_sec / 3600.0) * dt_rate, 2)
+    scrap_cost = round(total_scrap * scrap_rate, 2)
     net_val = round(rev_gen - dt_cost - scrap_cost, 2)
     pot_savings = round(dt_cost * 0.65 + scrap_cost * 0.8, 2)
 
     financial_roi = FinancialROI(
-        revenue_generated_usd=round(rev_gen, 2),
+        revenue_generated_usd=rev_gen,
         downtime_cost_usd=dt_cost,
         scrap_waste_cost_usd=scrap_cost,
         net_shift_value_usd=net_val,
         potential_savings_usd=pot_savings,
+        currency_symbol=curr_sym,
+        currency_code=curr_code,
+        unit_baseline=unit_base,
+        downtime_hourly_rate=dt_rate,
+        scrap_unit_cost=scrap_rate,
     )
 
     total_kw = round(accumulated_power_kw + 14.5, 1)
@@ -2539,17 +2702,18 @@ def copilot_query(query: CopilotQuery):
 
     elif "financial" in prompt or "cost" in prompt or "roi" in prompt or "revenue" in prompt:
         roi = summary.financial_roi
+        sym = roi.currency_symbol or "$"
         ans = (
-            f"Current shift at {site_name} has generated ₹{roi.revenue_generated_usd:,.2f} in gross production value "
+            f"Current shift at {site_name} has generated {sym}{roi.revenue_generated_usd:,.2f} in gross production value "
             f"across {summary.total_good} conforming parts. "
-            f"Unplanned downtime losses total -₹{roi.downtime_cost_usd:,.2f} (rate: ₹95,000/hr) "
-            f"and scrap defect waste is -₹{roi.scrap_waste_cost_usd:,.2f}. "
-            f"Net shift economic yield stands at ₹{roi.net_shift_value_usd:,.2f}. "
-            f"Recoverable opportunity through process tuning is estimated at +₹{roi.potential_savings_usd:,.2f}."
+            f"Unplanned downtime losses total -{sym}{roi.downtime_cost_usd:,.2f} (rate: {sym}{roi.downtime_hourly_rate:,.0f}/hr) "
+            f"and scrap defect waste is -{sym}{roi.scrap_waste_cost_usd:,.2f}. "
+            f"Net shift economic yield stands at {sym}{roi.net_shift_value_usd:,.2f}. "
+            f"Recoverable opportunity through process tuning is estimated at +{sym}{roi.potential_savings_usd:,.2f}."
         )
         citations = [
-            f"Gross Value: ₹{roi.revenue_generated_usd:,.2f}",
-            f"Downtime Hours Cost: -₹{roi.downtime_cost_usd:,.2f}",
+            f"Gross Value: {sym}{roi.revenue_generated_usd:,.2f}",
+            f"Downtime Hours Cost: -{sym}{roi.downtime_cost_usd:,.2f}",
             f"Conforming Parts: {summary.total_good} / {summary.total_target}",
         ]
         actions = [
