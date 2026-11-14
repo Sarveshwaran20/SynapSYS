@@ -325,3 +325,4 @@ export const REGION_VIEWBOXES: Record<string, RegionViewboxConfig> = {
   'us-south1': { x: 145, y: 105, w: 80, h: 70, title: 'US South & Texas Triangle (us-south1)', continent: 'Americas' },
   'us-west1': { x: 95, y: 85, w: 75, h: 65, title: 'US Pacific Coast Corridor (us-west1)', continent: 'Americas' },
 };
+

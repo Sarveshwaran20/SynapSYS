@@ -230,6 +230,7 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
           code: 'INR',
           symbol: '₹',
           name: 'Indian Rupee',
+          country: 'India',
           unitBaseline: 7200,
           downtimeHourlyRate: 95000,
           scrapUnitCost: 3800,
@@ -245,18 +246,17 @@ export const InventoryManagementDeck: React.FC<InventoryManagementDeckProps> = R
     const getItemUnitCost = useCallback(
       (item: { unit_cost_inr?: number; unit_cost_usd: number }): number => {
         if (activeCurr.code === 'USD') return item.unit_cost_usd || (item.unit_cost_inr ? item.unit_cost_inr / 86.0 : 50);
-        if (activeCurr.code === 'EUR') return Math.round((item.unit_cost_usd || 50) * 0.92 * 100) / 100;
-        if (activeCurr.code === 'JPY') return Math.round((item.unit_cost_usd || 50) * 155.0);
-        if (activeCurr.code === 'GBP') return Math.round((item.unit_cost_usd || 50) * 0.79 * 100) / 100;
-        if (activeCurr.code === 'SGD') return Math.round((item.unit_cost_usd || 50) * 1.35 * 100) / 100;
-        return item.unit_cost_inr || item.unit_cost_usd * 86.0;
+        if (activeCurr.code === 'INR') return item.unit_cost_inr || item.unit_cost_usd * 86.0;
+        const usdRate = item.unit_cost_usd || (item.unit_cost_inr ? item.unit_cost_inr / 86.0 : 50);
+        const converted = usdRate * activeCurr.fxRate;
+        return activeCurr.fxRate >= 100 ? Math.round(converted) : Math.round(converted * 100) / 100;
       },
       [activeCurr]
     );
 
     const formatCurrencyAmount = useCallback(
       (amount: number): string => {
-        const dec = activeCurr.code === 'JPY' || activeCurr.code === 'INR' ? 0 : 2;
+        const dec = activeCurr.fxRate >= 100 || activeCurr.code === 'INR' ? 0 : 2;
         return `${activeCurr.symbol}${amount.toLocaleString(undefined, {
           minimumFractionDigits: dec,
           maximumFractionDigits: dec,

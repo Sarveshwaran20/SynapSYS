@@ -131,6 +131,251 @@ class ProductionSite(BaseModel):
     company_name: Optional[str] = Field(None, description="Name of owning enterprise company")
 
 
+def get_currency_for_site(site: Optional[ProductionSite] = None) -> dict:
+    if not site:
+        return {
+            "symbol": "$",
+            "code": "USD",
+            "name": "US Dollar",
+            "country": "United States",
+            "unit_base": 85.0,
+            "dt_rate": 1200.0,
+            "scrap_rate": 45.0,
+            "power_rate": 0.14,
+        }
+
+    loc = (site.location or "").lower()
+    name = (site.name or "").lower()
+    site_id = (site.id or "").lower()
+    reg = (site.region or "").lower()
+    lat = site.latitude
+    lon = site.longitude
+
+    # 1. India (INR ₹)
+    if (
+        "india" in loc or "tamil nadu" in loc or "karnataka" in loc or "maharashtra" in loc
+        or "gujarat" in loc or "haryana" in loc or "coimbatore" in loc or "chennai" in loc
+        or "bengaluru" in loc or "bangalore" in loc or "pune" in loc or "sanand" in loc
+        or "ahmedabad" in loc or "gurugram" in loc or "manesar" in loc or "mumbai" in loc or "delhi" in loc
+        or "coimbatore" in name or "chennai" in name or "in-" in site_id or "coimbatore" in site_id
+        or reg == "asia-south1"
+        or (lat is not None and lon is not None and 6 <= lat <= 38 and 68 <= lon <= 97)
+    ):
+        return {
+            "symbol": "₹",
+            "code": "INR",
+            "name": "Indian Rupee",
+            "country": "India",
+            "unit_base": 7200.0,
+            "dt_rate": 95000.0,
+            "scrap_rate": 3800.0,
+            "power_rate": 11.50,
+        }
+
+    # 2. Japan (JPY ¥)
+    if (
+        "japan" in loc or "tokyo" in loc or "yokohama" in loc or "osaka" in loc or "nagoya" in loc
+        or "kanagawa" in loc or "yokohama" in name or "tokyo" in name or "jp-" in site_id
+        or (reg == "asia-northeast1" and "korea" not in loc and "ulsan" not in loc and "korea" not in name)
+        or (lat is not None and lon is not None and 30 <= lat <= 46 and 129 <= lon <= 146)
+    ):
+        return {
+            "symbol": "¥",
+            "code": "JPY",
+            "name": "Japanese Yen",
+            "country": "Japan",
+            "unit_base": 13000.0,
+            "dt_rate": 180000.0,
+            "scrap_rate": 7000.0,
+            "power_rate": 28.00,
+        }
+
+    # 3. South Korea (KRW ₩)
+    if (
+        "korea" in loc or "ulsan" in loc or "seoul" in loc or "incheon" in loc or "busan" in loc
+        or "ulsan" in name or "korea" in name or "kr-" in site_id
+        or (lat is not None and lon is not None and 34 <= lat <= 39 and 125 <= lon <= 130)
+    ):
+        return {
+            "symbol": "₩",
+            "code": "KRW",
+            "name": "South Korean Won",
+            "country": "South Korea",
+            "unit_base": 115000.0,
+            "dt_rate": 1600000.0,
+            "scrap_rate": 60000.0,
+            "power_rate": 180.00,
+        }
+
+    # 4. Taiwan (TWD NT$)
+    if (
+        "taiwan" in loc or "hsinchu" in loc or "taipei" in loc or "taichung" in loc
+        or "hsinchu" in name or "taiwan" in name or "tw-" in site_id or reg == "asia-east1"
+        or (lat is not None and lon is not None and 21 <= lat <= 26 and 119 <= lon <= 123)
+    ):
+        return {
+            "symbol": "NT$",
+            "code": "TWD",
+            "name": "New Taiwan Dollar",
+            "country": "Taiwan",
+            "unit_base": 2750.0,
+            "dt_rate": 38000.0,
+            "scrap_rate": 1450.0,
+            "power_rate": 4.20,
+        }
+
+    # 5. Singapore (SGD S$)
+    if (
+        "singapore" in loc or "jurong" in loc or "tuas" in loc or "singapore" in name
+        or "sg-" in site_id or reg == "asia-southeast1"
+        or (lat is not None and lon is not None and 1.1 <= lat <= 1.5 and 103.5 <= lon <= 104.1)
+    ):
+        return {
+            "symbol": "S$",
+            "code": "SGD",
+            "name": "Singapore Dollar",
+            "country": "Singapore",
+            "unit_base": 115.0,
+            "dt_rate": 1600.0,
+            "scrap_rate": 60.0,
+            "power_rate": 0.32,
+        }
+
+    # 6. United Kingdom (GBP £)
+    if (
+        "united kingdom" in loc or "uk" in loc or "england" in loc or "scotland" in loc or "wales" in loc
+        or "london" in loc or "birmingham" in loc or "coventry" in loc or "manchester" in loc
+        or "birmingham" in name or "coventry" in name or "uk-" in site_id or reg == "europe-west2"
+        or (lat is not None and lon is not None and 49.5 <= lat <= 59.5 and -8.5 <= lon <= 2.0)
+    ):
+        return {
+            "symbol": "£",
+            "code": "GBP",
+            "name": "British Pound",
+            "country": "United Kingdom",
+            "unit_base": 68.0,
+            "dt_rate": 960.0,
+            "scrap_rate": 36.0,
+            "power_rate": 0.24,
+        }
+
+    # 7. Switzerland (CHF CHF)
+    if "switzerland" in loc or "zurich" in loc or "geneva" in loc or "basel" in loc or "ch-" in site_id:
+        return {
+            "symbol": "CHF",
+            "code": "CHF",
+            "name": "Swiss Franc",
+            "country": "Switzerland",
+            "unit_base": 76.0,
+            "dt_rate": 1050.0,
+            "scrap_rate": 40.0,
+            "power_rate": 0.26,
+        }
+
+    # 8. Eurozone (Germany, France, Austria, Italy, Spain, etc. - EUR €)
+    if (
+        "germany" in loc or "deutschland" in loc or "stuttgart" in loc or "munich" in loc or "frankfurt" in loc
+        or "france" in loc or "toulouse" in loc or "paris" in loc or "austria" in loc or "graz" in loc or "vienna" in loc
+        or "italy" in loc or "milan" in loc or "spain" in loc or "madrid" in loc or "netherlands" in loc
+        or "amsterdam" in loc or "belgium" in loc or "brussels" in loc or "ireland" in loc or "portugal" in loc
+        or "stuttgart" in name or "munich" in name or "toulouse" in name or "de-" in site_id or "fr-" in site_id or "eu-" in site_id
+        or reg.startswith("europe")
+        or (lat is not None and lon is not None and 36 <= lat <= 60 and -10 <= lon <= 25)
+    ):
+        euro_country = "France" if ("france" in loc or "toulouse" in loc) else ("Austria" if ("austria" in loc or "graz" in loc) else ("Italy" if "italy" in loc else ("Spain" if "spain" in loc else "Germany")))
+        return {
+            "symbol": "€",
+            "code": "EUR",
+            "name": "Euro",
+            "country": euro_country,
+            "unit_base": 78.0,
+            "dt_rate": 1100.0,
+            "scrap_rate": 42.0,
+            "power_rate": 0.28,
+        }
+
+    # 9. Mexico (MXN Mex$)
+    if (
+        "mexico" in loc or "monterrey" in loc or "guadalajara" in loc or "nuevo león" in loc
+        or "monterrey" in name or "mx-" in site_id
+        or (lat is not None and lon is not None and 14 <= lat <= 33 and -118 <= lon <= -86)
+    ):
+        return {
+            "symbol": "Mex$",
+            "code": "MXN",
+            "name": "Mexican Peso",
+            "country": "Mexico",
+            "unit_base": 1700.0,
+            "dt_rate": 24000.0,
+            "scrap_rate": 900.0,
+            "power_rate": 2.80,
+        }
+
+    # 10. Canada (CAD CA$)
+    if "canada" in loc or "toronto" in loc or "montreal" in loc or "vancouver" in loc or "ontario" in loc or "ca-" in site_id:
+        return {
+            "symbol": "CA$",
+            "code": "CAD",
+            "name": "Canadian Dollar",
+            "country": "Canada",
+            "unit_base": 118.0,
+            "dt_rate": 1650.0,
+            "scrap_rate": 62.0,
+            "power_rate": 0.19,
+        }
+
+    # 11. Australia (AUD A$)
+    if "australia" in loc or "sydney" in loc or "melbourne" in loc or "brisbane" in loc or "au-" in site_id:
+        return {
+            "symbol": "A$",
+            "code": "AUD",
+            "name": "Australian Dollar",
+            "country": "Australia",
+            "unit_base": 130.0,
+            "dt_rate": 1850.0,
+            "scrap_rate": 70.0,
+            "power_rate": 0.29,
+        }
+
+    # 12. China (CNY ¥)
+    if "china" in loc or "shanghai" in loc or "shenzhen" in loc or "beijing" in loc or "cn-" in site_id:
+        return {
+            "symbol": "¥",
+            "code": "CNY",
+            "name": "Chinese Yuan",
+            "country": "China",
+            "unit_base": 620.0,
+            "dt_rate": 8800.0,
+            "scrap_rate": 330.0,
+            "power_rate": 0.85,
+        }
+
+    # 13. Brazil (BRL R$)
+    if "brazil" in loc or "brasil" in loc or "são paulo" in loc or "sao paulo" in loc or "br-" in site_id:
+        return {
+            "symbol": "R$",
+            "code": "BRL",
+            "name": "Brazilian Real",
+            "country": "Brazil",
+            "unit_base": 480.0,
+            "dt_rate": 6800.0,
+            "scrap_rate": 250.0,
+            "power_rate": 0.80,
+        }
+
+    # Default / Americas: United States (USD $)
+    return {
+        "symbol": "$",
+        "code": "USD",
+        "name": "US Dollar",
+        "country": "United States",
+        "unit_base": 85.0,
+        "dt_rate": 1200.0,
+        "scrap_rate": 45.0,
+        "power_rate": 0.14,
+    }
+
+
 class TelemetryPayload(BaseModel):
     timestamp: str = Field(..., description="ISO 8601 UTC timestamp")
     machine_id: str = Field(..., description="Unique machine identifier (e.g., CNC-101)")
@@ -723,6 +968,48 @@ production_sites: Dict[str, ProductionSite] = {
         created_at=datetime.now(timezone.utc).isoformat(),
         latitude=11.0168,
         longitude=76.9558,
+    ),
+    "synapsys-mfg-uk-midlands": ProductionSite(
+        id="synapsys-mfg-uk-midlands",
+        name="UK Midlands Plant 03 (Propulsion Systems)",
+        region="europe-west2",
+        location="Birmingham, West Midlands, UK",
+        facility_type="Automotive Powertrain & Clean Propulsion",
+        active_lines=7,
+        target_capacity=3200,
+        nominal_oee=84.6,
+        status="active",
+        created_at=datetime.now(timezone.utc).isoformat(),
+        latitude=52.4862,
+        longitude=-1.8904,
+    ),
+    "synapsys-mfg-sg-jurong": ProductionSite(
+        id="synapsys-mfg-sg-jurong",
+        name="Jurong Cleanroom Fab 05 (Advanced Packaging)",
+        region="asia-southeast1",
+        location="Jurong, Singapore",
+        facility_type="Semiconductor Fab & Cleanroom",
+        active_lines=5,
+        target_capacity=2200,
+        nominal_oee=91.5,
+        status="active",
+        created_at=datetime.now(timezone.utc).isoformat(),
+        latitude=1.3329,
+        longitude=103.7436,
+    ),
+    "synapsys-mfg-mx-monterrey": ProductionSite(
+        id="synapsys-mfg-mx-monterrey",
+        name="Monterrey Advanced Stamping 06 (Tier-1 Castings)",
+        region="us-south1",
+        location="Monterrey, Nuevo León, Mexico",
+        facility_type="Precision Stamping & Tier-1 Heavy Castings",
+        active_lines=9,
+        target_capacity=4100,
+        nominal_oee=83.8,
+        status="active",
+        created_at=datetime.now(timezone.utc).isoformat(),
+        latitude=25.6866,
+        longitude=-100.3161,
     ),
 }
 
@@ -2406,81 +2693,13 @@ def get_dashboard(site_id: Optional[str] = Query(default=None), company_domain: 
     divisor = max(1, num_machines)
     overall_oee_pct = round((accumulated_oee / divisor) * 100, 2)
 
-    site_reg = (current_site_info.region if current_site_info else "").lower()
-    site_loc = (current_site_info.location if current_site_info else "").lower()
-    site_lower = site_id.lower()
-
-    if (
-        site_reg == "asia-south1"
-        or "india" in site_loc
-        or "coimbatore" in site_loc
-        or "chennai" in site_loc
-        or "pune" in site_loc
-        or "sanand" in site_loc
-        or "gurugram" in site_loc
-        or "in-" in site_lower
-        or "coimbatore" in site_lower
-        or "chennai" in site_lower
-    ):
-        curr_sym = "₹"
-        curr_code = "INR"
-        unit_base = 7200.0
-        dt_rate = 95000.0
-        scrap_rate = 3800.0
-        power_rate = 11.50
-    elif (
-        site_reg.startswith("europe")
-        or "germany" in site_loc
-        or "stuttgart" in site_loc
-        or "munich" in site_loc
-        or "france" in site_loc
-        or "toulouse" in site_loc
-        or "eu-" in site_lower
-    ):
-        if site_reg == "europe-west2" or "uk" in site_loc or "london" in site_loc or "birmingham" in site_loc:
-            curr_sym = "£"
-            curr_code = "GBP"
-            unit_base = 68.0
-            dt_rate = 960.0
-            scrap_rate = 36.0
-            power_rate = 0.24
-        else:
-            curr_sym = "€"
-            curr_code = "EUR"
-            unit_base = 78.0
-            dt_rate = 1100.0
-            scrap_rate = 42.0
-            power_rate = 0.28
-    elif (
-        site_reg in ("asia-northeast1", "asia-east1")
-        or "japan" in site_loc
-        or "tokyo" in site_loc
-        or "yokohama" in site_loc
-        or "korea" in site_loc
-        or "ulsan" in site_loc
-        or "apac" in site_lower
-    ):
-        curr_sym = "¥"
-        curr_code = "JPY"
-        unit_base = 13000.0
-        dt_rate = 180000.0
-        scrap_rate = 7000.0
-        power_rate = 28.00
-    elif site_reg == "asia-southeast1" or "singapore" in site_loc or "jurong" in site_loc:
-        curr_sym = "S$"
-        curr_code = "SGD"
-        unit_base = 115.0
-        dt_rate = 1600.0
-        scrap_rate = 60.0
-        power_rate = 0.32
-    else:
-        # Americas / US Default
-        curr_sym = "$"
-        curr_code = "USD"
-        unit_base = 85.0
-        dt_rate = 1200.0
-        scrap_rate = 45.0
-        power_rate = 0.14
+    curr_data = get_currency_for_site(current_site_info)
+    curr_sym = curr_data["symbol"]
+    curr_code = curr_data["code"]
+    unit_base = curr_data["unit_base"]
+    dt_rate = curr_data["dt_rate"]
+    scrap_rate = curr_data["scrap_rate"]
+    power_rate = curr_data["power_rate"]
 
     rev_gen = round(total_good * unit_base, 2)
     dt_cost = round((total_downtime_sec / 3600.0) * dt_rate, 2)

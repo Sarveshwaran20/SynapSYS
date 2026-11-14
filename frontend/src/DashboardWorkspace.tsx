@@ -1030,10 +1030,10 @@ const YOKOHAMA_SITE_DATA: DashboardResponse = {
   ],
 };
 
-function generateCustomSiteMockData(siteId: string, siteName: string = 'Production Facility'): DashboardResponse {
+function generateCustomSiteMockData(siteId: string, siteName: string = 'Production Facility', siteObj?: ProductionSite | null): DashboardResponse {
   const slug = siteId.replace('synapsys-mfg-', '').replace('site-', '').replace(/-/g, ' ').trim().toUpperCase();
   const prefix = siteId.split('-').pop()?.slice(0, 3).toUpperCase() || 'AST';
-  const siteCur = getCurrencyForSite({ id: siteId, name: siteName });
+  const siteCur = getCurrencyForSite(siteObj || { id: siteId, name: siteName });
   const revGen = Math.round(1318 * siteCur.unitBaseline);
   const dtCost = Math.round((140 / 3600) * siteCur.downtimeHourlyRate * 100) / 100;
   const scrapCost = Math.round(32 * siteCur.scrapUnitCost);
@@ -1520,14 +1520,12 @@ const COIMBATORE_SITE_DATA: DashboardResponse = {
   ],
 };
 
-function getMockDataForSite(siteId: string, siteName?: string): DashboardResponse {
-  if (siteId === 'synapsys-mfg-in-coimbatore' || siteId.includes('coimbatore') || siteId.includes('chennai') || siteId.includes('india') || siteId.includes('in-')) {
-    return COIMBATORE_SITE_DATA;
-  }
+function getMockDataForSite(siteId: string, siteName?: string, siteObj?: ProductionSite | null): DashboardResponse {
+  if (siteId === 'synapsys-mfg-in-coimbatore') return COIMBATORE_SITE_DATA;
   if (siteId === 'synapsys-mfg-eu-frankfurt') return STUTTGART_SITE_DATA;
   if (siteId === 'synapsys-mfg-apac-tokyo') return YOKOHAMA_SITE_DATA;
   if (siteId === 'synapsys-mfg-prod-us') return INITIAL_DASHBOARD;
-  return generateCustomSiteMockData(siteId, siteName);
+  return generateCustomSiteMockData(siteId, siteName, siteObj);
 }
 
 const DEFAULT_PRODUCTION_SITES: ProductionSite[] = [
@@ -1581,6 +1579,45 @@ const DEFAULT_PRODUCTION_SITES: ProductionSite[] = [
     active_lines: 6,
     target_capacity: 2800,
     nominal_oee: 89.4,
+    status: 'active',
+  },
+  {
+    id: 'synapsys-mfg-uk-midlands',
+    name: 'UK Midlands Plant 03 (Propulsion Systems)',
+    region: 'europe-west2',
+    location: 'Birmingham, West Midlands, UK',
+    latitude: 52.4862,
+    longitude: -1.8904,
+    facility_type: 'Automotive Powertrain & Clean Propulsion',
+    active_lines: 7,
+    target_capacity: 3200,
+    nominal_oee: 84.6,
+    status: 'active',
+  },
+  {
+    id: 'synapsys-mfg-sg-jurong',
+    name: 'Jurong Cleanroom Fab 05 (Advanced Packaging)',
+    region: 'asia-southeast1',
+    location: 'Jurong, Singapore',
+    latitude: 1.3329,
+    longitude: 103.7436,
+    facility_type: 'Semiconductor Fab & Cleanroom',
+    active_lines: 5,
+    target_capacity: 2200,
+    nominal_oee: 91.5,
+    status: 'active',
+  },
+  {
+    id: 'synapsys-mfg-mx-monterrey',
+    name: 'Monterrey Advanced Stamping 06 (Tier-1 Castings)',
+    region: 'us-south1',
+    location: 'Monterrey, Nuevo León, Mexico',
+    latitude: 25.6866,
+    longitude: -100.3161,
+    facility_type: 'Precision Stamping & Tier-1 Heavy Castings',
+    active_lines: 9,
+    target_capacity: 4100,
+    nominal_oee: 83.8,
     status: 'active',
   },
 ];
@@ -1835,7 +1872,7 @@ export default function DashboardWorkspace({
   }, [activeSite]);
 
   const [data, setData] = useState<DashboardResponse>(() => {
-    return getMockDataForSite(currentProject);
+    return getMockDataForSite(currentProject, activeSite?.name, activeSite);
   });
   const [activeTab, setActiveTab] = useState<'overview' | 'connectors' | 'twin' | 'losses' | 'workorders' | 'alarms' | 'inventory'>('overview');
   const [statusFilter, setStatusFilter] = useState<'all' | 'running' | 'idle' | 'down'>('all');
@@ -1949,7 +1986,9 @@ export default function DashboardWorkspace({
 
   useEffect(() => {
     localStorage.setItem('synapsys_current_project', currentProject);
-  }, [currentProject]);
+    const target = productionSites.find((s) => s.id === currentProject);
+    setData(getMockDataForSite(currentProject, target?.name, target));
+  }, [currentProject, productionSites]);
 
   useEffect(() => {
     if (!csvFeedback) return;
@@ -2091,7 +2130,7 @@ export default function DashboardWorkspace({
     } catch {
       setIsConnected(false);
       // Fallback: If backend is unreachable or running offline, switch to the dedicated site fleet
-      const mock = getMockDataForSite(currentProject, activeSite?.name);
+      const mock = getMockDataForSite(currentProject, activeSite?.name, activeSite);
       const unackSimulated = simulatedAlarms.filter((s) => !s.acknowledged);
       const mergedAlarms = [...unackSimulated];
       const updatedMachines = mock.machines.map((m) => {
@@ -4012,6 +4051,9 @@ export default function DashboardWorkspace({
               <StatusDot status="running" />
               <span className="font-medium truncate max-w-[140px] sm:max-w-[210px]">
                 {activeSite?.name.replace(/\s*\(Production Live\)/i, '') || currentProject}
+              </span>
+              <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-g-surface border border-g-border text-cyan-400 font-bold shrink-0">
+                {siteCurrency.symbol} {siteCurrency.code}
               </span>
               <svg className="w-4 h-4 text-g-textSecondary ml-0.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
@@ -8799,6 +8841,12 @@ export default function DashboardWorkspace({
                               </span>
                               <span className="px-2 py-0.5 rounded-md bg-g-surface border border-g-border font-mono text-emerald-500 font-semibold">
                                 {site.nominal_oee}% OEE
+                              </span>
+                              <span className="px-2 py-0.5 rounded-md bg-g-surface border border-cyan-500/30 font-mono text-cyan-400 font-semibold">
+                                {(() => {
+                                  const c = getCurrencyForSite(site);
+                                  return `${c.country}: ${c.symbol} ${c.code}`;
+                                })()}
                               </span>
                             </div>
                           </div>
