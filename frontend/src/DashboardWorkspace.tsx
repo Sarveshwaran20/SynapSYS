@@ -1985,6 +1985,23 @@ export default function DashboardWorkspace({
   }, [productionSites]);
 
   useEffect(() => {
+    const domain = currentUser?.company_domain || 'synapsys.com';
+    fetch(`/api/sites?company_domain=${encodeURIComponent(domain)}`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((sites: ProductionSite[]) => {
+        if (Array.isArray(sites) && sites.length > 0) {
+          setProductionSites(sites);
+          if (currentUser?.assigned_facility && sites.some((s) => s.id === currentUser.assigned_facility)) {
+            setCurrentProject(currentUser.assigned_facility);
+          } else if (!sites.some((s) => s.id === currentProject)) {
+            setCurrentProject(sites[0].id);
+          }
+        }
+      })
+      .catch(() => {});
+  }, [currentUser?.company_domain, currentUser?.assigned_facility]);
+
+  useEffect(() => {
     localStorage.setItem('synapsys_current_project', currentProject);
     const target = productionSites.find((s) => s.id === currentProject);
     setData(getMockDataForSite(currentProject, target?.name, target));
@@ -8367,26 +8384,32 @@ export default function DashboardWorkspace({
 
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddSiteForm(!showAddSiteForm)}
-                    className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 ${showAddSiteForm
-                        ? 'bg-g-surfaceElevated border-g-border text-g-text hover:bg-g-surfaceSubtle'
-                        : 'bg-g-blue text-white border-g-blue hover:bg-blue-600 shadow-xs'
-                      }`}
-                  >
-                    {showAddSiteForm ? (
-                      <>
-                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                        <span>Close Form</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                        <span>Provision Site</span>
-                      </>
-                    )}
-                  </button>
+                  {(currentUser?.role === 'owner' || currentUser?.role === 'manager' || currentUser?.role === 'admin') ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowAddSiteForm(!showAddSiteForm)}
+                      className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 ${showAddSiteForm
+                          ? 'bg-g-surfaceElevated border-g-border text-g-text hover:bg-g-surfaceSubtle'
+                          : 'bg-g-blue text-white border-g-blue hover:bg-blue-600 shadow-xs'
+                        }`}
+                    >
+                      {showAddSiteForm ? (
+                        <>
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                          <span>Close Form</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                          <span>Provision Site</span>
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <span className="text-[10px] font-mono text-g-textMuted px-2 py-1 rounded bg-g-surfaceElevated border border-g-border">
+                      Owner/Manager Provisioning Only
+                    </span>
+                  )}
                   <button
                     onClick={() => { setShowProjectModal(false); setShowAddSiteForm(false); }}
                     className="p-1.5 rounded-lg text-g-textSecondary hover:text-g-text hover:bg-g-surfaceElevated transition-colors cursor-pointer"

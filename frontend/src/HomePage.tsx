@@ -511,6 +511,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [password, setPassword] = useState<string>('');
   const [fullName, setFullName] = useState<string>('');
   const [companyName, setCompanyName] = useState<string>('');
+  const [selectedRole, setSelectedRole] = useState<UserRole>('owner');
   const [otpCode, setOtpCode] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -612,6 +613,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           password: password.trim(),
           fullName: fullName.trim() || undefined,
           companyName: companyName.trim() || undefined,
+          role: selectedRole,
         });
         setAuthSuccess(`2FA security code dispatched to ${res.recipient}! An alert was sent to supervisor.`);
         setModalAuthMode('otp_verify');
@@ -650,6 +652,7 @@ export const HomePage: React.FC<HomePageProps> = ({
         otpCode: otpCode.trim(),
         fullName: fullName.trim() || undefined,
         companyName: companyName.trim() || undefined,
+        role: selectedRole,
       });
       setAuthSuccess('2FA verified! Loading isolated company workspace...');
       setTimeout(() => {
@@ -1679,6 +1682,50 @@ export const HomePage: React.FC<HomePageProps> = ({
               <span className="text-[11px] text-g-textMuted mt-0.5 block">
                 Provisions a distinct, isolated industrial dashboard with your company branding.
               </span>
+            </div>
+
+            <div>
+              <label className="block text-[13px] font-medium text-g-textSecondary mb-1.5">
+                Sign Up Role & Authority *
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedRole('owner')}
+                  className={`p-2 rounded border text-left transition-all cursor-pointer ${
+                    selectedRole === 'owner'
+                      ? 'border-g-blue bg-g-blue/15 text-g-text'
+                      : 'border-g-border bg-g-surface hover:border-g-borderHover text-g-textSecondary'
+                  }`}
+                >
+                  <div className="font-semibold text-xs">Owner</div>
+                  <div className="text-[10px] text-g-textMuted leading-tight mt-0.5">Sets up plant</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedRole('manager')}
+                  className={`p-2 rounded border text-left transition-all cursor-pointer ${
+                    selectedRole === 'manager'
+                      ? 'border-g-blue bg-g-blue/15 text-g-text'
+                      : 'border-g-border bg-g-surface hover:border-g-borderHover text-g-textSecondary'
+                  }`}
+                >
+                  <div className="font-semibold text-xs">Manager</div>
+                  <div className="text-[10px] text-g-textMuted leading-tight mt-0.5">Sets up plant</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedRole('admin')}
+                  className={`p-2 rounded border text-left transition-all cursor-pointer ${
+                    selectedRole === 'admin'
+                      ? 'border-g-blue bg-g-blue/15 text-g-text'
+                      : 'border-g-border bg-g-surface hover:border-g-borderHover text-g-textSecondary'
+                  }`}
+                >
+                  <div className="font-semibold text-xs">Supervisor</div>
+                  <div className="text-[10px] text-g-textMuted leading-tight mt-0.5">Runs daily shifts</div>
+                </button>
+              </div>
             </div>
 
             <div>

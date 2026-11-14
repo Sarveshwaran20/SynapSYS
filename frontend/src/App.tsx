@@ -16,6 +16,11 @@ const LazyAuthLoadingPage = lazy(() =>
   }))
 );
 const LazyDashboardWorkspace = lazy(() => import('./DashboardWorkspace'));
+const LazyPlantSetupOnboarding = lazy(() =>
+  import('./components/onboarding/PlantSetupOnboarding').then((m) => ({
+    default: m.PlantSetupOnboarding,
+  }))
+);
 
 function getSavedFacilityName(): string | undefined {
   if (typeof window === 'undefined') return undefined;
@@ -302,6 +307,35 @@ export default function App() {
             onLoginSuccess={beginAuthenticatedTransition}
             isDarkMode={isDarkMode}
             onToggleTheme={toggleTheme}
+          />
+        </PageTransition>
+      </Suspense>
+    );
+  }
+
+  // Check if non-demo corporate organization requires initial plant setup and commissioning
+  const isDemoWorkspace = currentUser.company_domain === 'synapsys.com';
+  const needsPlantSetup = Boolean(
+    !isDemoWorkspace &&
+    (!currentUser.assigned_facility || currentUser.assigned_facility === '')
+  );
+
+  if (needsPlantSetup) {
+    return (
+      <Suspense fallback={<ChunkRouteFallback label="Loading plant setup wizard..." />}>
+        <PageTransition pageKey="page-plant-onboarding">
+          <LazyPlantSetupOnboarding
+            currentUser={currentUser}
+            isDarkMode={isDarkMode}
+            onToggleTheme={toggleTheme}
+            onLogout={handleLogout}
+            onPlantCommissioned={(site) => {
+              const updated = { ...currentUser, assigned_facility: site.id };
+              setCurrentUser(updated);
+              localStorage.setItem('synapsys_auth_user', JSON.stringify(updated));
+              localStorage.setItem('synapsys_current_project', site.id);
+              localStorage.setItem('synapsys_production_sites', JSON.stringify([site]));
+            }}
           />
         </PageTransition>
       </Suspense>

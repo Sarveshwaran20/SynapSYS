@@ -827,8 +827,10 @@ def get_sites_for_company(company_domain: str) -> List[ProductionSite]:
     conn.close()
 
     if not rows:
-        site = ensure_company_site(domain)
-        return [site]
+        if domain == "synapsys.com":
+            site = ensure_company_site(domain)
+            return [site]
+        return []
 
     results = []
     for r in rows:
@@ -1560,7 +1562,7 @@ class SignUpRequest(BaseModel):
     password: str
     full_name: Optional[str] = None
     company_name: Optional[str] = None
-    role: Optional[str] = "admin"
+    role: Optional[str] = "owner"
     assigned_facility: Optional[str] = None
 
 
@@ -1569,7 +1571,7 @@ class Initiate2FARequest(BaseModel):
     password: str
     full_name: Optional[str] = None
     company_name: Optional[str] = None
-    role: Optional[str] = "admin"
+    role: Optional[str] = "owner"
 
 
 class Verify2FARequest(BaseModel):
@@ -1602,6 +1604,19 @@ def initiate_2fa(req: Initiate2FARequest):
     prefix = email.split("@")[0].lower()
     full_name = (req.full_name or "").strip() or prefix.replace(".", " ").replace("_", " ").title()
     company_name = (req.company_name or "").strip() or (domain.split(".")[0].replace("-", " ").title() + " Industrial")
+    role = req.role if req.role in ("owner", "manager", "admin", "operator", "demo") else "owner"
+
+    if role == "operator" and domain != "synapsys.com":
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM production_sites WHERE company_domain = ?", (domain,))
+        has_site = cursor.fetchone()
+        conn.close()
+        if not has_site:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Plant Commissioning Required: No production plant has been set up for '{company_name}' yet. Please ask your Company Owner or Plant Manager to set up the facility first."
+            )
 
     candidate_data = {
         "email": email,
@@ -1609,7 +1624,7 @@ def initiate_2fa(req: Initiate2FARequest):
         "full_name": full_name,
         "company_name": company_name,
         "domain": domain,
-        "role": req.role if req.role in ("admin", "operator", "demo") else "admin",
+        "role": role,
     }
 
     _, otp_code, delivery_info = initiate_2fa_signup(candidate_data)
@@ -1630,7 +1645,7 @@ def initiate_2fa(req: Initiate2FARequest):
 def verify_2fa_and_register(req: Verify2FARequest):
     """
     Step 2 of 2FA: Validates the 6-digit OTP code, creates the user in SQLite,
-    provisions their dedicated company manufacturing site, and syncs immediately to Cloud Firestore.
+    and assigns them to their company's active manufacturing site if one is already running.
     """
     candidate_data = verify_2fa_code(req.email, req.otp_code)
     if not candidate_data:
@@ -1644,7 +1659,7 @@ def verify_2fa_and_register(req: Verify2FARequest):
     full_name = candidate_data["full_name"]
     company_name = candidate_data["company_name"]
     domain = candidate_data["domain"]
-    role = candidate_data["role"]
+    role = candidate_data.get("role", "owner")
 
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -1656,8 +1671,22 @@ def verify_2fa_and_register(req: Verify2FARequest):
     pwd_hash = hash_password(password)
     created_at = datetime.now(timezone.utc).isoformat()
 
-    comp_site = ensure_company_site(domain, company_name)
-    assigned_facility = comp_site.id
+    cursor.execute("SELECT id FROM production_sites WHERE company_domain = ?", (domain,))
+    site_row = cursor.fetchone()
+
+    if site_row:
+        assigned_facility = site_row[0]
+    elif domain == "synapsys.com":
+        comp_site = ensure_company_site(domain, company_name)
+        assigned_facility = comp_site.id
+    else:
+        if role == "operator":
+            conn.close()
+            raise HTTPException(
+                status_code=403,
+                detail=f"Plant Commissioning Required: No production plant has been set up for '{company_name}' yet. Please ask your Company Owner or Plant Manager to set up the facility first."
+            )
+        assigned_facility = None
 
     cursor.execute("""
         INSERT INTO users (email, password_hash, full_name, company_name, company_domain, role, assigned_facility, created_at)
@@ -1722,13 +1751,27 @@ def register(req: SignUpRequest):
 
     full_name = (req.full_name or "").strip() or prefix.replace(".", " ").replace("_", " ").title()
     company_name = (req.company_name or "").strip() or (domain.split(".")[0].replace("-", " ").title() + " Industrial")
-    role = req.role if req.role in ("admin", "operator", "demo") else "admin"
+    role = req.role if req.role in ("owner", "manager", "admin", "operator", "demo") else "owner"
 
     pwd_hash = hash_password(password)
     created_at = datetime.now(timezone.utc).isoformat()
 
-    comp_site = ensure_company_site(domain, company_name)
-    assigned_facility = req.assigned_facility or comp_site.id
+    cursor.execute("SELECT id FROM production_sites WHERE company_domain = ?", (domain,))
+    site_row = cursor.fetchone()
+
+    if site_row:
+        assigned_facility = site_row[0]
+    elif domain == "synapsys.com":
+        comp_site = ensure_company_site(domain, company_name)
+        assigned_facility = comp_site.id
+    else:
+        if role == "operator":
+            conn.close()
+            raise HTTPException(
+                status_code=403,
+                detail=f"Plant Commissioning Required: No production plant has been set up for '{company_name}' yet. Please ask your Company Owner or Plant Manager to set up the facility first."
+            )
+        assigned_facility = None
 
     cursor.execute("""
         INSERT INTO users (email, password_hash, full_name, company_name, company_domain, role, assigned_facility, created_at)
@@ -1794,10 +1837,22 @@ def login(req: LoginRequest):
         if pwd_hash != hash_password(password):
             conn.close()
             raise HTTPException(status_code=401, detail="Invalid corporate password")
-        # Ensure company primary site exists
-        comp_site = ensure_company_site(company_domain, company_name)
-        if not assigned_facility or assigned_facility == "synapsys-mfg-prod-us" and company_domain != "synapsys.com":
+        cursor.execute("SELECT id FROM production_sites WHERE company_domain = ?", (company_domain,))
+        site_rows = cursor.fetchall()
+        if site_rows:
+            if not assigned_facility or assigned_facility not in [r[0] for r in site_rows]:
+                assigned_facility = site_rows[0][0]
+        elif company_domain == "synapsys.com":
+            comp_site = ensure_company_site(company_domain, company_name)
             assigned_facility = comp_site.id
+        else:
+            if role == "operator":
+                conn.close()
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Plant Setup Required: {company_name} has not yet commissioned a production plant. Please ask your Company Owner or Plant Manager to set up the facility before supervisors or operators can log in."
+                )
+            assigned_facility = None
     else:
         # Dynamic Enterprise Auto-Provisioning:
         # Derive role cleanly from corporate identity prefix without granting admin to demo/operator addresses
@@ -1818,12 +1873,28 @@ def login(req: LoginRequest):
             else prefix.replace(".", " ").replace("_", " ").title()
         )
 
-        role = "demo" if is_demo else ("operator" if is_operator else "admin")
+        cursor.execute("SELECT id FROM production_sites WHERE company_domain = ?", (domain,))
+        site_rows = cursor.fetchall()
+
+        if site_rows:
+            assigned_facility = site_rows[0][0]
+            role = "demo" if is_demo else ("operator" if is_operator else "admin")
+        elif domain == "synapsys.com":
+            comp_site = ensure_company_site(domain, clean_company)
+            assigned_facility = comp_site.id
+            role = "demo" if is_demo else ("operator" if is_operator else "admin")
+        else:
+            if is_operator:
+                conn.close()
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Plant Setup Required: {clean_company} has not yet commissioned a production plant. Please ask your Company Owner or Plant Manager to set up the facility first."
+                )
+            role = "owner"
+            assigned_facility = None
+
         pwd_hash = hash_password(password)
         created_at = datetime.now(timezone.utc).isoformat()
-        
-        comp_site = ensure_company_site(domain, clean_company)
-        assigned_facility = comp_site.id
         
         cursor.execute("""
             INSERT INTO users (email, password_hash, full_name, company_name, company_domain, role, assigned_facility, created_at)
@@ -1950,6 +2021,7 @@ def toggle_connector(connector_id: str):
 # ---------------------------------------------------------------------------
 
 @app.get("/api/sites", response_model=List[ProductionSite])
+@app.get("/api/production-sites", response_model=List[ProductionSite])
 def get_production_sites(company_domain: Optional[str] = Query(None)):
     """Returns list of configured manufacturing facilities strictly for the requesting company."""
     if not company_domain:
@@ -1958,6 +2030,7 @@ def get_production_sites(company_domain: Optional[str] = Query(None)):
 
 
 @app.post("/api/sites", response_model=ProductionSite, status_code=201)
+@app.post("/api/production-sites", response_model=ProductionSite, status_code=201)
 def create_production_site(site: ProductionSite):
     """Provisions a new production site / manufacturing plant with automatic distinct machine seeding for that company."""
     site_id = site.id.strip().lower().replace(" ", "-")
@@ -1985,6 +2058,11 @@ def create_production_site(site: ProductionSite):
         INSERT INTO production_sites (id, company_domain, company_name, name, region, location, facility_type, active_lines, target_capacity, nominal_oee, status, latitude, longitude, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (new_site.id, new_site.company_domain, new_site.company_name, new_site.name, new_site.region, new_site.location, new_site.facility_type, new_site.active_lines, new_site.target_capacity, new_site.nominal_oee, new_site.status, new_site.latitude, new_site.longitude, new_site.created_at))
+    
+    cursor.execute("""
+        UPDATE users SET assigned_facility = ?
+        WHERE company_domain = ? AND (assigned_facility IS NULL OR assigned_facility = '')
+    """, (new_site.id, domain))
     conn.commit()
     conn.close()
 
@@ -2522,6 +2600,36 @@ def get_dashboard(site_id: Optional[str] = Query(default=None), company_domain: 
     if company_domain:
         comp_domain = company_domain.strip().lower()
         comp_sites = get_sites_for_company(comp_domain)
+        if not comp_sites and comp_domain != "synapsys.com":
+            clean_company = comp_domain.split(".")[0].replace("-", " ").title()
+            return DashboardResponseModel(
+                site_id="",
+                site_name=f"{clean_company} (Pending Plant Setup)",
+                facility_type="Uncommissioned Facility",
+                region="none",
+                location="Facility Pending Commissioning",
+                machines=[],
+                connectors=[],
+                active_alarms=[],
+                work_orders=[],
+                summary=DashboardSummary(
+                    overall_oee=0.0,
+                    availability=0.0,
+                    performance=0.0,
+                    quality=0.0,
+                    total_output=0,
+                    target_output=0,
+                    total_good=0,
+                    total_scrap=0,
+                    running_machines=0,
+                    idle_machines=0,
+                    down_machines=0,
+                    total_downtime_hours=0.0,
+                    financial_yield=0.0,
+                    fleet_power_kw=0.0,
+                ),
+                timestamp=datetime.now(timezone.utc).isoformat(),
+            )
         comp_ids = [s.id for s in comp_sites]
         if not site_id or site_id not in comp_ids:
             site_id = comp_sites[0].id if comp_sites else "synapsys-mfg-prod-us"

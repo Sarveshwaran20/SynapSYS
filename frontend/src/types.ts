@@ -216,7 +216,7 @@ export interface ProductionSite {
   company_name?: string;
 }
 
-export type UserRole = 'admin' | 'operator' | 'demo';
+export type UserRole = 'owner' | 'manager' | 'admin' | 'operator' | 'demo';
 
 export interface UserProfile {
   id: number;
@@ -225,7 +225,7 @@ export interface UserProfile {
   company_name: string;
   company_domain: string;
   role: UserRole;
-  assigned_facility?: string;
+  assigned_facility?: string | null;
   created_at: string;
 }
 

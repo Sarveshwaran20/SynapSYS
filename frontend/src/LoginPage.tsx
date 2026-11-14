@@ -27,6 +27,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [companyName, setCompanyName] = useState('');
+  const [selectedRole, setSelectedRole] = useState<UserRole>('owner');
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -87,6 +88,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         password: password.trim(),
         fullName: fullName.trim() || undefined,
         companyName: companyName.trim() || undefined,
+        role: selectedRole,
       });
 
       setEmailDeliveryInfo({
@@ -134,6 +136,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         otpCode: fullCode,
         fullName: fullName.trim() || undefined,
         companyName: companyName.trim() || undefined,
+        role: selectedRole,
       });
 
       setSuccessMessage('2FA Verified! Provisioning isolated company twin and signing in...');
@@ -539,6 +542,71 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     placeholder="e.g. Coimbatore Precision Tooling"
                     className="w-full px-3 py-2 bg-g-surfaceElevated border border-g-border rounded-[4px] text-g-text text-sm focus:outline-none focus:border-aegean focus:ring-1 focus:ring-aegean transition-all font-sans placeholder:text-g-textMuted/60"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-[13px] font-semibold text-g-textSecondary mb-1.5 font-sans">
+                    Sign Up Role & Authority *
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRole('owner')}
+                      className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                        selectedRole === 'owner'
+                          ? 'border-g-blue bg-g-blue/15 text-g-text shadow-xs ring-1 ring-g-blue/30'
+                          : 'border-g-border bg-g-surfaceElevated hover:border-g-borderHover text-g-textSecondary'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-xs font-bold font-sans">Company Owner</span>
+                        {selectedRole === 'owner' && <span className="w-2 h-2 rounded-full bg-g-blue" />}
+                      </div>
+                      <p className="text-[10px] text-g-textMuted leading-tight font-sans">
+                        Authorizes plant setup & full organization control
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRole('manager')}
+                      className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                        selectedRole === 'manager'
+                          ? 'border-g-blue bg-g-blue/15 text-g-text shadow-xs ring-1 ring-g-blue/30'
+                          : 'border-g-border bg-g-surfaceElevated hover:border-g-borderHover text-g-textSecondary'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-xs font-bold font-sans">Plant Manager</span>
+                        {selectedRole === 'manager' && <span className="w-2 h-2 rounded-full bg-g-blue" />}
+                      </div>
+                      <p className="text-[10px] text-g-textMuted leading-tight font-sans">
+                        Authorizes plant setup & facility operations
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRole('admin')}
+                      className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                        selectedRole === 'admin'
+                          ? 'border-g-blue bg-g-blue/15 text-g-text shadow-xs ring-1 ring-g-blue/30'
+                          : 'border-g-border bg-g-surfaceElevated hover:border-g-borderHover text-g-textSecondary'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-xs font-bold font-sans">Plant Supervisor</span>
+                        {selectedRole === 'admin' && <span className="w-2 h-2 rounded-full bg-g-blue" />}
+                      </div>
+                      <p className="text-[10px] text-g-textMuted leading-tight font-sans">
+                        Authorizes plant setup & shift supervisory control
+                      </p>
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-amber-500/90 font-sans mt-1.5 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                    <span>Owners, Managers & Admins initialize and run the plant. Once active, staff can log in.</span>
+                  </p>
                 </div>
 
                 <div>

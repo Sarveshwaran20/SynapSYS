@@ -4,11 +4,23 @@ export const DEMO_WORKSPACE_CREDENTIALS: Record<
   UserRole,
   { email: string; password: string; fullName: string; companyName: string }
 > = {
-  demo: {
-    email: 'demo@synapsys.com',
-    password: 'demo123',
-    fullName: 'Demo Explorer',
-    companyName: 'SynapSYS Demo Workspace',
+  owner: {
+    email: 'owner@synapsys.com',
+    password: 'owner123',
+    fullName: 'Enterprise Owner',
+    companyName: 'SynapSYS Global Intelligence',
+  },
+  manager: {
+    email: 'manager@synapsys.com',
+    password: 'manager123',
+    fullName: 'Plant Operations Manager',
+    companyName: 'SynapSYS Global Intelligence',
+  },
+  admin: {
+    email: 'admin@synapsys.com',
+    password: 'admin123',
+    fullName: 'System Administrator',
+    companyName: 'SynapSYS Global Intelligence',
   },
   operator: {
     email: 'operator@synapsys.com',
@@ -16,11 +28,11 @@ export const DEMO_WORKSPACE_CREDENTIALS: Record<
     fullName: 'Floor Shift Operator',
     companyName: 'SynapSYS Operations',
   },
-  admin: {
-    email: 'admin@synapsys.com',
-    password: 'admin123',
-    fullName: 'System Administrator',
-    companyName: 'SynapSYS Global Intelligence',
+  demo: {
+    email: 'demo@synapsys.com',
+    password: 'demo123',
+    fullName: 'Demo Explorer',
+    companyName: 'SynapSYS Demo Workspace',
   },
 };
 
@@ -34,6 +46,12 @@ export function inferUserRole(email: string, directRole?: UserRole): UserRole {
     localPart.startsWith('demo+')
   ) {
     return 'demo';
+  }
+  if (localPart.includes('owner')) {
+    return 'owner';
+  }
+  if (localPart.includes('manager')) {
+    return 'manager';
   }
   if (localPart.includes('operator') || localPart.includes('shift')) {
     return 'operator';
@@ -81,10 +99,7 @@ export function buildFallbackSession(
     company_name: companyName,
     company_domain: domain,
     role,
-    assigned_facility:
-      domain === 'synapsys.com'
-        ? 'synapsys-mfg-prod-us'
-        : `${domain.split('.')[0]}-mfg-plant-01`,
+    assigned_facility: domain === 'synapsys.com' ? 'synapsys-mfg-prod-us' : undefined,
     created_at: new Date().toISOString(),
   };
 
