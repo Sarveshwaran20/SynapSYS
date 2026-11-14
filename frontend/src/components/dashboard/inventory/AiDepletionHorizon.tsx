@@ -15,7 +15,15 @@ export const AiDepletionHorizon: React.FC<AiDepletionHorizonProps> = ({
 }) => {
   // Compute predictive depletion hours based on live machine usage
   const predictions = items.map((item, idx) => {
-    const consumptionPerHour = idx === 0 ? 0.12 : idx === 1 ? 1.4 : idx === 2 ? 0.8 : 0.05;
+    const rateByCategory: Record<string, number> = {
+      'Cutting Tools': 0.85,
+      'Raw Materials': 2.4,
+      'Fluids & Lubricants': 0.08,
+      'Machine Spares': 0.04,
+      'Safety & PPE': 0.5,
+    };
+    const baseRate = rateByCategory[item.category] || 0.1;
+    const consumptionPerHour = Math.round((baseRate * (1 + (idx % 3) * 0.2)) * 100) / 100;
     const hoursRemaining = Math.max(0.5, Math.round((item.quantity / consumptionPerHour) * 10) / 10);
     const daysRemaining = Math.round((hoursRemaining / 24) * 10) / 10;
     const isCritical = item.quantity <= item.min_safety_stock;
