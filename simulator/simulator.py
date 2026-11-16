@@ -57,36 +57,49 @@ class SimulatedMachine:
         self.active_alarm = None
         self.alarm_severity = "None"
         self.alarm_code = None
+        self.alarm_duration_sec = 0.0
+        self.alarm_max_duration_sec = 12.0
         self.seconds_since_last_part = 0.0
 
     def step(self, delta_time: float):
+        # Auto-resolve transient warnings and alarms after duration expires
+        if self.active_alarm:
+            self.alarm_duration_sec += delta_time
+            if self.alarm_duration_sec >= self.alarm_max_duration_sec:
+                self.active_alarm = None
+                self.alarm_severity = "None"
+                self.alarm_code = None
+                self.alarm_duration_sec = 0.0
+
         self.state_countdown -= 1
 
         if self.state_countdown <= 0:
             roll = random.random()
             if self.status == "Running":
-                if roll < 0.12:
+                if roll < 0.04:
                     self.status = "Down"
-                    self.state_countdown = random.randint(4, 8)
+                    self.state_countdown = random.randint(5, 9)
                     self._generate_fault()
-                elif roll < 0.25:
+                elif roll < 0.09:
                     self.status = "Idle"
-                    self.state_countdown = random.randint(3, 6)
+                    self.state_countdown = random.randint(4, 7)
                     self._generate_idle_state()
                 else:
-                    self.state_countdown = random.randint(18, 32)
+                    self.state_countdown = random.randint(30, 60)
             elif self.status == "Down":
                 self.status = "Running"
                 self.active_alarm = None
                 self.alarm_severity = "None"
                 self.alarm_code = None
-                self.state_countdown = random.randint(22, 38)
+                self.alarm_duration_sec = 0.0
+                self.state_countdown = random.randint(40, 70)
             elif self.status == "Idle":
                 self.status = "Running"
                 self.active_alarm = None
                 self.alarm_severity = "None"
                 self.alarm_code = None
-                self.state_countdown = random.randint(20, 34)
+                self.alarm_duration_sec = 0.0
+                self.state_countdown = random.randint(35, 65)
 
         if self.status == "Running":
             self.uptime_seconds += delta_time
@@ -101,19 +114,19 @@ class SimulatedMachine:
                 self.output_count += 1
                 self.seconds_since_last_part = 0.0
 
-                if random.random() < 0.02:
+                if random.random() < 0.015:
                     self.scrap_count += 1
                 else:
                     self.good_count += 1
 
-                if random.random() < 0.04 and not self.active_alarm:
-                    self.active_alarm = f"Vibration drift (RMS: {round(random.uniform(2.8, 3.4), 2)} mm/s)"
+                # Rare transient harmonic vibration drift, auto-resolving in 8-12s
+                if random.random() < 0.01 and not self.active_alarm:
+                    v_val = round(random.uniform(2.8, 3.4), 2)
+                    self.active_alarm = f"Vibration drift (RMS: {v_val} mm/s)"
                     self.alarm_severity = "Warning"
                     self.alarm_code = "ALM-W108"
-                elif self.alarm_severity == "Warning" and random.random() < 0.25:
-                    self.active_alarm = None
-                    self.alarm_severity = "None"
-                    self.alarm_code = None
+                    self.alarm_duration_sec = 0.0
+                    self.alarm_max_duration_sec = random.uniform(8.0, 12.0)
 
         elif self.status == "Down":
             self.downtime_seconds += delta_time
@@ -149,6 +162,8 @@ class SimulatedMachine:
         self.active_alarm = alarm_text
         self.alarm_severity = severity
         self.alarm_code = code
+        self.alarm_duration_sec = 0.0
+        self.alarm_max_duration_sec = 16.0
 
     def _generate_idle_state(self):
         idle_map = {
@@ -163,11 +178,16 @@ class SimulatedMachine:
         self.active_alarm = alarm_text
         self.alarm_severity = severity
         self.alarm_code = code
+        self.alarm_duration_sec = 0.0
+        self.alarm_max_duration_sec = 12.0
 
     def get_sensors(self) -> dict:
         if self.status == "Running":
             temp = self.base_temp + random.uniform(-1.2, 2.5)
-            vib = 1.6 + random.uniform(-0.15, 0.25)
+            if self.alarm_code == "ALM-W108":
+                vib = random.uniform(2.85, 3.35)
+            else:
+                vib = 1.6 + random.uniform(-0.15, 0.25)
             pwr = self.base_power + random.uniform(-1.0, 1.5)
             press = 6.4 + random.uniform(-0.1, 0.1)
         elif self.status == "Down":
