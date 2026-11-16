@@ -314,7 +314,10 @@ export default function App() {
   }
 
   // Check if non-demo corporate organization requires initial plant setup and commissioning
-  const isDemoWorkspace = currentUser.company_domain === 'synapsys.com';
+  const isDemoWorkspace =
+    !currentUser.company_domain ||
+    currentUser.company_domain === 'synapsys.com' ||
+    currentUser.role === 'demo';
   const needsPlantSetup = Boolean(
     !isDemoWorkspace &&
     (!currentUser.assigned_facility || currentUser.assigned_facility === '')
