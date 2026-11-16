@@ -8,7 +8,7 @@ import {
 } from './lib/auth';
 import { SynapsysLogo } from './SynapsysLogo';
 import { dur, ease } from './lib/motion';
-import { SingularityBackdrop } from './components/dashboard/SingularityBackdrop';
+import { AuthBackdrop } from './components/auth/AuthBackdrop';
 
 interface LoginPageProps {
   onLoginSuccess: (session: AuthSession) => void;
@@ -258,8 +258,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     <div
       className="min-h-screen w-full bg-g-bg text-g-text flex flex-col justify-between relative overflow-x-clip font-sans select-none transition-colors duration-200"
     >
-      {/* Unified Industrial SCADA Animated Backdrop */}
-      <SingularityBackdrop isDarkMode={isDarkMode} enabled={true} intensity={0.65} />
+      {/* Bespoke Gateway Security & 3D Perspective Digital Twin Backdrop */}
+      <AuthBackdrop isDarkMode={isDarkMode} enabled={true} />
 
       {/* Subtle Ambient Vignette & Center Spotlight Glow */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
