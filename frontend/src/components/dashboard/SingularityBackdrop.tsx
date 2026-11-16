@@ -3,11 +3,10 @@ import { useReducedMotion } from 'framer-motion';
 import { useDocumentVisible } from '../../lib/motion';
 
 export type BackdropMode =
-  | 'ecosystem_constellation'
-  | 'lidar_mesh'
-  | 'tokamak_fusion'
-  | 'neural_synapse'
-  | 'singularity';
+  | 'circuit_matrix'
+  | 'cad_robotic_gantry'
+  | 'matrix_telemetry'
+  | 'oscilloscope_spectral';
 
 export interface BackdropEngineMeta {
   id: BackdropMode;
@@ -19,148 +18,80 @@ export interface BackdropEngineMeta {
 
 export const BACKDROP_ENGINES: BackdropEngineMeta[] = [
   {
-    id: 'ecosystem_constellation',
-    name: '3D Ecosystem Twin',
-    tagline: 'CODESYS Automation Topology',
+    id: 'circuit_matrix',
+    name: 'Circuit Highway',
+    tagline: 'PCB Bus & CAD Oscilloscope',
     badge: 'NEW',
-    description: '3D isometric wireframe hypercube with interconnected SCADA & PLC digital twin constellation',
+    description: 'Orthogonal high-speed PCB circuit bus traces with traveling photon data packets, logic chips, and live oscilloscope waveform',
   },
   {
-    id: 'lidar_mesh',
-    name: '3D LiDAR Mesh',
-    tagline: 'Topographic LiDAR Terrain',
-    badge: '3D',
-    description: 'Dynamic isometric LiDAR wave field with 3D triple-gimbal gyroscope core',
+    id: 'cad_robotic_gantry',
+    name: 'CAD CNC Gantry',
+    tagline: '3D Cartesian Machine Blueprint',
+    badge: 'CAD',
+    description: 'Precision Cartesian CNC gantry wireframe moving along rails with laser toolhead, dimensional calipers, and drafting grid',
   },
   {
-    id: 'tokamak_fusion',
-    name: 'Tokamak Fusion',
-    tagline: 'Plasma Magnetic Confinement',
-    badge: 'FX',
-    description: 'Toroidal magnetic flux coils with orbiting plasma and Lorenz attractor stream',
+    id: 'matrix_telemetry',
+    name: 'Telemetry Waterfall',
+    tagline: 'SCADA Hex & Binary Matrix',
+    badge: 'DATA',
+    description: 'Cascading monospace industrial telemetry data streams with register readouts and horizontal laser scanlines',
   },
   {
-    id: 'neural_synapse',
-    name: 'Neural Synapse',
-    tagline: 'Cognitive SCADA Intelligence',
-    badge: 'AI',
-    description: 'Multi-layer neural synapse network with propagating action potentials',
-  },
-  {
-    id: 'singularity',
-    name: 'Gravitational Vortex',
-    tagline: 'Deep Space Singularity',
-    badge: 'CORE',
-    description: 'Keplerian accretion disk with event horizon and infalling relativistic matter',
+    id: 'oscilloscope_spectral',
+    name: 'Spectral FFT Lab',
+    tagline: 'Multi-Channel Vibration Audio',
+    badge: 'FFT',
+    description: 'Multi-frequency acoustic resonance harmonic waves and real-time frequency spectrum analyzer bars',
   },
 ];
 
 export interface SingularityBackdropProps {
   isDarkMode?: boolean;
   enabled?: boolean;
-  intensity?: number; // 0.1 to 1.0 (default: 0.65)
-  mode?: BackdropMode; // default: 'ecosystem_constellation'
+  intensity?: number;
+  mode?: BackdropMode;
 }
 
 // -----------------------------------------------------------------------------
-// Engine 1 Structures: 3D Ecosystem Constellation (CODESYS Industrial Topology)
+// Circuit Highway & PCB Structures
 // -----------------------------------------------------------------------------
-interface EcosystemNode {
-  id: string;
-  label: string;
-  sub: string;
-  angle: number;
-  orbitRadius: number;
-  speed: number;
-  tiltAngle: number;
-  color: string;
-  glowColor: string;
-  packetProgress: number;
-  packetSpeed: number;
-}
-
-interface PerimeterPacket {
-  edgeIdx: number;
-  progress: number;
-  speed: number;
-  color: string;
-}
-
-// -----------------------------------------------------------------------------
-// Engine 2 Structures: LiDAR Mesh & Cybernetic Gyroscope
-// -----------------------------------------------------------------------------
-interface CircuitTrack {
+interface CircuitWire {
   points: Array<{ x: number; y: number }>;
+  color: string;
   packetProgress: number;
   speed: number;
-  color: string;
+  packetSize: number;
 }
 
-interface HudBadge {
+interface CircuitChip {
+  id: string;
+  name: string;
+  code: string;
   relX: number;
   relY: number;
-  label: string;
-  metric: string;
-  sub: string;
-  tone: 'cyan' | 'purple' | 'emerald';
-}
-
-// -----------------------------------------------------------------------------
-// Engine 3 Structures: Tokamak Magnetic Fusion Plasma
-// -----------------------------------------------------------------------------
-interface PlasmaParticle {
-  torusAngle: number;
-  poloidalAngle: number;
-  torusSpeed: number;
-  poloidalSpeed: number;
-  orbitRadius: number;
-  tubeRadius: number;
+  width: number;
+  height: number;
   color: string;
-  size: number;
+  pins: 'both' | 'left' | 'right' | 'horizontal';
 }
 
 // -----------------------------------------------------------------------------
-// Engine 4 Structures: Neural Synapse Cyber-Grid
+// Matrix Waterfall Column Structure
 // -----------------------------------------------------------------------------
-interface NeuralNode {
-  x: number;
-  y: number;
-  baseX: number;
-  baseY: number;
-  layer: number;
-  activity: number;
-  pulseRadius: number;
-  connections: number[];
-  label: string;
-}
-
-interface SynapticPulse {
-  fromNode: number;
-  toNode: number;
-  progress: number;
+interface TelemetryColumn {
+  xRel: number;
+  yOffset: number;
   speed: number;
-  color: string;
-}
-
-// -----------------------------------------------------------------------------
-// Engine 5 Structures: Gravitational Singularity Accretion
-// -----------------------------------------------------------------------------
-interface SingularityParticle {
-  r: number;
-  theta: number;
-  orbitSpeed: number;
-  radialSpeed: number;
-  size: number;
-  color: string;
-  alpha: number;
-  history: Array<{ x: number; y: number }>;
+  chars: string[];
 }
 
 export const SingularityBackdrop: React.FC<SingularityBackdropProps> = React.memo(({
   isDarkMode = true,
   enabled = true,
   intensity = 0.65,
-  mode = 'ecosystem_constellation',
+  mode = 'circuit_matrix',
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
@@ -169,23 +100,11 @@ export const SingularityBackdrop: React.FC<SingularityBackdropProps> = React.mem
   const isDocVisible = useDocumentVisible();
 
   // Engine state references
-  const ecosystemNodesRef = useRef<EcosystemNode[]>([]);
-  const perimeterPacketsRef = useRef<PerimeterPacket[]>([]);
-  const circuitTracksRef = useRef<CircuitTrack[]>([]);
-  const plasmaParticlesRef = useRef<PlasmaParticle[]>([]);
-  const neuralNodesRef = useRef<NeuralNode[]>([]);
-  const synapticPulsesRef = useRef<SynapticPulse[]>([]);
-  const singularityParticlesRef = useRef<SingularityParticle[]>([]);
+  const wiresRef = useRef<CircuitWire[]>([]);
+  const chipsRef = useRef<CircuitChip[]>([]);
+  const columnsRef = useRef<TelemetryColumn[]>([]);
 
-  // Lorenz attractor integration state for Tokamak mode
-  const lorenzStateRef = useRef<{ x: number; y: number; z: number; trail: Array<{ x: number; y: number; z: number }> }>({
-    x: 0.1,
-    y: 0,
-    z: 0,
-    trail: [],
-  });
-
-  // Track mouse coordinates with inertia
+  // Mouse coordinate tracking with smooth interpolation
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       mouseRef.current.targetX = e.clientX;
@@ -198,246 +117,125 @@ export const SingularityBackdrop: React.FC<SingularityBackdropProps> = React.mem
     };
   }, []);
 
-  // Initialize all engine particle systems
+  // Initialize PCB components, circuit bus traces, and telemetry streams
   useEffect(() => {
-    // 1. Initialize Ecosystem Constellation Nodes (CODESYS automation topology)
-    ecosystemNodesRef.current = [
+    // 1. Integrated Circuit (IC) Chip Footprints
+    chipsRef.current = [
+      { id: 'mcu', name: 'CORE MCU', code: 'STM32-H743', relX: 0.28, relY: 0.22, width: 110, height: 50, color: '#38bdf8', pins: 'both' },
+      { id: 'plc', name: 'PLC I/O BUS', code: 'IEC-61131-3', relX: 0.74, relY: 0.26, width: 120, height: 52, color: '#34d399', pins: 'both' },
+      { id: 'phy', name: 'ANALOG DSP', code: 'FFT-48kS/s', relX: 0.35, relY: 0.62, width: 115, height: 48, color: '#fbbf24', pins: 'both' },
+      { id: 'asic', name: 'ETHERCAT PHY', code: '100BASE-TX', relX: 0.82, relY: 0.65, width: 125, height: 50, color: '#c084fc', pins: 'both' },
+      { id: 'gate', name: 'SCADA BRIDGE', code: 'MQTT-SPARKPLUG', relX: 0.56, relY: 0.84, width: 130, height: 46, color: '#f43f5e', pins: 'horizontal' },
+    ];
+
+    // 2. Multi-Layer PCB Circuit Highway Bus Traces (Horizontal & Vertical with 45-degree chamfers)
+    wiresRef.current = [
+      // Top Primary Data Highway
       {
-        id: 'codesys',
-        label: 'CODESYS PLC',
-        sub: 'IEC 61131-3 Runtime',
-        angle: 0,
-        orbitRadius: 240,
-        speed: 0.0018,
-        tiltAngle: 0.1,
+        points: [{ x: 0.02, y: 0.14 }, { x: 0.24, y: 0.14 }, { x: 0.28, y: 0.20 }, { x: 0.65, y: 0.20 }, { x: 0.70, y: 0.14 }, { x: 0.98, y: 0.14 }],
         color: '#38bdf8',
-        glowColor: 'rgba(56, 189, 248, 0.45)',
-        packetProgress: 0.15,
-        packetSpeed: 0.0055,
-      },
-      {
-        id: 'twin',
-        label: 'DIGITAL TWIN',
-        sub: '3D Spatial Mesh',
-        angle: (Math.PI / 4) * 1,
-        orbitRadius: 280,
-        speed: 0.0016,
-        tiltAngle: -0.15,
-        color: '#818cf8',
-        glowColor: 'rgba(129, 140, 248, 0.45)',
-        packetProgress: 0.62,
-        packetSpeed: 0.0048,
-      },
-      {
-        id: 'acoustic',
-        label: 'ACOUSTIC AI',
-        sub: 'Heterodyne Spectral',
-        angle: (Math.PI / 4) * 2,
-        orbitRadius: 230,
-        speed: 0.002,
-        tiltAngle: 0.08,
-        color: '#34d399',
-        glowColor: 'rgba(52, 211, 153, 0.45)',
-        packetProgress: 0.35,
-        packetSpeed: 0.0062,
-      },
-      {
-        id: 'opcua',
-        label: 'OPC-UA / MQTT',
-        sub: 'Sparkplug B 10Gbps',
-        angle: (Math.PI / 4) * 3,
-        orbitRadius: 290,
-        speed: 0.0017,
-        tiltAngle: -0.12,
-        color: '#fbbf24',
-        glowColor: 'rgba(251, 191, 36, 0.45)',
-        packetProgress: 0.8,
-        packetSpeed: 0.005,
-      },
-      {
-        id: 'mro',
-        label: 'PREDICTIVE MRO',
-        sub: 'Weibull RUL Twin',
-        angle: (Math.PI / 4) * 4,
-        orbitRadius: 250,
-        speed: 0.0019,
-        tiltAngle: 0.14,
-        color: '#f43f5e',
-        glowColor: 'rgba(244, 63, 94, 0.45)',
-        packetProgress: 0.42,
-        packetSpeed: 0.0058,
-      },
-      {
-        id: 'fft',
-        label: 'ULTRASONIC FFT',
-        sub: '48 kS/s Ingest',
-        angle: (Math.PI / 4) * 5,
-        orbitRadius: 270,
-        speed: 0.0015,
-        tiltAngle: -0.06,
-        color: '#c084fc',
-        glowColor: 'rgba(192, 132, 252, 0.45)',
-        packetProgress: 0.73,
-        packetSpeed: 0.0046,
-      },
-      {
-        id: 'oee',
-        label: 'ISO-22400 OEE',
-        sub: '99.4% Availability',
-        angle: (Math.PI / 4) * 6,
-        orbitRadius: 235,
-        speed: 0.0021,
-        tiltAngle: 0.11,
-        color: '#2dd4bf',
-        glowColor: 'rgba(45, 212, 191, 0.45)',
-        packetProgress: 0.2,
-        packetSpeed: 0.0065,
-      },
-      {
-        id: 'scada',
-        label: 'SCADA MES RING',
-        sub: 'Zero-Drop Bus',
-        angle: (Math.PI / 4) * 7,
-        orbitRadius: 285,
-        speed: 0.0018,
-        tiltAngle: -0.1,
-        color: '#60a5fa',
-        glowColor: 'rgba(96, 165, 250, 0.45)',
-        packetProgress: 0.5,
-        packetSpeed: 0.0052,
-      },
-    ];
-
-    // Perimeter packets between constellation nodes
-    perimeterPacketsRef.current = [
-      { edgeIdx: 0, progress: 0.2, speed: 0.004, color: '#38bdf8' },
-      { edgeIdx: 2, progress: 0.5, speed: 0.0035, color: '#34d399' },
-      { edgeIdx: 4, progress: 0.7, speed: 0.0045, color: '#f43f5e' },
-      { edgeIdx: 6, progress: 0.35, speed: 0.0038, color: '#2dd4bf' },
-    ];
-
-    // 2. Initialize Circuit Tracks for LiDAR Mesh
-    circuitTracksRef.current = [
-      {
-        points: [{ x: 0.05, y: 0.18 }, { x: 0.28, y: 0.18 }, { x: 0.35, y: 0.28 }, { x: 0.65, y: 0.28 }],
-        packetProgress: 0.1,
+        packetProgress: 0.12,
         speed: 0.0035,
+        packetSize: 3.2,
+      },
+      {
+        points: [{ x: 0.04, y: 0.16 }, { x: 0.23, y: 0.16 }, { x: 0.27, y: 0.22 }, { x: 0.64, y: 0.22 }, { x: 0.69, y: 0.16 }, { x: 0.96, y: 0.16 }],
         color: '#22d3ee',
+        packetProgress: 0.68,
+        speed: 0.0042,
+        packetSize: 2.6,
       },
+
+      // Mid-Level Cross Bus Conduit
       {
-        points: [{ x: 0.65, y: 0.28 }, { x: 0.75, y: 0.38 }, { x: 0.95, y: 0.38 }],
-        packetProgress: 0.6,
-        speed: 0.004,
-        color: '#38bdf8',
-      },
-      {
-        points: [{ x: 0.08, y: 0.72 }, { x: 0.22, y: 0.72 }, { x: 0.30, y: 0.60 }, { x: 0.55, y: 0.60 }],
+        points: [{ x: 0.28, y: 0.27 }, { x: 0.28, y: 0.44 }, { x: 0.35, y: 0.50 }, { x: 0.68, y: 0.50 }, { x: 0.74, y: 0.32 }],
+        color: '#34d399',
         packetProgress: 0.45,
-        speed: 0.003,
-        color: '#a855f7',
-      },
-      {
-        points: [{ x: 0.55, y: 0.60 }, { x: 0.68, y: 0.75 }, { x: 0.92, y: 0.75 }],
-        packetProgress: 0.8,
-        speed: 0.0045,
-        color: '#2dd4bf',
-      },
-      {
-        points: [{ x: 0.72, y: 0.12 }, { x: 0.72, y: 0.35 }, { x: 0.82, y: 0.48 }, { x: 0.82, y: 0.88 }],
-        packetProgress: 0.25,
         speed: 0.0038,
-        color: '#38bdf8',
+        packetSize: 3.0,
+      },
+      {
+        points: [{ x: 0.35, y: 0.27 }, { x: 0.35, y: 0.42 }, { x: 0.42, y: 0.48 }, { x: 0.82, y: 0.48 }, { x: 0.82, y: 0.60 }],
+        color: '#86efac',
+        packetProgress: 0.82,
+        speed: 0.0032,
+        packetSize: 2.4,
+      },
+
+      // Left I/O Sensor Collector Traces
+      {
+        points: [{ x: 0.05, y: 0.40 }, { x: 0.18, y: 0.40 }, { x: 0.24, y: 0.48 }, { x: 0.24, y: 0.62 }, { x: 0.29, y: 0.62 }],
+        color: '#fbbf24',
+        packetProgress: 0.25,
+        speed: 0.0045,
+        packetSize: 2.8,
+      },
+      {
+        points: [{ x: 0.06, y: 0.75 }, { x: 0.22, y: 0.75 }, { x: 0.28, y: 0.68 }, { x: 0.30, y: 0.68 }],
+        color: '#f59e0b',
+        packetProgress: 0.6,
+        speed: 0.0039,
+        packetSize: 2.5,
+      },
+
+      // Right Fieldbus Telemetry Traces
+      {
+        points: [{ x: 0.95, y: 0.35 }, { x: 0.84, y: 0.35 }, { x: 0.80, y: 0.31 }, { x: 0.74, y: 0.31 }],
+        color: '#c084fc',
+        packetProgress: 0.18,
+        speed: 0.0048,
+        packetSize: 3.0,
+      },
+      {
+        points: [{ x: 0.82, y: 0.70 }, { x: 0.82, y: 0.78 }, { x: 0.74, y: 0.84 }, { x: 0.63, y: 0.84 }],
+        color: '#a855f7',
+        packetProgress: 0.52,
+        speed: 0.0036,
+        packetSize: 2.6,
+      },
+
+      // Lower SCADA Gateway Bus
+      {
+        points: [{ x: 0.10, y: 0.88 }, { x: 0.45, y: 0.88 }, { x: 0.50, y: 0.86 }, { x: 0.62, y: 0.86 }, { x: 0.66, y: 0.92 }, { x: 0.94, y: 0.92 }],
+        color: '#f43f5e',
+        packetProgress: 0.33,
+        speed: 0.0041,
+        packetSize: 3.0,
+      },
+      {
+        points: [{ x: 0.35, y: 0.67 }, { x: 0.35, y: 0.80 }, { x: 0.42, y: 0.86 }, { x: 0.50, y: 0.86 }],
+        color: '#fb7185',
+        packetProgress: 0.77,
+        speed: 0.0044,
+        packetSize: 2.4,
       },
     ];
 
-    // 3. Initialize Tokamak Plasma Particles
-    const plasma: PlasmaParticle[] = [];
-    for (let i = 0; i < 90; i++) {
-      plasma.push({
-        torusAngle: Math.random() * Math.PI * 2,
-        poloidalAngle: Math.random() * Math.PI * 2,
-        torusSpeed: 0.008 + Math.random() * 0.012,
-        poloidalSpeed: 0.02 + Math.random() * 0.035,
-        orbitRadius: 180 + Math.random() * 40,
-        tubeRadius: 45 + Math.random() * 25,
-        color: i % 3 === 0 ? '#38bdf8' : i % 3 === 1 ? '#a855f7' : '#f59e0b',
-        size: 1.5 + Math.random() * 2.2,
-      });
-    }
-    plasmaParticlesRef.current = plasma;
-
-    // 4. Initialize Neural Synapse Nodes
-    const nodes: NeuralNode[] = [];
-    const layers = [
-      { count: 3, xRel: 0.15, label: 'INGEST' },
-      { count: 5, xRel: 0.32, label: 'FILTER' },
-      { count: 6, xRel: 0.50, label: 'SPECTRAL' },
-      { count: 4, xRel: 0.70, label: 'INFERENCE' },
-      { count: 2, xRel: 0.88, label: 'DISPATCH' },
+    // 3. Telemetry Stream Columns for Matrix Mode
+    const rawTokens = [
+      '0x4F', '0xA1', 'PLC:RUN', 'MODBUS', '79.3kW', '246_U', 'OEE:98%', 'VIB:0.8g',
+      'FFT:48k', 'ISO22400', 'CAN:OK', 'ETHERCAT', '0xFF', '0x10', 'SYNC', 'ACK',
+      'RPM:2980', 'PRES:4.2B', 'TEMP:42C', 'NET:10G', 'DB:NORM', '0x7E', '0x3C', 'CRC32'
     ];
 
-    layers.forEach((layer, layerIdx) => {
-      for (let i = 0; i < layer.count; i++) {
-        const yRel = 0.2 + (i + 1) * (0.6 / (layer.count + 1));
-        const connections: number[] = [];
-        if (layerIdx < layers.length - 1) {
-          const nextLayerStart = layers.slice(0, layerIdx + 1).reduce((acc, l) => acc + l.count, 0);
-          const nextLayerCount = layers[layerIdx + 1].count;
-          for (let c = 0; c < nextLayerCount; c++) {
-            if (Math.random() > 0.35) connections.push(nextLayerStart + c);
-          }
-          if (connections.length === 0) connections.push(nextLayerStart);
-        }
-
-        nodes.push({
-          x: 0,
-          y: 0,
-          baseX: layer.xRel,
-          baseY: yRel,
-          layer: layerIdx,
-          activity: 0.2 + Math.random() * 0.8,
-          pulseRadius: 0,
-          connections,
-          label: `${layer.label}-${i + 1}`,
-        });
+    const cols: TelemetryColumn[] = [];
+    const numCols = 16;
+    for (let c = 0; c < numCols; c++) {
+      const colChars: string[] = [];
+      for (let i = 0; i < 28; i++) {
+        colChars.push(rawTokens[Math.floor(Math.random() * rawTokens.length)]);
       }
-    });
-    neuralNodesRef.current = nodes;
-
-    synapticPulsesRef.current = [];
-    for (let p = 0; p < 18; p++) {
-      const srcNode = Math.floor(Math.random() * (nodes.length - 3));
-      const validConns = nodes[srcNode]?.connections || [];
-      if (validConns.length > 0) {
-        const target = validConns[Math.floor(Math.random() * validConns.length)];
-        synapticPulsesRef.current.push({
-          fromNode: srcNode,
-          toNode: target,
-          progress: Math.random(),
-          speed: 0.005 + Math.random() * 0.009,
-          color: p % 2 === 0 ? '#38bdf8' : '#c084fc',
-        });
-      }
-    }
-
-    // 5. Initialize Singularity Particles
-    const singParts: SingularityParticle[] = [];
-    for (let i = 0; i < 110; i++) {
-      singParts.push({
-        r: 60 + Math.random() * 440,
-        theta: Math.random() * Math.PI * 2,
-        orbitSpeed: 0.006 + Math.random() * 0.012,
-        radialSpeed: 0.15 + Math.random() * 0.45,
-        size: 1.2 + Math.random() * 2.2,
-        color: i % 4 === 0 ? '#38bdf8' : i % 4 === 1 ? '#a855f7' : i % 4 === 2 ? '#2dd4bf' : '#fb7185',
-        alpha: 0.4 + Math.random() * 0.6,
-        history: [],
+      cols.push({
+        xRel: (c + 0.5) / numCols,
+        yOffset: Math.random() * 800,
+        speed: 0.6 + Math.random() * 1.2,
+        chars: colChars,
       });
     }
-    singularityParticlesRef.current = singParts;
+    columnsRef.current = cols;
   }, []);
 
-  // Main 60 FPS Canvas Render Loop
+  // Main 60 FPS Render Loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !enabled) return;
@@ -473,8 +271,8 @@ export const SingularityBackdrop: React.FC<SingularityBackdropProps> = React.mem
 
       // Mouse inertia lerping
       const mouse = mouseRef.current;
-      mouse.currentX += (mouse.targetX - mouse.currentX) * 0.05;
-      mouse.currentY += (mouse.targetY - mouse.currentY) * 0.05;
+      mouse.currentX += (mouse.targetX - mouse.currentX) * 0.06;
+      mouse.currentY += (mouse.targetY - mouse.currentY) * 0.06;
 
       ctx.clearRect(0, 0, width, height);
 
@@ -482,878 +280,459 @@ export const SingularityBackdrop: React.FC<SingularityBackdropProps> = React.mem
       const effectiveIntensity = intensity;
 
       // =========================================================================
-      // MODE 1: 3D DIGITAL TWIN ECOSYSTEM CONSTELLATION (CODESYS Topology)
+      // ENGINE 1: CIRCUIT HIGHWAY & CAD OSCILLOSCOPE (Brand New Default Style!)
+      // Completely linear, rectangular, orthogonal - ZERO black hole resemblance
       // =========================================================================
-      if (mode === 'ecosystem_constellation') {
-        const coreCenterX = isMobile ? width * 0.5 : width * 0.72;
-        const coreCenterY = isMobile ? height * 0.42 : height * 0.46;
-
-        const mouseDeltaX = (mouse.currentX - width * 0.5) * 0.04;
-        const mouseDeltaY = (mouse.currentY - height * 0.5) * 0.04;
-
+      if (mode === 'circuit_matrix') {
         ctx.save();
 
-        // 1A. Background Ambient Starfield & Isometric Ground Coordinate Grid
-        const gridStep = isMobile ? 60 : 75;
-        const gridStartY = height * 0.55;
-        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.04)' : 'rgba(14, 116, 144, 0.03)';
+        // 1A. Background Technical Blueprint Drafting Grid
+        const gridStep = isMobile ? 50 : 64;
         ctx.lineWidth = 1;
+        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.035)' : 'rgba(14, 116, 144, 0.03)';
+
         ctx.beginPath();
-        for (let gx = -width * 0.2; gx <= width * 1.2; gx += gridStep) {
-          ctx.moveTo(gx + mouseDeltaX * 0.5, gridStartY);
-          ctx.lineTo(gx + (gx - width * 0.5) * 0.6 + mouseDeltaX, height);
+        for (let x = 0; x <= width; x += gridStep) {
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, height);
         }
-        for (let gy = gridStartY; gy <= height; gy += 45) {
-          ctx.moveTo(0, gy + mouseDeltaY * 0.3);
-          ctx.lineTo(width, gy + mouseDeltaY * 0.3);
+        for (let y = 0; y <= height; y += gridStep) {
+          ctx.moveTo(0, y);
+          ctx.lineTo(width, y);
         }
         ctx.stroke();
 
-        // 1B. Concentric Isometric Orbital Ellipses with Degree Marks
-        const orbitR1 = isMobile ? 180 : 255;
-        const orbitR2 = isMobile ? 220 : 310;
-        const orbitRatioY = 0.48; // isometric angle compression
-
-        // Inner orbital guide ring
-        ctx.beginPath();
-        ctx.ellipse(coreCenterX, coreCenterY, orbitR1, orbitR1 * orbitRatioY, -0.15, 0, Math.PI * 2);
-        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.15)' : 'rgba(14, 116, 144, 0.12)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([6, 8]);
-        ctx.stroke();
-
-        // Outer orbital ring with degree marks
-        ctx.beginPath();
-        ctx.ellipse(coreCenterX, coreCenterY, orbitR2, orbitR2 * orbitRatioY, -0.15, 0, Math.PI * 2);
-        ctx.strokeStyle = isDarkMode ? 'rgba(168, 85, 247, 0.14)' : 'rgba(124, 58, 237, 0.10)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([12, 16]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // Degree calibration ticks along outer ring
-        const tickCount = 24;
-        for (let t = 0; t < tickCount; t++) {
-          const tAngle = (t / tickCount) * Math.PI * 2 + (shouldReduce ? 0 : time * 0.04);
-          const cosA = Math.cos(tAngle);
-          const sinA = Math.sin(tAngle) * orbitRatioY;
-          const tiltCos = Math.cos(-0.15);
-          const tiltSin = Math.sin(-0.15);
-
-          const tx = coreCenterX + (cosA * orbitR2 * tiltCos - sinA * orbitR2 * tiltSin);
-          const ty = coreCenterY + (cosA * orbitR2 * tiltSin + sinA * orbitR2 * tiltCos);
-
-          ctx.fillStyle = isDarkMode ? 'rgba(56, 189, 248, 0.4)' : 'rgba(14, 116, 144, 0.35)';
-          ctx.beginPath();
-          ctx.arc(tx, ty, 1.4, 0, Math.PI * 2);
-          ctx.fill();
-        }
-
-        // 1C. Calculate Projected 3D Positions for Satellite Nodes
-        const nodes = ecosystemNodesRef.current;
-        interface ProjectedNode {
-          node: EcosystemNode;
-          screenX: number;
-          screenY: number;
-          depthZ: number;
-          isHovered: boolean;
-        }
-
-        const projectedNodes: ProjectedNode[] = nodes.map((n) => {
-          if (!shouldReduce) {
-            n.angle += n.speed;
-            n.packetProgress += n.packetSpeed;
-            if (n.packetProgress > 1) n.packetProgress = 0;
+        // Major grid intersection dots
+        ctx.fillStyle = isDarkMode ? 'rgba(56, 189, 248, 0.22)' : 'rgba(14, 116, 144, 0.18)';
+        for (let x = gridStep * 2; x < width; x += gridStep * 2) {
+          for (let y = gridStep * 2; y < height; y += gridStep * 2) {
+            ctx.fillRect(x - 1, y - 1, 2, 2);
           }
+        }
 
-          const currentR = isMobile ? n.orbitRadius * 0.72 : n.orbitRadius;
-          const cosTheta = Math.cos(n.angle);
-          const sinTheta = Math.sin(n.angle);
+        // 1B. Sweeping Vertical Laser Scanner
+        const scanPeriod = 9.0;
+        const scanProgress = (time % scanPeriod) / scanPeriod;
+        const laserX = scanProgress * (width + 100) - 50;
 
-          // 3D elliptical coordinates with isometric compression
-          const rawX = cosTheta * currentR;
-          const rawY = sinTheta * currentR * orbitRatioY;
-          const depthZ = sinTheta * currentR * 0.6;
+        const laserGrad = ctx.createLinearGradient(laserX - 25, 0, laserX + 25, 0);
+        laserGrad.addColorStop(0, 'rgba(34, 211, 238, 0)');
+        laserGrad.addColorStop(0.5, isDarkMode ? 'rgba(34, 211, 238, 0.28)' : 'rgba(14, 116, 144, 0.22)');
+        laserGrad.addColorStop(1, 'rgba(34, 211, 238, 0)');
 
-          const tiltCos = Math.cos(-0.15 + n.tiltAngle);
-          const tiltSin = Math.sin(-0.15 + n.tiltAngle);
+        ctx.fillStyle = laserGrad;
+        ctx.fillRect(laserX - 25, 0, 50, height);
 
-          const px = coreCenterX + (rawX * tiltCos - rawY * tiltSin) + mouseDeltaX * (1 + depthZ / 600);
-          const py = coreCenterY + (rawX * tiltSin + rawY * tiltCos) + mouseDeltaY * (1 + depthZ / 600);
-
-          const distToMouse = Math.hypot(px - mouse.currentX, py - mouse.currentY);
-          const isHovered = distToMouse < 60;
-
-          return {
-            node: n,
-            screenX: px,
-            screenY: py,
-            depthZ,
-            isHovered,
-          };
-        });
-
-        // 1D. Laser Interconnects: Radial Cables to Central Digital Twin Core
-        projectedNodes.forEach((pn) => {
-          const depthAlpha = 0.25 + ((pn.depthZ + 200) / 400) * 0.45;
-
-          // Radial laser link line
-          const linkGrad = ctx.createLinearGradient(coreCenterX, coreCenterY, pn.screenX, pn.screenY);
-          linkGrad.addColorStop(0, isDarkMode ? `rgba(244, 63, 94, ${depthAlpha * 0.75})` : `rgba(225, 29, 72, ${depthAlpha * 0.65})`);
-          linkGrad.addColorStop(1, pn.node.glowColor);
-
-          ctx.beginPath();
-          ctx.moveTo(coreCenterX, coreCenterY);
-          ctx.lineTo(pn.screenX, pn.screenY);
-          ctx.strokeStyle = linkGrad;
-          ctx.lineWidth = pn.isHovered ? 2.0 : 1.2;
-          ctx.stroke();
-
-          // Traveling photon data packet along the radial link
-          const prog = pn.node.packetProgress;
-          const packetX = coreCenterX + (pn.screenX - coreCenterX) * prog;
-          const packetY = coreCenterY + (pn.screenY - coreCenterY) * prog;
-
-          ctx.fillStyle = pn.node.color;
-          ctx.shadowColor = pn.node.color;
-          ctx.shadowBlur = pn.isHovered ? 12 : 8;
-          ctx.beginPath();
-          ctx.arc(packetX, packetY, pn.isHovered ? 3.5 : 2.6, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.shadowBlur = 0;
-        });
-
-        // 1E. Constellation Perimeter Polygon Links (Interconnecting Neighbor Nodes)
-        ctx.beginPath();
-        projectedNodes.forEach((pn, idx) => {
-          if (idx === 0) ctx.moveTo(pn.screenX, pn.screenY);
-          else ctx.lineTo(pn.screenX, pn.screenY);
-        });
-        ctx.closePath();
-        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.18)' : 'rgba(14, 116, 144, 0.15)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 6]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // Perimeter traveling packets
-        perimeterPacketsRef.current.forEach((pkt) => {
-          if (!shouldReduce) {
-            pkt.progress += pkt.speed;
-            if (pkt.progress > 1) pkt.progress = 0;
-          }
-          const fromNode = projectedNodes[pkt.edgeIdx];
-          const toNode = projectedNodes[(pkt.edgeIdx + 1) % projectedNodes.length];
-          if (fromNode && toNode) {
-            const px = fromNode.screenX + (toNode.screenX - fromNode.screenX) * pkt.progress;
-            const py = fromNode.screenY + (toNode.screenY - fromNode.screenY) * pkt.progress;
-
-            ctx.fillStyle = pkt.color;
-            ctx.shadowColor = pkt.color;
-            ctx.shadowBlur = 7;
-            ctx.beginPath();
-            ctx.arc(px, py, 2.2, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.shadowBlur = 0;
-          }
-        });
-
-        // 1F. Central 3D Rotating Isometric Wireframe Hypercube (Tesseract Digital Twin Core)
-        const outerSize = isMobile ? 32 : 44;
-        const innerSize = outerSize * 0.52;
-
-        const rotX = shouldReduce ? 0.4 : time * 0.45 + (mouse.currentY - height * 0.5) * 0.0006;
-        const rotY = shouldReduce ? 0.6 : time * 0.60 + (mouse.currentX - width * 0.5) * 0.0006;
-        const rotZ = shouldReduce ? 0.2 : time * 0.25;
-
-        const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
-        const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
-        const cosZ = Math.cos(rotZ), sinZ = Math.sin(rotZ);
-
-        const project3DPoint = (x: number, y: number, z: number) => {
-          // 3D rotation
-          const y1 = y * cosX - z * sinX;
-          const z1 = y * sinX + z * cosX;
-          const x2 = x * cosY + z1 * sinY;
-          const z2 = -x * sinY + z1 * cosY;
-          const x3 = x2 * cosZ - y1 * sinZ;
-          const y3 = x2 * sinZ + y1 * cosZ;
-
-          return { x: coreCenterX + x3, y: coreCenterY + y3, z: z2 };
-        };
-
-        const cubeUnitVerts: Array<[number, number, number]> = [
-          [-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1],
-          [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1],
-        ];
-
-        const outerVerts = cubeUnitVerts.map(([vx, vy, vz]) =>
-          project3DPoint(vx * outerSize, vy * outerSize, vz * outerSize)
-        );
-        const innerVerts = cubeUnitVerts.map(([vx, vy, vz]) =>
-          project3DPoint(vx * innerSize, vy * innerSize, vz * innerSize)
-        );
-
-        const cubeEdges: Array<[number, number]> = [
-          [0, 1], [1, 2], [2, 3], [3, 0], // front face
-          [4, 5], [5, 6], [6, 7], [7, 4], // back face
-          [0, 4], [1, 5], [2, 6], [3, 7], // connecting edges
-        ];
-
-        // Draw outer hypercube wireframe (Ruby neon cybernetic)
-        ctx.strokeStyle = isDarkMode ? 'rgba(244, 63, 94, 0.75)' : 'rgba(225, 29, 72, 0.70)';
-        ctx.lineWidth = 1.4;
-        ctx.shadowColor = '#f43f5e';
-        ctx.shadowBlur = 9;
-        ctx.beginPath();
-        cubeEdges.forEach(([a, b]) => {
-          ctx.moveTo(outerVerts[a].x, outerVerts[a].y);
-          ctx.lineTo(outerVerts[b].x, outerVerts[b].y);
-        });
-        ctx.stroke();
-
-        // Draw inner tesseract cube wireframe (Cyan neon)
-        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.85)' : 'rgba(14, 116, 144, 0.80)';
+        // Crisp leading laser beam
+        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.65)' : 'rgba(14, 116, 144, 0.55)';
         ctx.lineWidth = 1.2;
-        ctx.shadowColor = '#38bdf8';
-        ctx.shadowBlur = 7;
         ctx.beginPath();
-        cubeEdges.forEach(([a, b]) => {
-          ctx.moveTo(innerVerts[a].x, innerVerts[a].y);
-          ctx.lineTo(innerVerts[b].x, innerVerts[b].y);
-        });
+        ctx.moveTo(laserX, 0);
+        ctx.lineTo(laserX, height);
         ctx.stroke();
 
-        // Cross-connect outer vertices to inner vertices (4D hypercube tesseract diagonals)
-        ctx.strokeStyle = isDarkMode ? 'rgba(168, 85, 247, 0.45)' : 'rgba(124, 58, 237, 0.40)';
-        ctx.lineWidth = 1.0;
-        ctx.shadowBlur = 4;
-        ctx.beginPath();
-        for (let i = 0; i < 8; i++) {
-          ctx.moveTo(outerVerts[i].x, outerVerts[i].y);
-          ctx.lineTo(innerVerts[i].x, innerVerts[i].y);
-        }
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-
-        // Glowing center core energy beacon
-        const coreBeaconGrad = ctx.createRadialGradient(coreCenterX, coreCenterY, 2, coreCenterX, coreCenterY, 22);
-        coreBeaconGrad.addColorStop(0, '#f43f5e');
-        coreBeaconGrad.addColorStop(0.4, isDarkMode ? 'rgba(244, 63, 94, 0.45)' : 'rgba(225, 29, 72, 0.35)');
-        coreBeaconGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        ctx.fillStyle = coreBeaconGrad;
-        ctx.beginPath();
-        ctx.arc(coreCenterX, coreCenterY, 22, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Core label badge
-        if (!isMobile) {
-          ctx.fillStyle = isDarkMode ? 'rgba(244, 63, 94, 0.95)' : 'rgba(225, 29, 72, 0.95)';
-          ctx.font = '700 9px "JetBrains Mono", ui-monospace, monospace';
-          ctx.textAlign = 'center';
-          ctx.fillText('DIGITAL TWIN // CORE', coreCenterX, coreCenterY + outerSize + 18);
-          ctx.fillStyle = isDarkMode ? 'rgba(148, 163, 184, 0.65)' : 'rgba(100, 116, 139, 0.65)';
-          ctx.font = '500 8px ui-sans-serif, system-ui, sans-serif';
-          ctx.fillText('CODESYS / SCADA INTERCONNECT', coreCenterX, coreCenterY + outerSize + 29);
-        }
-
-        // 1G. Render Satellite Ecosystem Nodes (Depth-Sorted)
-        const sortedNodes = [...projectedNodes].sort((a, b) => a.depthZ - b.depthZ);
-
-        sortedNodes.forEach((pn) => {
-          const depthRatio = Math.max(0.4, Math.min(1.0, (pn.depthZ + 200) / 400));
-          const nodeRadius = (isMobile ? 12 : 15) * (0.8 + depthRatio * 0.35) * (pn.isHovered ? 1.25 : 1.0);
-
-          // Outer halo ring
-          ctx.beginPath();
-          ctx.arc(pn.screenX, pn.screenY, nodeRadius + (pn.isHovered ? 7 : 4), 0, Math.PI * 2);
-          ctx.strokeStyle = pn.node.glowColor;
-          ctx.lineWidth = pn.isHovered ? 1.8 : 1.0;
-          ctx.stroke();
-
-          // Main node circle
-          ctx.fillStyle = isDarkMode ? '#090d16' : '#f8fafc';
-          ctx.strokeStyle = pn.node.color;
-          ctx.lineWidth = pn.isHovered ? 2.0 : 1.4;
-          ctx.shadowColor = pn.node.color;
-          ctx.shadowBlur = pn.isHovered ? 14 : 6;
-          ctx.beginPath();
-          ctx.arc(pn.screenX, pn.screenY, nodeRadius, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-          ctx.shadowBlur = 0;
-
-          // Inner glowing beacon LED
-          ctx.fillStyle = pn.node.color;
-          ctx.beginPath();
-          ctx.arc(pn.screenX, pn.screenY, nodeRadius * 0.38, 0, Math.PI * 2);
-          ctx.fill();
-
-          // Label chip & subtitle
-          if (!isMobile || pn.isHovered) {
-            const labelX = pn.screenX;
-            const labelY = pn.screenY + nodeRadius + 14;
-
-            ctx.textAlign = 'center';
-            ctx.fillStyle = isDarkMode ? 'rgba(241, 245, 249, 0.92)' : 'rgba(15, 23, 42, 0.92)';
-            ctx.font = '700 9px "JetBrains Mono", ui-monospace, monospace';
-            ctx.fillText(pn.node.label, labelX, labelY);
-
-            ctx.fillStyle = isDarkMode ? 'rgba(148, 163, 184, 0.70)' : 'rgba(100, 116, 139, 0.70)';
-            ctx.font = '500 8px ui-sans-serif, system-ui, sans-serif';
-            ctx.fillText(pn.node.sub, labelX, labelY + 11);
-          }
-        });
-
-        ctx.restore();
-      }
-
-      // =========================================================================
-      // MODE 2: LIDAR CYBER-MESH & HOLOGRAPHIC GYROSCOPE
-      // =========================================================================
-      else if (mode === 'lidar_mesh') {
-        const coreCenterX = isMobile ? width * 0.5 : width * 0.74;
-        const coreCenterY = isMobile ? height * 0.38 : height * 0.44;
-
-        // 2A. 3D Isometric LiDAR Topographic Wave Grid
-        ctx.save();
-        const gridCols = isMobile ? 18 : 28;
-        const gridRows = isMobile ? 12 : 18;
-        const gridOriginX = width * 0.5 + (mouse.currentX - width * 0.5) * 0.03;
-        const gridOriginY = height * 0.72 + (mouse.currentY - height * 0.5) * 0.02;
-
-        const cellW = isMobile ? width * 0.055 : width * 0.042;
-        const cellH = cellW * 0.52; // isometric aspect ratio
-
-        // Calculate elevation matrix
-        const nodeMatrix: Array<Array<{ x: number; y: number; z: number; intensityRatio: number }>> = [];
-
-        for (let r = 0; r <= gridRows; r++) {
-          const rowNodes: Array<{ x: number; y: number; z: number; intensityRatio: number }> = [];
-          for (let c = 0; c <= gridCols; c++) {
-            const relC = c - gridCols * 0.5;
-            const relR = r - gridRows * 0.5;
-
-            const isoX = gridOriginX + (relC - relR) * cellW;
-            const isoY = gridOriginY + (relC + relR) * cellH;
-
-            const wave1 = Math.sin(c * 0.32 + time * 1.3) * Math.cos(r * 0.28 + time * 0.9) * 22;
-            const wave2 = Math.sin((c + r) * 0.2 - time * 1.6) * 14;
-
-            const mDist = Math.hypot(isoX - mouse.currentX, isoY - mouse.currentY);
-            const mRipple = mDist < 260 ? Math.cos(mDist * 0.035 - time * 6) * Math.exp(-Math.pow(mDist / 140, 2)) * 36 : 0;
-
-            const totalZ = wave1 + wave2 + mRipple;
-            const finalY = isoY - totalZ;
-
-            const ratio = Math.max(0, Math.min(1, (totalZ + 30) / 60));
-
-            rowNodes.push({ x: isoX, y: finalY, z: totalZ, intensityRatio: ratio });
-          }
-          nodeMatrix.push(rowNodes);
-        }
-
-        // Draw isometric terrain mesh lines
-        ctx.lineWidth = 1;
-        for (let r = 0; r <= gridRows; r++) {
-          ctx.beginPath();
-          for (let c = 0; c <= gridCols; c++) {
-            const n = nodeMatrix[r][c];
-            if (c === 0) ctx.moveTo(n.x, n.y);
-            else ctx.lineTo(n.x, n.y);
-          }
-          const rowRatio = r / gridRows;
-          const alpha = (0.04 + rowRatio * 0.16) * effectiveIntensity;
-          ctx.strokeStyle = isDarkMode ? `rgba(56, 189, 248, ${alpha})` : `rgba(14, 116, 144, ${alpha})`;
-          ctx.stroke();
-        }
-
-        for (let c = 0; c <= gridCols; c++) {
-          ctx.beginPath();
-          for (let r = 0; r <= gridRows; r++) {
-            const n = nodeMatrix[r][c];
-            if (r === 0) ctx.moveTo(n.x, n.y);
-            else ctx.lineTo(n.x, n.y);
-          }
-          const colAlpha = (0.05 + Math.sin((c / gridCols) * Math.PI) * 0.14) * effectiveIntensity;
-          ctx.strokeStyle = isDarkMode ? `rgba(168, 85, 247, ${colAlpha})` : `rgba(124, 58, 237, ${colAlpha})`;
-          ctx.stroke();
-        }
-
-        // Glowing LiDAR elevation vertices
-        ctx.fillStyle = isDarkMode ? '#38bdf8' : '#0284c7';
-        for (let r = 2; r < gridRows; r += 2) {
-          for (let c = 2; c < gridCols; c += 2) {
-            const n = nodeMatrix[r][c];
-            if (n.intensityRatio > 0.65) {
-              const ptAlpha = (n.intensityRatio - 0.65) * 2.5 * effectiveIntensity;
-              ctx.globalAlpha = ptAlpha;
-              ctx.beginPath();
-              ctx.arc(n.x, n.y, 1.8, 0, Math.PI * 2);
-              ctx.fill();
-            }
-          }
-        }
-        ctx.restore();
-
-        // 2B. Ortholinear Industrial Fiber Tracks & Laser Data Packets
-        ctx.save();
-        circuitTracksRef.current.forEach((track) => {
+        // 1C. Draw Orthogonal PCB Circuit Bus Traces
+        wiresRef.current.forEach((wire) => {
           if (!shouldReduce) {
-            track.packetProgress += track.speed;
-            if (track.packetProgress > 1) track.packetProgress = 0;
+            wire.packetProgress += wire.speed;
+            if (wire.packetProgress > 1) wire.packetProgress = 0;
           }
 
-          const screenPts = track.points.map((p) => ({
+          const screenPts = wire.points.map((p) => ({
             x: p.x * width,
             y: p.y * height,
           }));
 
+          // Outer copper trace glow
           ctx.beginPath();
           ctx.moveTo(screenPts[0].x, screenPts[0].y);
           for (let i = 1; i < screenPts.length; i++) {
             ctx.lineTo(screenPts[i].x, screenPts[i].y);
           }
-          ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.12)' : 'rgba(14, 116, 144, 0.10)';
-          ctx.lineWidth = 1;
-          ctx.setLineDash([4, 6]);
-          ctx.lineDashOffset = -time * 12;
+          ctx.strokeStyle = isDarkMode ? 'rgba(30, 41, 59, 0.8)' : 'rgba(226, 232, 240, 0.8)';
+          ctx.lineWidth = 3.5;
           ctx.stroke();
 
-          if (screenPts.length > 1) {
-            const totalSegments = screenPts.length - 1;
-            const currentSegFloat = track.packetProgress * totalSegments;
-            const segIdx = Math.min(Math.floor(currentSegFloat), totalSegments - 1);
-            const segFraction = currentSegFloat - segIdx;
-
-            const pA = screenPts[segIdx];
-            const pB = screenPts[segIdx + 1];
-            const packetX = pA.x + (pB.x - pA.x) * segFraction;
-            const packetY = pA.y + (pB.y - pA.y) * segFraction;
-
-            ctx.setLineDash([]);
-            ctx.fillStyle = track.color;
-            ctx.shadowColor = track.color;
-            ctx.shadowBlur = 8;
-            ctx.beginPath();
-            ctx.arc(packetX, packetY, 2.5, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.shadowBlur = 0;
-            ctx.strokeStyle = track.color;
-            ctx.lineWidth = 1;
-            ctx.strokeRect(screenPts[screenPts.length - 1].x - 3, screenPts[screenPts.length - 1].y - 3, 6, 6);
-          }
-        });
-        ctx.restore();
-
-        // 2C. Sweeping LiDAR Radar Sensor Cone
-        ctx.save();
-        const sweepAngle = (time * 0.8) % (Math.PI * 2);
-        const radarRadius = Math.min(width, height) * 0.42;
-
-        const sweepGrad = ctx.createRadialGradient(coreCenterX, coreCenterY, 10, coreCenterX, coreCenterY, radarRadius);
-        sweepGrad.addColorStop(0, isDarkMode ? 'rgba(34, 211, 238, 0.16)' : 'rgba(14, 116, 144, 0.12)');
-        sweepGrad.addColorStop(0.7, isDarkMode ? 'rgba(168, 85, 247, 0.08)' : 'rgba(124, 58, 237, 0.06)');
-        sweepGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-
-        ctx.fillStyle = sweepGrad;
-        ctx.beginPath();
-        ctx.moveTo(coreCenterX, coreCenterY);
-        ctx.arc(coreCenterX, coreCenterY, radarRadius, sweepAngle - 0.45, sweepAngle);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.55)' : 'rgba(14, 116, 144, 0.45)';
-        ctx.lineWidth = 1.4;
-        ctx.beginPath();
-        ctx.moveTo(coreCenterX, coreCenterY);
-        ctx.lineTo(coreCenterX + Math.cos(sweepAngle) * radarRadius, coreCenterY + Math.sin(sweepAngle) * radarRadius);
-        ctx.stroke();
-        ctx.restore();
-
-        // 2D. Rotating 3D Cybernetic Triple-Gimbal Gyroscope Core
-        ctx.save();
-        const drawGimbalRing = (
-          radius: number,
-          rotRingX: number,
-          rotRingY: number,
-          rotRingZ: number,
-          strokeColor: string,
-          lineWidth: number,
-          dashPattern: number[],
-          drawTicks: boolean
-        ) => {
-          const numPts = 64;
-          const cX = Math.cos(rotRingX), sX = Math.sin(rotRingX);
-          const cY = Math.cos(rotRingY), sY = Math.sin(rotRingY);
-          const cZ = Math.cos(rotRingZ), sZ = Math.sin(rotRingZ);
-
-          const pts: Array<{ x: number; y: number; z: number }> = [];
-
-          for (let i = 0; i <= numPts; i++) {
-            const theta = (i / numPts) * Math.PI * 2;
-            const rx = radius * Math.cos(theta);
-            const ry = radius * Math.sin(theta);
-            const rz = 0;
-
-            const y1 = ry * cX - rz * sX;
-            const z1 = ry * sX + rz * cX;
-            const x2 = rx * cY + z1 * sY;
-            const z2 = -rx * sY + z1 * cY;
-            const x3 = x2 * cZ - y1 * sZ;
-            const y3 = x2 * sZ + y1 * cZ;
-
-            pts.push({ x: coreCenterX + x3, y: coreCenterY + y3, z: z2 });
-          }
-
-          ctx.beginPath();
-          pts.forEach((pt, idx) => {
-            if (idx === 0) ctx.moveTo(pt.x, pt.y);
-            else ctx.lineTo(pt.x, pt.y);
-          });
-          ctx.strokeStyle = strokeColor;
-          ctx.lineWidth = lineWidth;
-          ctx.setLineDash(dashPattern);
-          ctx.stroke();
-
-          if (drawTicks) {
-            ctx.setLineDash([]);
-            for (let t = 0; t < 12; t++) {
-              const tickIdx = Math.floor((t / 12) * numPts);
-              const p = pts[tickIdx];
-              ctx.fillStyle = strokeColor;
-              ctx.beginPath();
-              ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
-              ctx.fill();
-            }
-          }
-        };
-
-        const tNorm = shouldReduce ? 1.0 : time;
-        drawGimbalRing(135, 0.45, tNorm * 0.45, 0, isDarkMode ? 'rgba(56, 189, 248, 0.45)' : 'rgba(14, 116, 144, 0.40)', 1.5, [6, 8], true);
-        drawGimbalRing(92, -tNorm * 0.65, 0.38, tNorm * 0.22, isDarkMode ? 'rgba(168, 85, 247, 0.55)' : 'rgba(124, 58, 237, 0.45)', 1.4, [10, 14], true);
-        drawGimbalRing(56, 0.2, -0.3, tNorm * 0.95, isDarkMode ? 'rgba(45, 212, 191, 0.65)' : 'rgba(13, 148, 136, 0.55)', 1.2, [4, 6], false);
-
-        // Inner 3D Rotating Quantum Octahedron Cage
-        const cageSize = 24;
-        const cageRotX = tNorm * 0.7;
-        const cageRotY = tNorm * 0.85;
-
-        const cosCX = Math.cos(cageRotX), sinCX = Math.sin(cageRotX);
-        const cosCY = Math.cos(cageRotY), sinCY = Math.sin(cageRotY);
-
-        const octaVerts = [
-          [0, -1, 0], [1, 0, 0], [0, 0, 1], [-1, 0, 0], [0, 0, -1], [0, 1, 0]
-        ];
-
-        const projectedOcta = octaVerts.map(([vx, vy, vz]) => {
-          const px = vx * cageSize;
-          const py = vy * cageSize;
-          const pz = vz * cageSize;
-
-          const y1 = py * cosCX - pz * sinCX;
-          const z1 = py * sinCX + pz * cosCX;
-          const x2 = px * cosCY + z1 * sinCY;
-
-          return { x: coreCenterX + x2, y: coreCenterY + y1 };
-        });
-
-        const octaEdges: Array<[number, number]> = [
-          [0, 1], [0, 2], [0, 3], [0, 4],
-          [5, 1], [5, 2], [5, 3], [5, 4],
-          [1, 2], [2, 3], [3, 4], [4, 1],
-        ];
-
-        ctx.setLineDash([]);
-        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.85)' : 'rgba(14, 116, 144, 0.80)';
-        ctx.lineWidth = 1.4;
-        ctx.shadowColor = isDarkMode ? '#38bdf8' : '#0284c7';
-        ctx.shadowBlur = 8;
-        ctx.beginPath();
-        octaEdges.forEach(([a, b]) => {
-          ctx.moveTo(projectedOcta[a].x, projectedOcta[a].y);
-          ctx.lineTo(projectedOcta[b].x, projectedOcta[b].y);
-        });
-        ctx.stroke();
-
-        ctx.fillStyle = isDarkMode ? '#38bdf8' : '#0284c7';
-        ctx.shadowBlur = 14;
-        ctx.beginPath();
-        ctx.arc(coreCenterX, coreCenterY, 3.8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-
-        // 2E. Floating Parallax Holographic Telemetry HUD Badges
-        if (!isMobile) {
-          ctx.save();
-          const badges: HudBadge[] = [
-            { relX: 0.12, relY: 0.32, label: 'LIDAR MESH TWIN', metric: '48.0 kS/s', sub: 'Spatial Resolution: 1.2mm', tone: 'cyan' },
-            { relX: 0.85, relY: 0.22, label: 'SCADA BUS 10Gbps', metric: 'ISO-22400', sub: 'Ring Topology · Zero Drop', tone: 'purple' },
-            { relX: 0.84, relY: 0.68, label: 'ACOUSTIC SENSOR', metric: '99.8% SYNC', sub: 'Heterodyne Ultrasound Active', tone: 'emerald' },
-          ];
-
-          badges.forEach((b) => {
-            const bx = b.relX * width + (mouse.currentX - width * 0.5) * 0.015;
-            const by = b.relY * height + (mouse.currentY - height * 0.5) * 0.015;
-
-            ctx.fillStyle = isDarkMode ? 'rgba(15, 23, 42, 0.55)' : 'rgba(255, 255, 255, 0.55)';
-            ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.25)' : 'rgba(14, 116, 144, 0.25)';
-            ctx.lineWidth = 1;
-            ctx.fillRect(bx, by, 140, 44);
-            ctx.strokeRect(bx, by, 140, 44);
-
-            ctx.fillStyle = b.tone === 'cyan' ? '#38bdf8' : b.tone === 'purple' ? '#c084fc' : '#34d399';
-            ctx.fillRect(bx, by, 3, 44);
-
-            ctx.fillStyle = isDarkMode ? 'rgba(226, 232, 240, 0.85)' : 'rgba(30, 41, 59, 0.85)';
-            ctx.font = '700 9px "JetBrains Mono", ui-monospace, monospace';
-            ctx.fillText(b.label, bx + 10, by + 14);
-
-            ctx.fillStyle = b.tone === 'cyan' ? '#38bdf8' : b.tone === 'purple' ? '#c084fc' : '#34d399';
-            ctx.font = '600 11px "JetBrains Mono", ui-monospace, monospace';
-            ctx.fillText(b.metric, bx + 10, by + 28);
-
-            ctx.fillStyle = isDarkMode ? 'rgba(148, 163, 184, 0.6)' : 'rgba(100, 116, 139, 0.6)';
-            ctx.font = '400 8px ui-sans-serif, system-ui, sans-serif';
-            ctx.fillText(b.sub, bx + 10, by + 39);
-          });
-          ctx.restore();
-        }
-      }
-
-      // =========================================================================
-      // MODE 3: TOKAMAK PLASMA FUSION STELLARATOR (Magnetic Confinement Torus)
-      // =========================================================================
-      else if (mode === 'tokamak_fusion') {
-        const torusCenterX = isMobile ? width * 0.5 : width * 0.68;
-        const torusCenterY = isMobile ? height * 0.45 : height * 0.48;
-
-        ctx.save();
-        const numCoils = 16;
-        const majorR = isMobile ? 130 : 200;
-        const minorR = isMobile ? 48 : 70;
-
-        for (let c = 0; c < numCoils; c++) {
-          const coilAngle = (c / numCoils) * Math.PI * 2 + time * 0.15;
-          const cx = torusCenterX + Math.cos(coilAngle) * majorR;
-          const cy = torusCenterY + Math.sin(coilAngle) * majorR * 0.42;
-
-          ctx.beginPath();
-          ctx.ellipse(cx, cy, minorR * 0.35, minorR, coilAngle, 0, Math.PI * 2);
-          ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.18)' : 'rgba(14, 116, 144, 0.16)';
+          // Inner conductive trace line
+          ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.22)' : 'rgba(14, 116, 144, 0.18)';
           ctx.lineWidth = 1.2;
           ctx.stroke();
-        }
 
-        plasmaParticlesRef.current.forEach((p) => {
-          if (!shouldReduce) {
-            p.torusAngle += p.torusSpeed;
-            p.poloidalAngle += p.poloidalSpeed;
-          }
-
-          const tX = (p.orbitRadius + p.tubeRadius * Math.cos(p.poloidalAngle)) * Math.cos(p.torusAngle);
-          const tY = (p.orbitRadius + p.tubeRadius * Math.cos(p.poloidalAngle)) * Math.sin(p.torusAngle) * 0.44;
-          const tZ = p.tubeRadius * Math.sin(p.poloidalAngle);
-
-          const screenX = torusCenterX + tX;
-          const screenY = torusCenterY + tY - tZ * 0.35;
-
-          const depthAlpha = 0.3 + (Math.sin(p.torusAngle) + 1) * 0.35;
-
-          ctx.fillStyle = p.color;
-          ctx.shadowColor = p.color;
-          ctx.shadowBlur = 6;
-          ctx.globalAlpha = depthAlpha * effectiveIntensity;
-          ctx.beginPath();
-          ctx.arc(screenX, screenY, p.size, 0, Math.PI * 2);
-          ctx.fill();
-        });
-
-        const lz = lorenzStateRef.current;
-        if (!shouldReduce) {
-          const dt = 0.008;
-          const dx = 10 * (lz.y - lz.x) * dt;
-          const dy = (lz.x * (28 - lz.z) - lz.y) * dt;
-          const dz = (lz.x * lz.y - (8 / 3) * lz.z) * dt;
-
-          lz.x += dx;
-          lz.y += dy;
-          lz.z += dz;
-
-          lz.trail.push({ x: lz.x, y: lz.y, z: lz.z });
-          if (lz.trail.length > 120) lz.trail.shift();
-        }
-
-        if (lz.trail.length > 2) {
-          ctx.beginPath();
-          const lzScale = isMobile ? 5.5 : 8.5;
-          lz.trail.forEach((pt, idx) => {
-            const px = torusCenterX + pt.x * lzScale;
-            const py = torusCenterY + (pt.y - pt.z * 0.5) * lzScale * 0.5;
-            if (idx === 0) ctx.moveTo(px, py);
-            else ctx.lineTo(px, py);
-          });
-          ctx.strokeStyle = isDarkMode ? 'rgba(244, 63, 94, 0.45)' : 'rgba(225, 29, 72, 0.4)';
-          ctx.lineWidth = 1.5;
-          ctx.shadowColor = '#f43f5e';
-          ctx.shadowBlur = 10;
-          ctx.stroke();
-        }
-        ctx.restore();
-      }
-
-      // =========================================================================
-      // MODE 4: NEURAL SYNAPSE CYBER-GRID (Cognitive SCADA Machine Intelligence)
-      // =========================================================================
-      else if (mode === 'neural_synapse') {
-        ctx.save();
-        const nodes = neuralNodesRef.current;
-
-        nodes.forEach((n, idx) => {
-          const wanderX = Math.sin(time * 0.8 + idx * 1.2) * 12;
-          const wanderY = Math.cos(time * 0.7 + idx * 0.9) * 12;
-          n.x = n.baseX * width + wanderX;
-          n.y = n.baseY * height + wanderY;
-        });
-
-        nodes.forEach((src) => {
-          src.connections.forEach((targetIdx) => {
-            const tgt = nodes[targetIdx];
-            if (!tgt) return;
-
-            const grad = ctx.createLinearGradient(src.x, src.y, tgt.x, tgt.y);
-            grad.addColorStop(0, isDarkMode ? 'rgba(56, 189, 248, 0.16)' : 'rgba(14, 116, 144, 0.14)');
-            grad.addColorStop(1, isDarkMode ? 'rgba(168, 85, 247, 0.16)' : 'rgba(124, 58, 237, 0.14)');
-
+          // Solder pad dots at wire vertex junctions
+          screenPts.forEach((pt) => {
+            ctx.fillStyle = isDarkMode ? '#0f172a' : '#f8fafc';
+            ctx.strokeStyle = wire.color;
+            ctx.lineWidth = 1.2;
             ctx.beginPath();
-            ctx.moveTo(src.x, src.y);
-            ctx.lineTo(tgt.x, tgt.y);
-            ctx.strokeStyle = grad;
-            ctx.lineWidth = 1;
+            ctx.arc(pt.x, pt.y, 2.5, 0, Math.PI * 2);
+            ctx.fill();
             ctx.stroke();
           });
-        });
 
-        synapticPulsesRef.current.forEach((pulse) => {
-          if (!shouldReduce) {
-            pulse.progress += pulse.speed;
-            if (pulse.progress > 1) {
-              pulse.progress = 0;
-              pulse.fromNode = Math.floor(Math.random() * (nodes.length - 3));
-              const conns = nodes[pulse.fromNode]?.connections || [];
-              if (conns.length > 0) {
-                pulse.toNode = conns[Math.floor(Math.random() * conns.length)];
-              }
+          // High-speed photon data packet
+          if (screenPts.length > 1) {
+            let totalLength = 0;
+            const segLengths: number[] = [];
+            for (let i = 0; i < screenPts.length - 1; i++) {
+              const segLen = Math.hypot(screenPts[i + 1].x - screenPts[i].x, screenPts[i + 1].y - screenPts[i].y);
+              segLengths.push(segLen);
+              totalLength += segLen;
             }
-          }
 
-          const src = nodes[pulse.fromNode];
-          const tgt = nodes[pulse.toNode];
-          if (src && tgt) {
-            const px = src.x + (tgt.x - src.x) * pulse.progress;
-            const py = src.y + (tgt.y - src.y) * pulse.progress;
+            const targetDist = wire.packetProgress * totalLength;
+            let accumulated = 0;
+            let currentX = screenPts[0].x;
+            let currentY = screenPts[0].y;
 
-            ctx.fillStyle = pulse.color;
-            ctx.shadowColor = pulse.color;
-            ctx.shadowBlur = 8;
+            for (let i = 0; i < segLengths.length; i++) {
+              const segLen = segLengths[i];
+              if (accumulated + segLen >= targetDist) {
+                const fraction = segLen > 0 ? (targetDist - accumulated) / segLen : 0;
+                currentX = screenPts[i].x + (screenPts[i + 1].x - screenPts[i].x) * fraction;
+                currentY = screenPts[i].y + (screenPts[i + 1].y - screenPts[i].y) * fraction;
+                break;
+              }
+              accumulated += segLen;
+            }
+
+            // Draw glowing packet with trailing photon aura
+            ctx.fillStyle = wire.color;
+            ctx.shadowColor = wire.color;
+            ctx.shadowBlur = 10;
             ctx.beginPath();
-            ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+            ctx.arc(currentX, currentY, wire.packetSize, 0, Math.PI * 2);
             ctx.fill();
+            ctx.shadowBlur = 0;
           }
         });
 
-        nodes.forEach((n) => {
+        // 1D. Render Integrated Circuit (IC) Microchip Footprints
+        chipsRef.current.forEach((chip) => {
+          const cx = chip.relX * width;
+          const cy = chip.relY * height;
+          const cw = isMobile ? chip.width * 0.8 : chip.width;
+          const ch = isMobile ? chip.height * 0.8 : chip.height;
+
+          const chipLeft = cx - cw / 2;
+          const chipTop = cy - ch / 2;
+
+          // Proximity to mouse
+          const mDist = Math.hypot(mouse.currentX - cx, mouse.currentY - cy);
+          const isTargeted = mDist < 85;
+
+          // Pin leads (metallic IC legs)
+          const numPins = 6;
+          ctx.fillStyle = isDarkMode ? '#64748b' : '#94a3b8';
+          for (let p = 1; p <= numPins; p++) {
+            const py = chipTop + (p / (numPins + 1)) * ch;
+            // Left pins
+            ctx.fillRect(chipLeft - 6, py - 1.5, 6, 3);
+            // Right pins
+            ctx.fillRect(chipLeft + cw, py - 1.5, 6, 3);
+          }
+
+          // Main chip package body
+          ctx.fillStyle = isDarkMode ? '#090d16' : '#ffffff';
+          ctx.strokeStyle = isTargeted ? chip.color : isDarkMode ? 'rgba(56, 189, 248, 0.35)' : 'rgba(14, 116, 144, 0.30)';
+          ctx.lineWidth = isTargeted ? 1.8 : 1.2;
+          ctx.shadowColor = chip.color;
+          ctx.shadowBlur = isTargeted ? 12 : 0;
+          ctx.fillRect(chipLeft, chipTop, cw, ch);
+          ctx.strokeRect(chipLeft, chipTop, cw, ch);
           ctx.shadowBlur = 0;
-          ctx.fillStyle = isDarkMode ? '#0f172a' : '#f8fafc';
-          ctx.strokeStyle = isDarkMode ? '#38bdf8' : '#0284c7';
-          ctx.lineWidth = 1.4;
 
+          // Corner orientation notch
+          ctx.fillStyle = chip.color;
           ctx.beginPath();
-          ctx.arc(n.x, n.y, 5, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-
-          ctx.fillStyle = isDarkMode ? '#38bdf8' : '#0284c7';
-          ctx.beginPath();
-          ctx.arc(n.x, n.y, 2.5, 0, Math.PI * 2);
+          ctx.arc(chipLeft + 8, chipTop + 8, 2.2, 0, Math.PI * 2);
           ctx.fill();
 
-          if (!isMobile) {
-            ctx.fillStyle = isDarkMode ? 'rgba(148, 163, 184, 0.7)' : 'rgba(100, 116, 139, 0.7)';
-            ctx.font = '600 8px "JetBrains Mono", ui-monospace, monospace';
-            ctx.fillText(n.label, n.x + 8, n.y + 3);
-          }
+          // Chip typography
+          ctx.fillStyle = isDarkMode ? 'rgba(241, 245, 249, 0.95)' : 'rgba(15, 23, 42, 0.95)';
+          ctx.font = '700 9px "JetBrains Mono", ui-monospace, monospace';
+          ctx.textAlign = 'left';
+          ctx.fillText(chip.name, chipLeft + 16, chipTop + 18);
+
+          ctx.fillStyle = isDarkMode ? 'rgba(148, 163, 184, 0.70)' : 'rgba(100, 116, 139, 0.70)';
+          ctx.font = '500 8px "JetBrains Mono", ui-monospace, monospace';
+          ctx.fillText(chip.code, chipLeft + 16, chipTop + 32);
+
+          // Active indicator pulse
+          ctx.fillStyle = chip.color;
+          ctx.beginPath();
+          ctx.arc(chipLeft + cw - 10, chipTop + 14, 2, 0, Math.PI * 2);
+          ctx.fill();
         });
+
+        // 1E. Live Dual-Channel Oscilloscope Waveform Spanning Bottom Section
+        const oscY = height - (isMobile ? 36 : 48);
+        const oscHeight = 24;
+
+        // Oscilloscope graticule axis
+        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.12)' : 'rgba(14, 116, 144, 0.10)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, oscY);
+        ctx.lineTo(width, oscY);
+        ctx.stroke();
+
+        // Channel 1: Harmonic Sine Wave (Acoustic / Vibration Telemetry)
+        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.85)' : 'rgba(14, 116, 144, 0.75)';
+        ctx.lineWidth = 1.4;
+        ctx.shadowColor = '#38bdf8';
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        const step = isMobile ? 6 : 4;
+        for (let x = 0; x <= width; x += step) {
+          const w1 = Math.sin(x * 0.012 - time * 3.8) * oscHeight * 0.45;
+          const w2 = Math.sin(x * 0.035 + time * 2.2) * oscHeight * 0.22;
+          const y = oscY + w1 + w2;
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        // Channel 2: Digital Clock Train / Square Wave Pulses
+        ctx.strokeStyle = isDarkMode ? 'rgba(52, 211, 153, 0.55)' : 'rgba(5, 150, 105, 0.45)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        for (let x = 0; x <= width; x += step * 2) {
+          const rawSq = Math.sin(x * 0.018 - time * 5.0);
+          const sqVal = Math.tanh(rawSq * 6) * oscHeight * 0.35;
+          const y = oscY + 8 + sqVal;
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        // 1F. High-Precision Cartesian CAD Laser Reticle Crosshair
+        const mx = mouse.currentX;
+        const my = mouse.currentY;
+
+        // Full-screen horizontal laser line
+        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.18)' : 'rgba(14, 116, 144, 0.15)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 5]);
+        ctx.beginPath();
+        ctx.moveTo(0, my);
+        ctx.lineTo(width, my);
+        ctx.moveTo(mx, 0);
+        ctx.lineTo(mx, height);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Target reticle calipers at cursor center
+        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.75)' : 'rgba(14, 116, 144, 0.70)';
+        ctx.lineWidth = 1.4;
+        const cSize = 14;
+        // Top-left
+        ctx.beginPath();
+        ctx.moveTo(mx - cSize, my - cSize / 2);
+        ctx.lineTo(mx - cSize, my - cSize);
+        ctx.lineTo(mx - cSize / 2, my - cSize);
+        // Top-right
+        ctx.moveTo(mx + cSize / 2, my - cSize);
+        ctx.lineTo(mx + cSize, my - cSize);
+        ctx.lineTo(mx + cSize, my - cSize / 2);
+        // Bottom-left
+        ctx.moveTo(mx - cSize, my + cSize / 2);
+        ctx.lineTo(mx - cSize, my + cSize);
+        ctx.lineTo(mx - cSize / 2, my + cSize);
+        // Bottom-right
+        ctx.moveTo(mx + cSize / 2, my + cSize);
+        ctx.lineTo(mx + cSize, my + cSize);
+        ctx.lineTo(mx + cSize, my + cSize / 2);
+        ctx.stroke();
+
+        // Small center reticle dot
+        ctx.fillStyle = isDarkMode ? '#38bdf8' : '#0284c7';
+        ctx.fillRect(mx - 1.5, my - 1.5, 3, 3);
+
+        // Coordinate telemetry readout chip next to reticle
+        if (!isMobile) {
+          const badgeX = Math.min(width - 160, mx + 18);
+          const badgeY = Math.max(20, my - 26);
+
+          ctx.fillStyle = isDarkMode ? 'rgba(15, 23, 42, 0.85)' : 'rgba(255, 255, 255, 0.85)';
+          ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.35)' : 'rgba(14, 116, 144, 0.30)';
+          ctx.lineWidth = 1;
+          ctx.fillRect(badgeX, badgeY, 145, 24);
+          ctx.strokeRect(badgeX, badgeY, 145, 24);
+
+          ctx.fillStyle = isDarkMode ? 'rgba(56, 189, 248, 0.95)' : 'rgba(14, 116, 144, 0.95)';
+          ctx.font = '700 8.5px "JetBrains Mono", ui-monospace, monospace';
+          ctx.textAlign = 'left';
+          ctx.fillText(`X:${mx.toFixed(1)}mm  Y:${my.toFixed(1)}mm`, badgeX + 8, badgeY + 11);
+
+          ctx.fillStyle = isDarkMode ? 'rgba(148, 163, 184, 0.70)' : 'rgba(100, 116, 139, 0.70)';
+          ctx.font = '500 7.5px "JetBrains Mono", ui-monospace, monospace';
+          ctx.fillText('CAD BUS: 10Gbps SYNC', badgeX + 8, badgeY + 20);
+        }
+
         ctx.restore();
       }
 
       // =========================================================================
-      // MODE 5: GRAVITATIONAL SINGULARITY VORTEX & QUANTUM TESSERACT
+      // ENGINE 2: 3D CARTESIAN CNC GANTRY BLUEPRINT (Industrial Machine Toolhead)
       // =========================================================================
-      else if (mode === 'singularity') {
-        const singCenterX = isMobile ? width * 0.5 : width * 0.72;
-        const singCenterY = isMobile ? height * 0.42 : height * 0.48;
-
-        const tiltCos = Math.cos(-0.4);
-        const tiltSin = Math.sin(-0.4);
-        const compressionY = 0.42;
-
+      else if (mode === 'cad_robotic_gantry') {
         ctx.save();
-        const rings = [
-          { r: 75, speed: 0.008, dash: [8, 12], color: isDarkMode ? 'rgba(56, 189, 248, 0.45)' : 'rgba(14, 116, 144, 0.35)' },
-          { r: 135, speed: 0.005, dash: [14, 20], color: isDarkMode ? 'rgba(168, 85, 247, 0.4)' : 'rgba(124, 58, 237, 0.3)' },
-          { r: 215, speed: 0.003, dash: [22, 34], color: isDarkMode ? 'rgba(45, 212, 191, 0.35)' : 'rgba(13, 148, 136, 0.28)' },
-          { r: 310, speed: 0.0018, dash: [35, 45], color: isDarkMode ? 'rgba(245, 158, 11, 0.25)' : 'rgba(217, 119, 6, 0.2)' },
-        ];
+        const gantryX = isMobile ? width * 0.5 : width * 0.72;
+        const gantryY = isMobile ? height * 0.42 : height * 0.45;
 
-        rings.forEach((ring) => {
-          ctx.beginPath();
-          ctx.ellipse(singCenterX, singCenterY, ring.r, ring.r * compressionY, -0.4, 0, Math.PI * 2);
-          ctx.strokeStyle = ring.color;
-          ctx.lineWidth = 1.4;
-          ctx.setLineDash(ring.dash);
-          ctx.lineDashOffset = shouldReduce ? 0 : -time * ring.speed * 1200;
-          ctx.stroke();
-        });
-
-        singularityParticlesRef.current.forEach((p) => {
-          if (!shouldReduce) {
-            const speedBoost = 150 / (p.r + 40);
-            p.theta += p.orbitSpeed * speedBoost;
-            const fallBoost = 220 / (p.r + 60);
-            p.r -= p.radialSpeed * fallBoost * 0.35;
-            if (p.r <= 38) {
-              p.r = 480 + Math.random() * 160;
-              p.theta = Math.random() * Math.PI * 2;
-            }
-          }
-
-          const rawX = p.r * Math.cos(p.theta);
-          const rawY = p.r * Math.sin(p.theta) * compressionY;
-          const px = singCenterX + (rawX * tiltCos - rawY * tiltSin);
-          const py = singCenterY + (rawX * tiltSin + rawY * tiltCos);
-
-          ctx.fillStyle = p.color;
-          ctx.globalAlpha = p.alpha * effectiveIntensity;
-          ctx.beginPath();
-          ctx.arc(px, py, p.size, 0, Math.PI * 2);
-          ctx.fill();
-        });
-
+        // Background drafting cross grid
+        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.04)' : 'rgba(14, 116, 144, 0.03)';
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.arc(singCenterX, singCenterY, 44, 0, Math.PI * 2);
-        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.95)' : 'rgba(14, 116, 144, 0.85)';
-        ctx.lineWidth = 1.8;
-        ctx.shadowColor = '#38bdf8';
-        ctx.shadowBlur = 14;
+        for (let x = 0; x <= width; x += 60) {
+          ctx.moveTo(x, 0); ctx.lineTo(x, height);
+        }
+        for (let y = 0; y <= height; y += 60) {
+          ctx.moveTo(0, y); ctx.lineTo(width, y);
+        }
         ctx.stroke();
 
-        ctx.fillStyle = isDarkMode ? '#020617' : '#0f172a';
-        ctx.shadowBlur = 0;
+        // Mechanical Linear Motion Rails (Isometric 3D Gantry)
+        const railLen = isMobile ? 180 : 280;
+        const railHeight = isMobile ? 90 : 140;
+
+        const gantryProgressX = (Math.sin(time * 0.7) + 1) * 0.5;
+        const gantryProgressY = (Math.cos(time * 0.9) + 1) * 0.5;
+
+        const carriageX = gantryX - railLen / 2 + gantryProgressX * railLen;
+        const carriageY = gantryY - railHeight / 2 + gantryProgressY * railHeight;
+
+        // Outer gantry rail frame
+        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.35)' : 'rgba(14, 116, 144, 0.30)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(gantryX - railLen / 2, gantryY - railHeight / 2, railLen, railHeight);
+
+        // Linear guide shafts
+        ctx.strokeStyle = isDarkMode ? 'rgba(148, 163, 184, 0.25)' : 'rgba(100, 116, 139, 0.25)';
+        ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.arc(singCenterX, singCenterY, 36, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.moveTo(gantryX - railLen / 2, gantryY);
+        ctx.lineTo(gantryX + railLen / 2, gantryY);
+        ctx.stroke();
+
+        // Moving transverse cross-beam
+        ctx.strokeStyle = isDarkMode ? 'rgba(52, 211, 153, 0.65)' : 'rgba(5, 150, 105, 0.55)';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(carriageX, gantryY - railHeight / 2);
+        ctx.lineTo(carriageX, gantryY + railHeight / 2);
+        ctx.stroke();
+
+        // Laser cutting / machining toolhead carriage
+        ctx.fillStyle = isDarkMode ? '#090d16' : '#ffffff';
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1.8;
+        ctx.shadowColor = '#38bdf8';
+        ctx.shadowBlur = 8;
+        ctx.fillRect(carriageX - 16, carriageY - 16, 32, 32);
+        ctx.strokeRect(carriageX - 16, carriageY - 16, 32, 32);
+        ctx.shadowBlur = 0;
+
+        // Downward vertical laser machining beam
+        ctx.strokeStyle = 'rgba(244, 63, 94, 0.85)';
+        ctx.lineWidth = 1.5;
+        ctx.shadowColor = '#f43f5e';
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.moveTo(carriageX, carriageY + 16);
+        ctx.lineTo(carriageX, carriageY + 60);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        // Dimension Callout Arrows and Labels
+        ctx.fillStyle = isDarkMode ? 'rgba(241, 245, 249, 0.85)' : 'rgba(15, 23, 42, 0.85)';
+        ctx.font = '700 9px "JetBrains Mono", ui-monospace, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(`AXIS X: ${(gantryProgressX * 1200).toFixed(1)} mm`, gantryX, gantryY - railHeight / 2 - 12);
+        ctx.fillText(`AXIS Y: ${(gantryProgressY * 600).toFixed(1)} mm`, gantryX, gantryY + railHeight / 2 + 22);
+
+        ctx.restore();
+      }
+
+      // =========================================================================
+      // ENGINE 3: SCADA TELEMETRY DATA WATERFALL (Matrix Monospace Stream)
+      // =========================================================================
+      else if (mode === 'matrix_telemetry') {
+        ctx.save();
+        const cols = columnsRef.current;
+
+        ctx.font = '600 10px "JetBrains Mono", ui-monospace, monospace';
+        ctx.textAlign = 'center';
+
+        cols.forEach((col) => {
+          if (!shouldReduce) {
+            col.yOffset += col.speed;
+            if (col.yOffset > 40) col.yOffset = 0;
+          }
+
+          const colX = col.xRel * width;
+          const colHeight = height + 100;
+
+          col.chars.forEach((char, cIdx) => {
+            const rawY = (cIdx * 24 + col.yOffset) % colHeight;
+            const y = rawY - 20;
+
+            const isLeading = cIdx === 0;
+            const alpha = (0.08 + (cIdx % 4) * 0.05) * effectiveIntensity;
+
+            ctx.fillStyle = isLeading
+              ? (isDarkMode ? '#38bdf8' : '#0284c7')
+              : (isDarkMode ? `rgba(56, 189, 248, ${alpha})` : `rgba(14, 116, 144, ${alpha})`);
+
+            ctx.fillText(char, colX, y);
+          });
+        });
+
+        // Horizontal laser sweep line
+        const sweepY = (time * 60) % height;
+        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.45)' : 'rgba(14, 116, 144, 0.40)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(0, sweepY);
+        ctx.lineTo(width, sweepY);
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
+      // =========================================================================
+      // ENGINE 4: MULTI-CHANNEL SPECTRAL FFT AUDIO LAB (Acoustic Resonance Bars)
+      // =========================================================================
+      else if (mode === 'oscilloscope_spectral') {
+        ctx.save();
+        const numBars = isMobile ? 32 : 64;
+        const barWidth = width / numBars;
+        const baseY = height - 40;
+
+        for (let b = 0; b < numBars; b++) {
+          const freq = (b / numBars) * 12;
+          const amplitude =
+            Math.sin(freq - time * 4) * 0.4 +
+            Math.sin(freq * 2.5 + time * 6) * 0.3 +
+            Math.cos(freq * 0.8 + time * 1.5) * 0.3;
+
+          const barHeight = Math.max(6, Math.abs(amplitude) * 110);
+          const bx = b * barWidth;
+          const by = baseY - barHeight;
+
+          const barGrad = ctx.createLinearGradient(bx, by, bx, baseY);
+          barGrad.addColorStop(0, isDarkMode ? '#38bdf8' : '#0284c7');
+          barGrad.addColorStop(1, isDarkMode ? 'rgba(56, 189, 248, 0.05)' : 'rgba(14, 116, 144, 0.05)');
+
+          ctx.fillStyle = barGrad;
+          ctx.fillRect(bx + 1, by, barWidth - 2, barHeight);
+
+          // Peak cap LED
+          ctx.fillStyle = isDarkMode ? '#34d399' : '#059669';
+          ctx.fillRect(bx + 1, by - 3, barWidth - 2, 2);
+        }
+
         ctx.restore();
       }
 
@@ -1376,7 +755,7 @@ export const SingularityBackdrop: React.FC<SingularityBackdropProps> = React.mem
     <canvas
       ref={canvasRef}
       className={`fixed inset-0 pointer-events-none z-0 transition-opacity duration-700 ${
-        isDarkMode ? 'opacity-65' : 'opacity-45'
+        isDarkMode ? 'opacity-70' : 'opacity-50'
       }`}
       style={{ willChange: 'transform, opacity' }}
       aria-hidden="true"
