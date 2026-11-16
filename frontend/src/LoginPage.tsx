@@ -258,7 +258,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     <div
       className="min-h-screen w-full bg-g-bg text-g-text flex flex-col justify-between relative overflow-x-clip font-sans select-none transition-colors duration-200"
     >
-      {/* Bespoke Gateway Security & 3D Perspective Digital Twin Backdrop */}
+      {/* Clean Interactive Architecture Precision Grid Backdrop */}
       <AuthBackdrop isDarkMode={isDarkMode} enabled={true} />
 
       {/* Subtle Ambient Vignette & Center Spotlight Glow */}

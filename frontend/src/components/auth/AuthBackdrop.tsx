@@ -7,74 +7,68 @@ export interface AuthBackdropProps {
   enabled?: boolean;
 }
 
-interface AtmosphericParticle {
-  x: number;
-  y: number;
-  speed: number;
-  size: number;
-  phase: number;
-  opacity: number;
-}
-
 export const AuthBackdrop: React.FC<AuthBackdropProps> = React.memo(({
   isDarkMode = true,
   enabled = true,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
-  const mouseRef = useRef({ x: 0, y: 0, currentX: 0, currentY: 0 });
+  const mouseRef = useRef({
+    currentX: -1000,
+    currentY: -1000,
+    targetX: -1000,
+    targetY: -1000,
+    isOver: false,
+  });
   const shouldReduce = useReducedMotion();
   const isDocVisible = useDocumentVisible();
 
-  const particlesRef = useRef<AtmosphericParticle[]>([]);
-
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      mouseRef.current.x = e.clientX;
-      mouseRef.current.y = e.clientY;
+      mouseRef.current.targetX = e.clientX;
+      mouseRef.current.targetY = e.clientY;
+      mouseRef.current.isOver = true;
+    };
+    const handleMouseLeave = () => {
+      mouseRef.current.isOver = false;
+      mouseRef.current.targetX = -1000;
+      mouseRef.current.targetY = -1000;
     };
     window.addEventListener('mousemove', handleMouseMove, { passive: true });
-    return () => window.removeEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseleave', handleMouseLeave);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseleave', handleMouseLeave);
+    };
   }, []);
 
   useEffect(() => {
-    if (!enabled || shouldReduce) return;
+    if (!enabled) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) return;
 
-    let width = (canvas.width = window.innerWidth);
-    let height = (canvas.height = window.innerHeight);
+    let width = 0;
+    let height = 0;
+    let dpr = 1;
 
-    const initParticles = () => {
-      const particles: AtmosphericParticle[] = [];
-      const count = Math.min(45, Math.floor(width / 35));
-      for (let i = 0; i < count; i++) {
-        particles.push({
-          x: Math.random() * width,
-          y: Math.random() * height,
-          speed: 0.25 + Math.random() * 0.45,
-          size: 1.0 + Math.random() * 1.5,
-          phase: Math.random() * Math.PI * 2,
-          opacity: 0.15 + Math.random() * 0.35,
-        });
-      }
-      particlesRef.current = particles;
-    };
-
-    initParticles();
-
-    const handleResize = () => {
+    const resize = () => {
       if (!canvas) return;
-      width = canvas.width = window.innerWidth;
-      height = canvas.height = window.innerHeight;
-      initParticles();
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
     };
-    window.addEventListener('resize', handleResize);
 
-    let startTime = performance.now();
+    resize();
+    window.addEventListener('resize', resize);
+
+    const startTime = performance.now();
 
     const render = (currentTime: number) => {
       if (!isDocVisible) {
@@ -82,234 +76,121 @@ export const AuthBackdrop: React.FC<AuthBackdropProps> = React.memo(({
         return;
       }
 
-      const elapsed = (currentTime - startTime) * 0.001;
+      ctx.save();
+      ctx.scale(dpr, dpr);
       ctx.clearRect(0, 0, width, height);
 
-      // Mouse smooth interpolation
-      mouseRef.current.currentX += (mouseRef.current.x - mouseRef.current.currentX) * 0.04;
-      mouseRef.current.currentY += (mouseRef.current.y - mouseRef.current.currentY) * 0.04;
+      const elapsed = (currentTime - startTime) * 0.001;
 
-      const parallaxX = (mouseRef.current.currentX - width * 0.5) * 0.035;
-      const parallaxY = (mouseRef.current.currentY - height * 0.5) * 0.025;
+      // Smooth mouse interpolation
+      if (mouseRef.current.isOver) {
+        mouseRef.current.currentX += (mouseRef.current.targetX - mouseRef.current.currentX) * 0.12;
+        mouseRef.current.currentY += (mouseRef.current.targetY - mouseRef.current.currentY) * 0.12;
+      } else {
+        mouseRef.current.currentX = -1000;
+        mouseRef.current.currentY = -1000;
+      }
 
-      const vpX = width * 0.5 + parallaxX;
-      const vpY = height * 0.52 + parallaxY;
+      const mx = mouseRef.current.currentX;
+      const my = mouseRef.current.currentY;
 
-      // =========================================================================
-      // 1. HORIZON ATMOSPHERIC DAWN GLOW
-      // =========================================================================
-      ctx.save();
-      const horizonGrad = ctx.createRadialGradient(vpX, vpY, 20, vpX, vpY, width * 0.7);
-      horizonGrad.addColorStop(
-        0,
-        isDarkMode ? 'rgba(56, 189, 248, 0.12)' : 'rgba(37, 99, 235, 0.09)'
-      );
-      horizonGrad.addColorStop(
-        0.5,
-        isDarkMode ? 'rgba(76, 141, 246, 0.04)' : 'rgba(37, 99, 235, 0.03)'
-      );
-      horizonGrad.addColorStop(1, 'transparent');
-      ctx.fillStyle = horizonGrad;
+      // 1. Ultra-subtle ambient atmospheric glow orbs (breathing gently in background)
+      const orb1X = width * 0.5 + Math.sin(elapsed * 0.25) * (width * 0.15);
+      const orb1Y = height * 0.45 + Math.cos(elapsed * 0.3) * (height * 0.1);
+      const orb1Grad = ctx.createRadialGradient(orb1X, orb1Y, 40, orb1X, orb1Y, Math.min(width * 0.5, 540));
+      orb1Grad.addColorStop(0, isDarkMode ? 'rgba(37, 99, 235, 0.055)' : 'rgba(59, 130, 246, 0.04)');
+      orb1Grad.addColorStop(1, 'transparent');
+      ctx.fillStyle = orb1Grad;
       ctx.fillRect(0, 0, width, height);
-      ctx.restore();
 
-      // =========================================================================
-      // 2. 3D PERSPECTIVE TERRAIN WIREFRAME (DIGITAL TWIN GROUND PLANE)
-      // =========================================================================
-      ctx.save();
-      const groundStartY = vpY + 10;
-      const groundHeight = height - groundStartY;
+      const orb2X = width * 0.65 + Math.cos(elapsed * 0.2) * (width * 0.12);
+      const orb2Y = height * 0.6 + Math.sin(elapsed * 0.22) * (height * 0.12);
+      const orb2Grad = ctx.createRadialGradient(orb2X, orb2Y, 30, orb2X, orb2Y, Math.min(width * 0.4, 460));
+      orb2Grad.addColorStop(0, isDarkMode ? 'rgba(6, 182, 212, 0.04)' : 'rgba(14, 165, 233, 0.03)');
+      orb2Grad.addColorStop(1, 'transparent');
+      ctx.fillStyle = orb2Grad;
+      ctx.fillRect(0, 0, width, height);
 
-      if (groundHeight > 20) {
-        // Perspective Vanishing Fan Rays
-        ctx.lineWidth = 1;
-        const numRays = 26;
-        for (let r = 0; r <= numRays; r++) {
-          const spreadFactor = (r / numRays) * 2 - 1; // -1 to +1
-          const bottomX = vpX + spreadFactor * (width * 0.85);
-
-          const rayAlpha = (1 - Math.abs(spreadFactor) * 0.5) * (isDarkMode ? 0.09 : 0.07);
-          ctx.strokeStyle = isDarkMode
-            ? `rgba(56, 189, 248, ${rayAlpha})`
-            : `rgba(14, 116, 144, ${rayAlpha})`;
-
-          ctx.beginPath();
-          ctx.moveTo(vpX, groundStartY);
-          ctx.lineTo(bottomX, height);
-          ctx.stroke();
-        }
-
-        // Forward-Scrolling Perspective Transverse Grid Lines
-        const numHorizLines = 14;
-        const scrollSpeed = 0.16;
-        const scrollOffset = (elapsed * scrollSpeed) % 1.0;
-
-        for (let i = 0; i < numHorizLines; i++) {
-          const depth = (i + scrollOffset) / numHorizLines;
-          const projY = groundStartY + Math.pow(depth, 2.3) * groundHeight;
-          const halfSpan = depth * (width * 0.9);
-
-          const lineAlpha = depth * (isDarkMode ? 0.13 : 0.10);
-          ctx.strokeStyle = isDarkMode
-            ? `rgba(56, 189, 248, ${lineAlpha})`
-            : `rgba(14, 116, 144, ${lineAlpha})`;
-
-          ctx.beginPath();
-          ctx.moveTo(vpX - halfSpan, projY);
-          ctx.lineTo(vpX + halfSpan, projY);
-          ctx.stroke();
-        }
-
-        // Horizon Boundary Line with faint laser glow
-        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.28)' : 'rgba(14, 116, 144, 0.22)';
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.moveTo(width * 0.1, groundStartY);
-        ctx.lineTo(width * 0.9, groundStartY);
-        ctx.stroke();
-      }
-      ctx.restore();
-
-      // =========================================================================
-      // 3. CONCENTRIC SECURITY VAULT RETICLE & ORBITAL RADAR RINGS
-      // =========================================================================
-      ctx.save();
-      const reticleX = vpX;
-      const reticleY = vpY - 20;
-
-      // Outer Orbital Ring with Degree Ticks
-      const outerR = Math.min(360, width * 0.32);
-      ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.12)' : 'rgba(14, 116, 144, 0.10)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(reticleX, reticleY, outerR, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // Degree Tick Marks (every 6 degrees)
-      const tickRot = elapsed * 0.03;
-      for (let d = 0; d < 60; d++) {
-        const angle = (d * 6 * Math.PI) / 180 + tickRot;
-        const isMajor = d % 5 === 0;
-        const tLen = isMajor ? 8 : 4;
-
-        const x1 = reticleX + Math.cos(angle) * (outerR - tLen);
-        const y1 = reticleY + Math.sin(angle) * (outerR - tLen);
-        const x2 = reticleX + Math.cos(angle) * outerR;
-        const y2 = reticleY + Math.sin(angle) * outerR;
-
-        ctx.strokeStyle = isMajor
-          ? (isDarkMode ? 'rgba(56, 189, 248, 0.25)' : 'rgba(14, 116, 144, 0.20)')
-          : (isDarkMode ? 'rgba(56, 189, 248, 0.10)' : 'rgba(14, 116, 144, 0.08)');
-
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
+      // 2. Interactive flashlight illumination aura
+      const torchRadius = 280;
+      if (mx > -200 && my > -200) {
+        const torchGrad = ctx.createRadialGradient(mx, my, 0, mx, my, torchRadius);
+        torchGrad.addColorStop(0, isDarkMode ? 'rgba(56, 189, 248, 0.06)' : 'rgba(2, 132, 199, 0.045)');
+        torchGrad.addColorStop(0.6, isDarkMode ? 'rgba(56, 189, 248, 0.02)' : 'rgba(2, 132, 199, 0.015)');
+        torchGrad.addColorStop(1, 'transparent');
+        ctx.fillStyle = torchGrad;
+        ctx.fillRect(0, 0, width, height);
       }
 
-      // Middle Segmented Dashed Ring with Counter-Rotation
-      const midR = outerR * 0.72;
-      ctx.save();
-      ctx.strokeStyle = isDarkMode ? 'rgba(76, 141, 246, 0.15)' : 'rgba(37, 99, 235, 0.12)';
-      ctx.lineWidth = 1.2;
-      ctx.setLineDash([12, 14]);
-      ctx.beginPath();
-      ctx.arc(reticleX, reticleY, midR, -elapsed * 0.04, -elapsed * 0.04 + Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
+      // 3. Precision architectural drafting crosshair grid
+      const gridSize = 44;
+      const crossSize = 2.5;
 
-      // Rotating Radar Scanner Beam Arc (110-degree sweep)
-      const scanAngle = elapsed * 0.45;
-      const beamGrad = ctx.createRadialGradient(reticleX, reticleY, 20, reticleX, reticleY, midR);
-      beamGrad.addColorStop(
-        0,
-        isDarkMode ? 'rgba(56, 189, 248, 0.14)' : 'rgba(14, 116, 144, 0.10)'
-      );
-      beamGrad.addColorStop(1, 'transparent');
+      const baseCrossColor = isDarkMode ? 'rgba(148, 163, 184, 0.07)' : 'rgba(71, 85, 105, 0.08)';
+      const activeCrossColor = isDarkMode ? 'rgba(56, 189, 248, ' : 'rgba(2, 132, 199, ';
 
-      ctx.fillStyle = beamGrad;
-      ctx.beginPath();
-      ctx.moveTo(reticleX, reticleY);
-      ctx.arc(reticleX, reticleY, midR, scanAngle, scanAngle + Math.PI * 0.5);
-      ctx.closePath();
-      ctx.fill();
+      // Render crisp micro-crosshairs at grid points
+      const startX = Math.floor((width % gridSize) / 2);
+      const startY = Math.floor((height % gridSize) / 2);
 
-      // Quadrant Cardinal Alignment Calipers
-      const calR = outerR + 18;
-      const cardAngles = [0, Math.PI * 0.5, Math.PI, Math.PI * 1.5];
-      ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.35)' : 'rgba(14, 116, 144, 0.28)';
-      ctx.lineWidth = 1.5;
+      for (let x = startX; x < width; x += gridSize) {
+        for (let y = startY; y < height; y += gridSize) {
+          const dist = Math.hypot(x - mx, y - my);
 
-      cardAngles.forEach((a) => {
-        const cx1 = reticleX + Math.cos(a) * (calR - 7);
-        const cy1 = reticleY + Math.sin(a) * (calR - 7);
-        const cx2 = reticleX + Math.cos(a) * (calR + 7);
-        const cy2 = reticleY + Math.sin(a) * (calR + 7);
-        ctx.beginPath();
-        ctx.moveTo(cx1, cy1);
-        ctx.lineTo(cx2, cy2);
-        ctx.stroke();
-      });
+          if (dist < torchRadius && mx > -200) {
+            const factor = Math.pow(1 - dist / torchRadius, 2);
+            const alpha = 0.07 + factor * 0.38;
+            ctx.strokeStyle = `${activeCrossColor}${alpha})`;
+            ctx.lineWidth = 1;
 
-      // Caliper coordinate text
-      ctx.fillStyle = isDarkMode ? 'rgba(148, 163, 184, 0.45)' : 'rgba(100, 116, 139, 0.50)';
-      ctx.font = '600 7.5px "JetBrains Mono", ui-monospace, monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(
-        `SEC-GATE // AZIMUTH ${(((elapsed * 20) % 360)).toFixed(1)}°`,
-        reticleX,
-        reticleY - outerR - 12
-      );
-      ctx.fillText('NODE: GATEWAY-01 // TLS 1.3', reticleX, reticleY + outerR + 20);
+            const extendedArm = crossSize + factor * 1.5;
+            ctx.beginPath();
+            ctx.moveTo(x - extendedArm, y);
+            ctx.lineTo(x + extendedArm, y);
+            ctx.moveTo(x, y - extendedArm);
+            ctx.lineTo(x, y + extendedArm);
+            ctx.stroke();
+          } else {
+            ctx.strokeStyle = baseCrossColor;
+            ctx.lineWidth = 1;
 
-      ctx.restore();
-
-      // =========================================================================
-      // 4. FLOATING ATMOSPHERIC CLEANROOM PARTICLES
-      // =========================================================================
-      ctx.save();
-      const particles = particlesRef.current;
-      particles.forEach((p) => {
-        p.y -= p.speed;
-        p.x += Math.sin(elapsed * 0.8 + p.phase) * 0.3;
-
-        if (p.y < 0) {
-          p.y = height + 10;
-          p.x = Math.random() * width;
+            ctx.beginPath();
+            ctx.moveTo(x - crossSize, y);
+            ctx.lineTo(x + crossSize, y);
+            ctx.moveTo(x, y - crossSize);
+            ctx.lineTo(x, y + crossSize);
+            ctx.stroke();
+          }
         }
+      }
 
-        // Particle Glow
-        const alpha = p.opacity * (isDarkMode ? 0.7 : 0.55);
-        ctx.fillStyle = isDarkMode
-          ? `rgba(56, 189, 248, ${alpha})`
-          : `rgba(14, 116, 144, ${alpha})`;
-
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
-      });
       ctx.restore();
 
-      animFrameRef.current = requestAnimationFrame(render);
+      if (!shouldReduce) {
+        animFrameRef.current = requestAnimationFrame(render);
+      }
     };
 
-    animFrameRef.current = requestAnimationFrame(render);
+    if (shouldReduce) {
+      render(startTime);
+    } else {
+      animFrameRef.current = requestAnimationFrame(render);
+    }
 
     return () => {
       cancelAnimationFrame(animFrameRef.current);
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', resize);
     };
   }, [enabled, isDarkMode, shouldReduce, isDocVisible]);
 
-  if (!enabled || shouldReduce) return null;
+  if (!enabled) return null;
 
   return (
     <canvas
       ref={canvasRef}
       className={`fixed inset-0 pointer-events-none z-0 transition-opacity duration-700 ${
-        isDarkMode ? 'opacity-85' : 'opacity-65'
+        isDarkMode ? 'opacity-90' : 'opacity-75'
       }`}
-      style={{ willChange: 'transform, opacity' }}
       aria-hidden="true"
     />
   );
