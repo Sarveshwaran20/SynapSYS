@@ -27,6 +27,13 @@ SynapSYS is an enterprise industrial IoT (IIoT) telemetry and performance analyt
    - Breaks down theoretical capacity loss across Unplanned Stoppages, Setup/Adjustments, Micro-stops, Speed Loss, Process Defects, and Startup Rejects.
 5. **MES Active Work Order Tracking**:
    - Real production jobs mapped to physical assets (Pratt & Whitney, Bosch, Ford EV) with batch targets, parts produced, and estimated completion times.
+6. **Acoustic AI Harmonic Resonance Twin (Web Audio Ultrasound)**:
+   - Zero-dependency client-side procedural synthesis using Web Audio API nodes (`AudioContext`, `BiquadFilterNode`, `AnalyserNode`).
+   - Heterodyne demodulation shifting ultrasonic frequencies (20-40 kHz) to human-audible ranges with a real-time 48-band FFT spectrum to detect bearing micro-pitting before thermal or vibration sensors trip.
+7. **Process Sandbox & Prescriptive What-If Digital Twin (Weibull Reliability)**:
+   - Interactive multi-physics simulation of feed rate, coolant delivery pressure, tooling metallurgy (HSS, Solid Carbide, TiAlN, CBN), and time-of-use energy tariffs.
+   - Live Weibull cumulative failure probability modeling: $F(t) = 1 - e^{-(t/\eta)^\beta}$ with remaining useful life (RUL) projections.
+   - One-click Pareto Auto-Tuning and direct Chaos Engineering / Fault Injection drills.
 
 ---
 
