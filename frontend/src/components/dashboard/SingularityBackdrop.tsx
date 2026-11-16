@@ -2,644 +2,504 @@ import React, { useEffect, useRef } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { useDocumentVisible } from '../../lib/motion';
 
-export type BackdropMode =
-  | 'ambient_lattice'
-  | 'circuit_matrix'
-  | 'cad_robotic_gantry'
-  | 'matrix_telemetry'
-  | 'oscilloscope_spectral';
-
-export interface BackdropEngineMeta {
-  id: BackdropMode;
-  name: string;
-  tagline: string;
-  badge: string;
-  description: string;
-}
-
-export const BACKDROP_ENGINES: BackdropEngineMeta[] = [
-  {
-    id: 'ambient_lattice',
-    name: 'Ambient Fiber Flow',
-    tagline: 'Minimalist SCADA Telemetry Mesh',
-    badge: 'CLEAN',
-    description: 'Subtle fiber-optic currents, faint constellation micro-nodes, and a gentle ambient horizon — designed for clean, non-distracting industrial monitoring',
-  },
-  {
-    id: 'circuit_matrix',
-    name: 'Circuit Highway',
-    tagline: 'PCB Bus & CAD Oscilloscope',
-    badge: 'BUS',
-    description: 'Orthogonal PCB bus traces with traveling data packets and dual-channel oscilloscope waveform',
-  },
-  {
-    id: 'cad_robotic_gantry',
-    name: 'CAD CNC Gantry',
-    tagline: '3D Cartesian Machine Blueprint',
-    badge: 'CAD',
-    description: 'Precision Cartesian CNC gantry wireframe moving along rails with laser toolhead and drafting grid',
-  },
-  {
-    id: 'matrix_telemetry',
-    name: 'Telemetry Waterfall',
-    tagline: 'SCADA Hex & Binary Matrix',
-    badge: 'DATA',
-    description: 'Cascading monospace industrial telemetry data streams with register readouts',
-  },
-  {
-    id: 'oscilloscope_spectral',
-    name: 'Spectral FFT Lab',
-    tagline: 'Multi-Channel Vibration Audio',
-    badge: 'FFT',
-    description: 'Multi-frequency acoustic resonance harmonic waves and real-time frequency spectrum analyzer bars',
-  },
-];
-
 export interface SingularityBackdropProps {
   isDarkMode?: boolean;
   enabled?: boolean;
   intensity?: number;
-  mode?: BackdropMode;
+  mode?: string;
 }
 
 // -----------------------------------------------------------------------------
-// Engine 1: Ambient Lattice & Fiber Structures (Subtle, Clean & Non-Distracting)
+// Unified Industrial SCADA Matrix Engine
+// Master blended composition of CAD Gantry Blueprint, PCB Circuit Bus,
+// Telemetry Waterfall, Acoustic Resonance Oscilloscope & Ambient Constellation
 // -----------------------------------------------------------------------------
-interface AmbientNode {
+
+interface ConstellationNode {
   baseX: number;
   baseY: number;
   phaseX: number;
   phaseY: number;
   speed: number;
   size: number;
-  color: string;
 }
 
-interface FiberStream {
+interface CircuitTrace {
   points: Array<{ x: number; y: number }>;
   packetProgress: number;
   speed: number;
   color: string;
-}
-
-// -----------------------------------------------------------------------------
-// Circuit Highway & PCB Structures
-// -----------------------------------------------------------------------------
-interface CircuitWire {
-  points: Array<{ x: number; y: number }>;
-  color: string;
-  packetProgress: number;
-  speed: number;
-  packetSize: number;
 }
 
 interface CircuitChip {
-  id: string;
   name: string;
   code: string;
   relX: number;
   relY: number;
   width: number;
   height: number;
-  color: string;
-  pins: 'both' | 'left' | 'right' | 'horizontal';
 }
 
-// -----------------------------------------------------------------------------
-// Matrix Waterfall Column Structure
-// -----------------------------------------------------------------------------
-interface TelemetryColumn {
-  xRel: number;
+interface TelemetryStream {
+  x: number;
   yOffset: number;
   speed: number;
-  chars: string[];
+  readouts: string[];
 }
 
 export const SingularityBackdrop: React.FC<SingularityBackdropProps> = React.memo(({
   isDarkMode = true,
   enabled = true,
   intensity = 0.55,
-  mode = 'ambient_lattice',
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animFrameRef = useRef<number>(0);
-  const mouseRef = useRef({ x: 0, y: 0, currentX: 0, currentY: 0, targetX: 0, targetY: 0 });
+  const mouseRef = useRef({ currentX: 0, currentY: 0, targetX: 0, targetY: 0 });
   const shouldReduce = useReducedMotion();
   const isDocVisible = useDocumentVisible();
 
-  // Engine state references
-  const ambientNodesRef = useRef<AmbientNode[]>([]);
-  const fiberStreamsRef = useRef<FiberStream[]>([]);
-  const wiresRef = useRef<CircuitWire[]>([]);
+  // Internal structures for the unified blended engine
+  const nodesRef = useRef<ConstellationNode[]>([]);
+  const tracesRef = useRef<CircuitTrace[]>([]);
   const chipsRef = useRef<CircuitChip[]>([]);
-  const columnsRef = useRef<TelemetryColumn[]>([]);
+  const streamsRef = useRef<TelemetryStream[]>([]);
 
-  // Mouse coordinate tracking with smooth interpolation
+  // Smooth mouse interpolation
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       mouseRef.current.targetX = e.clientX;
       mouseRef.current.targetY = e.clientY;
     };
-
     window.addEventListener('mousemove', handleMouseMove, { passive: true });
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-    };
+    return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
-  // Initialize particle systems and ambient elements
+  // Main canvas animation loop
   useEffect(() => {
-    // 1. Ambient Lattice Floating Micro-Nodes (24 delicate, floating telemetry dots)
-    const nodes: AmbientNode[] = [];
-    for (let i = 0; i < 26; i++) {
-      nodes.push({
-        baseX: 0.05 + Math.random() * 0.90,
-        baseY: 0.08 + Math.random() * 0.84,
-        phaseX: Math.random() * Math.PI * 2,
-        phaseY: Math.random() * Math.PI * 2,
-        speed: 0.3 + Math.random() * 0.4,
-        size: 1.2 + Math.random() * 0.8,
-        color: i % 3 === 0 ? '#38bdf8' : i % 3 === 1 ? '#2dd4bf' : '#818cf8',
-      });
-    }
-    ambientNodesRef.current = nodes;
+    if (!enabled || shouldReduce) return;
 
-    // 2. Subtle Fiber-Optic Current Streams (Gentle, low-contrast conduit lines)
-    fiberStreamsRef.current = [
-      {
-        points: [{ x: 0.02, y: 0.20 }, { x: 0.30, y: 0.20 }, { x: 0.38, y: 0.28 }, { x: 0.72, y: 0.28 }, { x: 0.78, y: 0.22 }, { x: 0.98, y: 0.22 }],
-        packetProgress: 0.15,
-        speed: 0.0018,
-        color: '#38bdf8',
-      },
-      {
-        points: [{ x: 0.04, y: 0.44 }, { x: 0.25, y: 0.44 }, { x: 0.32, y: 0.52 }, { x: 0.65, y: 0.52 }, { x: 0.72, y: 0.44 }, { x: 0.96, y: 0.44 }],
-        packetProgress: 0.60,
-        speed: 0.0022,
-        color: '#2dd4bf',
-      },
-      {
-        points: [{ x: 0.05, y: 0.72 }, { x: 0.35, y: 0.72 }, { x: 0.42, y: 0.64 }, { x: 0.75, y: 0.64 }, { x: 0.82, y: 0.72 }, { x: 0.95, y: 0.72 }],
-        packetProgress: 0.35,
-        speed: 0.0016,
-        color: '#818cf8',
-      },
-      {
-        points: [{ x: 0.12, y: 0.88 }, { x: 0.45, y: 0.88 }, { x: 0.52, y: 0.82 }, { x: 0.80, y: 0.82 }, { x: 0.86, y: 0.88 }, { x: 0.94, y: 0.88 }],
-        packetProgress: 0.82,
-        speed: 0.0020,
-        color: '#38bdf8',
-      },
-    ];
-
-    // 3. Integrated Circuit (IC) Chip Footprints for Circuit Matrix Mode
-    chipsRef.current = [
-      { id: 'mcu', name: 'CORE MCU', code: 'STM32-H743', relX: 0.28, relY: 0.22, width: 110, height: 50, color: '#38bdf8', pins: 'both' },
-      { id: 'plc', name: 'PLC I/O BUS', code: 'IEC-61131-3', relX: 0.74, relY: 0.26, width: 120, height: 52, color: '#34d399', pins: 'both' },
-      { id: 'phy', name: 'ANALOG DSP', code: 'FFT-48kS/s', relX: 0.35, relY: 0.62, width: 115, height: 48, color: '#fbbf24', pins: 'both' },
-      { id: 'asic', name: 'ETHERCAT PHY', code: '100BASE-TX', relX: 0.82, relY: 0.65, width: 125, height: 50, color: '#c084fc', pins: 'both' },
-      { id: 'gate', name: 'SCADA BRIDGE', code: 'MQTT-SPARKPLUG', relX: 0.56, relY: 0.84, width: 130, height: 46, color: '#f43f5e', pins: 'horizontal' },
-    ];
-
-    // 4. PCB Circuit Traces
-    wiresRef.current = [
-      {
-        points: [{ x: 0.02, y: 0.14 }, { x: 0.24, y: 0.14 }, { x: 0.28, y: 0.20 }, { x: 0.65, y: 0.20 }, { x: 0.70, y: 0.14 }, { x: 0.98, y: 0.14 }],
-        color: '#38bdf8',
-        packetProgress: 0.12,
-        speed: 0.0035,
-        packetSize: 3.2,
-      },
-      {
-        points: [{ x: 0.28, y: 0.27 }, { x: 0.28, y: 0.44 }, { x: 0.35, y: 0.50 }, { x: 0.68, y: 0.50 }, { x: 0.74, y: 0.32 }],
-        color: '#34d399',
-        packetProgress: 0.45,
-        speed: 0.0038,
-        packetSize: 3.0,
-      },
-      {
-        points: [{ x: 0.05, y: 0.40 }, { x: 0.18, y: 0.40 }, { x: 0.24, y: 0.48 }, { x: 0.24, y: 0.62 }, { x: 0.29, y: 0.62 }],
-        color: '#fbbf24',
-        packetProgress: 0.25,
-        speed: 0.0045,
-        packetSize: 2.8,
-      },
-      {
-        points: [{ x: 0.10, y: 0.88 }, { x: 0.45, y: 0.88 }, { x: 0.50, y: 0.86 }, { x: 0.62, y: 0.86 }, { x: 0.66, y: 0.92 }, { x: 0.94, y: 0.92 }],
-        color: '#f43f5e',
-        packetProgress: 0.33,
-        speed: 0.0041,
-        packetSize: 3.0,
-      },
-    ];
-
-    // 5. Telemetry Waterfall Columns
-    const rawTokens = [
-      '0x4F', '0xA1', 'PLC:RUN', 'MODBUS', '79.3kW', '246_U', 'OEE:98%', 'VIB:0.8g',
-      'FFT:48k', 'ISO22400', 'CAN:OK', 'ETHERCAT', '0xFF', '0x10', 'SYNC', 'ACK',
-    ];
-    const cols: TelemetryColumn[] = [];
-    for (let c = 0; c < 14; c++) {
-      const colChars: string[] = [];
-      for (let i = 0; i < 24; i++) {
-        colChars.push(rawTokens[Math.floor(Math.random() * rawTokens.length)]);
-      }
-      cols.push({
-        xRel: (c + 0.5) / 14,
-        yOffset: Math.random() * 800,
-        speed: 0.5 + Math.random() * 0.8,
-        chars: colChars,
-      });
-    }
-    columnsRef.current = cols;
-  }, []);
-
-  // Main 60 FPS Render Loop
-  useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !enabled) return;
-
+    if (!canvas) return;
     const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) return;
 
-    let width = 0;
-    let height = 0;
+    let width = (canvas.width = window.innerWidth);
+    let height = (canvas.height = window.innerHeight);
 
     const handleResize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      width = window.innerWidth;
-      height = window.innerHeight;
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
-      ctx.resetTransform?.();
-      ctx.scale(dpr, dpr);
+      if (!canvas) return;
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+      initializeUnifiedStructures();
+    };
+    window.addEventListener('resize', handleResize);
+
+    const initializeUnifiedStructures = () => {
+      // 1. Constellation micro-nodes (from ambient lattice)
+      const nodes: ConstellationNode[] = [];
+      const nodeCount = Math.min(22, Math.max(12, Math.floor(width / 80)));
+      for (let i = 0; i < nodeCount; i++) {
+        nodes.push({
+          baseX: Math.random() * width,
+          baseY: Math.random() * height,
+          phaseX: Math.random() * Math.PI * 2,
+          phaseY: Math.random() * Math.PI * 2,
+          speed: 0.0015 + Math.random() * 0.002,
+          size: 1.2 + Math.random() * 1.4,
+        });
+      }
+      nodesRef.current = nodes;
+
+      // 2. Orthogonal PCB Circuit Traces & Packets (from circuit highway)
+      const traces: CircuitTrace[] = [
+        {
+          points: [
+            { x: 0, y: height * 0.22 },
+            { x: width * 0.28, y: height * 0.22 },
+            { x: width * 0.34, y: height * 0.32 },
+            { x: width * 0.62, y: height * 0.32 },
+            { x: width * 0.68, y: height * 0.18 },
+            { x: width, y: height * 0.18 },
+          ],
+          packetProgress: 0.15,
+          speed: 0.0016,
+          color: isDarkMode ? '#38bdf8' : '#0284c7',
+        },
+        {
+          points: [
+            { x: width * 0.15, y: 0 },
+            { x: width * 0.15, y: height * 0.42 },
+            { x: width * 0.24, y: height * 0.52 },
+            { x: width * 0.24, y: height },
+          ],
+          packetProgress: 0.55,
+          speed: 0.0012,
+          color: isDarkMode ? '#4c8df6' : '#2563eb',
+        },
+        {
+          points: [
+            { x: width, y: height * 0.62 },
+            { x: width * 0.72, y: height * 0.62 },
+            { x: width * 0.64, y: height * 0.74 },
+            { x: width * 0.36, y: height * 0.74 },
+            { x: width * 0.30, y: height * 0.86 },
+            { x: 0, y: height * 0.86 },
+          ],
+          packetProgress: 0.8,
+          speed: 0.0014,
+          color: isDarkMode ? '#34d399' : '#059669',
+        },
+        {
+          points: [
+            { x: width * 0.82, y: 0 },
+            { x: width * 0.82, y: height * 0.48 },
+            { x: width * 0.75, y: height * 0.58 },
+            { x: width * 0.75, y: height },
+          ],
+          packetProgress: 0.35,
+          speed: 0.0015,
+          color: isDarkMode ? '#38bdf8' : '#0284c7',
+        },
+      ];
+      tracesRef.current = traces;
+
+      // 3. Logic Micro-Chips on PCB Junctions
+      chipsRef.current = [
+        { name: 'PLC-CORE', code: 'MODBUS/TCP', relX: 0.28, relY: 0.22, width: 72, height: 26 },
+        { name: 'DSP-24', code: '48kHz FFT', relX: 0.62, relY: 0.32, width: 68, height: 24 },
+        { name: 'CAN-BUS', code: '1 Mbps ISO', relX: 0.72, relY: 0.62, width: 70, height: 24 },
+      ];
+
+      // 4. Peripheral Monospace Telemetry Waterfall Columns (from matrix telemetry)
+      const telemetryReadouts = [
+        ['0x7E', '48.2Hz', '14.2kW', '1.52mm/s', 'OPC-UA:OK', 'REG:4001', '24.2°C', '250Hz', 'SYNC'],
+        ['0xA4', 'RMS:1.8', 'ISO-18.2', '99.4%', 'VIB:NOM', 'NODE:02', '0x1F', 'PLC:RUN', 'TOL:±2μ'],
+        ['0x3B', 'SPINDLE', 'FFT:PEAK', '142Hz', 'BPFO', '400V', 'THD:1.8%', 'STATUS:OK', 'CH-01'],
+        ['0x9C', 'HYDR:P1', '140bar', 'FEED:+8%', 'TEMP:52°C', 'ALM:NONE', 'CYCLE:7.2s', 'RUN', '0x88'],
+      ];
+
+      streamsRef.current = [
+        { x: 26, yOffset: 0, speed: 0.45, readouts: telemetryReadouts[0] },
+        { x: 80, yOffset: 120, speed: 0.35, readouts: telemetryReadouts[1] },
+        { x: width - 95, yOffset: 60, speed: 0.40, readouts: telemetryReadouts[2] },
+        { x: width - 35, yOffset: 180, speed: 0.50, readouts: telemetryReadouts[3] },
+      ];
     };
 
-    handleResize();
-    window.addEventListener('resize', handleResize, { passive: true });
+    initializeUnifiedStructures();
 
-    let time = 0;
+    let startTime = performance.now();
 
-    const render = () => {
+    const render = (currentTime: number) => {
       if (!isDocVisible) {
         animFrameRef.current = requestAnimationFrame(render);
         return;
       }
 
-      time += 0.016;
-
-      // Mouse inertia lerping
-      const mouse = mouseRef.current;
-      mouse.currentX += (mouse.targetX - mouse.currentX) * 0.05;
-      mouse.currentY += (mouse.targetY - mouse.currentY) * 0.05;
-
+      const elapsed = (currentTime - startTime) * 0.001;
       ctx.clearRect(0, 0, width, height);
 
-      const isMobile = width < 768;
-      const effectiveIntensity = intensity;
+      // Smooth mouse coordinates interpolation
+      mouseRef.current.currentX += (mouseRef.current.targetX - mouseRef.current.currentX) * 0.05;
+      mouseRef.current.currentY += (mouseRef.current.targetY - mouseRef.current.currentY) * 0.05;
+
+      const effectiveIntensity = Math.max(0.2, Math.min(1.0, intensity));
 
       // =========================================================================
-      // ENGINE 1: AMBIENT FIBER FLOW (Clean, Subtle & Non-Distracting)
-      // Designed specifically for high-end SCADA dashboards - clean and not overdone
+      // LAYER 1: AMBIENT BLUEPRINT GRID & PRECISION CROSSHAIRS
       // =========================================================================
-      if (mode === 'ambient_lattice') {
-        ctx.save();
+      ctx.save();
+      const gridPitch = 120;
+      ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.045)' : 'rgba(14, 116, 144, 0.04)';
+      ctx.lineWidth = 1;
 
-        // 1A. Delicate Engineering Blueprint Coordinate Grid
-        const gridStep = isMobile ? 60 : 72;
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.022)' : 'rgba(14, 116, 144, 0.02)';
-
+      // Coordinate Grid Lines
+      for (let x = 0; x <= width; x += gridPitch) {
         ctx.beginPath();
-        for (let x = 0; x <= width; x += gridStep) {
-          ctx.moveTo(x, 0);
-          ctx.lineTo(x, height);
-        }
-        for (let y = 0; y <= height; y += gridStep) {
-          ctx.moveTo(0, y);
-          ctx.lineTo(width, y);
-        }
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
         ctx.stroke();
-
-        // Tiny crosshair marks (+) at grid intersections
-        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.12)' : 'rgba(14, 116, 144, 0.10)';
-        ctx.lineWidth = 0.8;
+      }
+      for (let y = 0; y <= height; y += gridPitch) {
         ctx.beginPath();
-        for (let x = gridStep; x < width; x += gridStep * 2) {
-          for (let y = gridStep; y < height; y += gridStep * 2) {
-            ctx.moveTo(x - 2, y); ctx.lineTo(x + 2, y);
-            ctx.moveTo(x, y - 2); ctx.lineTo(x, y + 2);
-          }
-        }
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
         ctx.stroke();
-
-        // 1B. Soft Cursor Proximity Aura (Gentle radial ambient glow, zero harsh reticles)
-        if (!isMobile) {
-          const auraGrad = ctx.createRadialGradient(
-            mouse.currentX, mouse.currentY, 10,
-            mouse.currentX, mouse.currentY, 160
-          );
-          auraGrad.addColorStop(0, isDarkMode ? 'rgba(56, 189, 248, 0.05)' : 'rgba(14, 116, 144, 0.04)');
-          auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-          ctx.fillStyle = auraGrad;
-          ctx.beginPath();
-          ctx.arc(mouse.currentX, mouse.currentY, 160, 0, Math.PI * 2);
-          ctx.fill();
-        }
-
-        // 1C. Floating Ambient Micro-Nodes & Constellation Threads
-        const nodes = ambientNodesRef.current;
-        const projectedNodes: Array<{ x: number; y: number; color: string; size: number }> = [];
-
-        nodes.forEach((n) => {
-          const wanderX = Math.sin(time * n.speed + n.phaseX) * 20;
-          const wanderY = Math.cos(time * (n.speed * 0.9) + n.phaseY) * 16;
-          const px = n.baseX * width + wanderX;
-          const py = n.baseY * height + wanderY;
-          projectedNodes.push({ x: px, y: py, color: n.color, size: n.size });
-        });
-
-        // Hairline connection threads between nearby nodes
-        const maxDist = isMobile ? 90 : 125;
-        for (let i = 0; i < projectedNodes.length; i++) {
-          for (let j = i + 1; j < projectedNodes.length; j++) {
-            const p1 = projectedNodes[i];
-            const p2 = projectedNodes[j];
-            const d = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-            if (d < maxDist) {
-              const alpha = (1 - d / maxDist) * 0.12 * effectiveIntensity;
-              ctx.strokeStyle = isDarkMode ? `rgba(56, 189, 248, ${alpha})` : `rgba(14, 116, 144, ${alpha})`;
-              ctx.lineWidth = 0.8;
-              ctx.beginPath();
-              ctx.moveTo(p1.x, p1.y);
-              ctx.lineTo(p2.x, p2.y);
-              ctx.stroke();
-            }
-          }
-        }
-
-        // Draw micro-dots
-        projectedNodes.forEach((p) => {
-          ctx.fillStyle = p.color;
-          ctx.globalAlpha = 0.45 * effectiveIntensity;
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-          ctx.fill();
-        });
-        ctx.globalAlpha = 1.0;
-
-        // 1D. Smooth Fiber-Optic Current Streams (Soft glowing pulses)
-        fiberStreamsRef.current.forEach((stream) => {
-          if (!shouldReduce) {
-            stream.packetProgress += stream.speed;
-            if (stream.packetProgress > 1) stream.packetProgress = 0;
-          }
-
-          const screenPts = stream.points.map((p) => ({
-            x: p.x * width,
-            y: p.y * height,
-          }));
-
-          // Conduit trace line
-          ctx.beginPath();
-          ctx.moveTo(screenPts[0].x, screenPts[0].y);
-          for (let i = 1; i < screenPts.length; i++) {
-            ctx.lineTo(screenPts[i].x, screenPts[i].y);
-          }
-          ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.06)' : 'rgba(14, 116, 144, 0.05)';
-          ctx.lineWidth = 1;
-          ctx.stroke();
-
-          // Traveling soft photon pulse
-          if (screenPts.length > 1) {
-            let totalLength = 0;
-            const segLengths: number[] = [];
-            for (let i = 0; i < screenPts.length - 1; i++) {
-              const segLen = Math.hypot(screenPts[i + 1].x - screenPts[i].x, screenPts[i + 1].y - screenPts[i].y);
-              segLengths.push(segLen);
-              totalLength += segLen;
-            }
-
-            const targetDist = stream.packetProgress * totalLength;
-            let accumulated = 0;
-            let currentX = screenPts[0].x;
-            let currentY = screenPts[0].y;
-
-            for (let i = 0; i < segLengths.length; i++) {
-              const segLen = segLengths[i];
-              if (accumulated + segLen >= targetDist) {
-                const fraction = segLen > 0 ? (targetDist - accumulated) / segLen : 0;
-                currentX = screenPts[i].x + (screenPts[i + 1].x - screenPts[i].x) * fraction;
-                currentY = screenPts[i].y + (screenPts[i + 1].y - screenPts[i].y) * fraction;
-                break;
-              }
-              accumulated += segLen;
-            }
-
-            // Soft glowing pulse with modest aura
-            ctx.fillStyle = stream.color;
-            ctx.shadowColor = stream.color;
-            ctx.shadowBlur = 6;
-            ctx.beginPath();
-            ctx.arc(currentX, currentY, 2.0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.shadowBlur = 0;
-          }
-        });
-
-        // 1E. Whisper Horizon Waveform (Single delicate telemetry wave along lower margin)
-        const waveY = height - 28;
-        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.18)' : 'rgba(14, 116, 144, 0.15)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        const waveStep = isMobile ? 8 : 6;
-        for (let x = 0; x <= width; x += waveStep) {
-          const w1 = Math.sin(x * 0.007 + time * 1.4) * 5;
-          const w2 = Math.cos(x * 0.016 - time * 0.9) * 3;
-          const y = waveY + w1 + w2;
-          if (x === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-
-        ctx.restore();
       }
 
-      // =========================================================================
-      // ENGINE 2: CIRCUIT HIGHWAY & CAD OSCILLOSCOPE
-      // =========================================================================
-      else if (mode === 'circuit_matrix') {
-        ctx.save();
-        const gridStep = isMobile ? 50 : 64;
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.035)' : 'rgba(14, 116, 144, 0.03)';
-
-        ctx.beginPath();
-        for (let x = 0; x <= width; x += gridStep) {
-          ctx.moveTo(x, 0); ctx.lineTo(x, height);
-        }
-        for (let y = 0; y <= height; y += gridStep) {
-          ctx.moveTo(0, y); ctx.lineTo(width, y);
-        }
-        ctx.stroke();
-
-        // PCB Traces
-        wiresRef.current.forEach((wire) => {
-          if (!shouldReduce) {
-            wire.packetProgress += wire.speed;
-            if (wire.packetProgress > 1) wire.packetProgress = 0;
-          }
-
-          const screenPts = wire.points.map((p) => ({
-            x: p.x * width,
-            y: p.y * height,
-          }));
-
+      // Precision Crosshairs at Grid Intersections
+      ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.16)' : 'rgba(14, 116, 144, 0.14)';
+      ctx.lineWidth = 1;
+      const crossSize = 3.5;
+      for (let x = gridPitch; x < width; x += gridPitch * 2) {
+        for (let y = gridPitch; y < height; y += gridPitch * 2) {
           ctx.beginPath();
-          ctx.moveTo(screenPts[0].x, screenPts[0].y);
-          for (let i = 1; i < screenPts.length; i++) {
-            ctx.lineTo(screenPts[i].x, screenPts[i].y);
-          }
-          ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.18)' : 'rgba(14, 116, 144, 0.15)';
-          ctx.lineWidth = 1.2;
+          ctx.moveTo(x - crossSize, y);
+          ctx.lineTo(x + crossSize, y);
+          ctx.moveTo(x, y - crossSize);
+          ctx.lineTo(x, y + crossSize);
           ctx.stroke();
-        });
+        }
+      }
+      ctx.restore();
 
-        // IC Chips
-        chipsRef.current.forEach((chip) => {
-          const cx = chip.relX * width;
-          const cy = chip.relY * height;
-          const cw = isMobile ? chip.width * 0.8 : chip.width;
-          const ch = isMobile ? chip.height * 0.8 : chip.height;
-
-          const chipLeft = cx - cw / 2;
-          const chipTop = cy - ch / 2;
-
-          ctx.fillStyle = isDarkMode ? '#090d16' : '#ffffff';
-          ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.35)' : 'rgba(14, 116, 144, 0.30)';
-          ctx.lineWidth = 1.2;
-          ctx.fillRect(chipLeft, chipTop, cw, ch);
-          ctx.strokeRect(chipLeft, chipTop, cw, ch);
-
-          ctx.fillStyle = isDarkMode ? 'rgba(241, 245, 249, 0.95)' : 'rgba(15, 23, 42, 0.95)';
-          ctx.font = '700 9px "JetBrains Mono", ui-monospace, monospace';
-          ctx.textAlign = 'left';
-          ctx.fillText(chip.name, chipLeft + 12, chipTop + 18);
-        });
-
-        // Bottom Oscilloscope Waveform
-        const oscY = height - 40;
-        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.65)' : 'rgba(14, 116, 144, 0.55)';
+      // =========================================================================
+      // LAYER 2: ORTHOGONAL PCB BUS HIGHWAY TRACES & TRAVELING PHOTONS
+      // =========================================================================
+      ctx.save();
+      const traces = tracesRef.current;
+      traces.forEach((wire) => {
+        // Trace line
+        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.09)' : 'rgba(14, 116, 144, 0.08)';
         ctx.lineWidth = 1.2;
         ctx.beginPath();
-        for (let x = 0; x <= width; x += 6) {
-          const y = oscY + Math.sin(x * 0.012 - time * 3.8) * 12;
-          if (x === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-        ctx.restore();
-      }
-
-      // =========================================================================
-      // ENGINE 3: 3D CARTESIAN CNC GANTRY BLUEPRINT
-      // =========================================================================
-      else if (mode === 'cad_robotic_gantry') {
-        ctx.save();
-        const gantryX = isMobile ? width * 0.5 : width * 0.72;
-        const gantryY = isMobile ? height * 0.42 : height * 0.45;
-        const railLen = isMobile ? 180 : 280;
-        const railHeight = isMobile ? 90 : 140;
-
-        const gantryProgressX = (Math.sin(time * 0.7) + 1) * 0.5;
-        const gantryProgressY = (Math.cos(time * 0.9) + 1) * 0.5;
-        const carriageX = gantryX - railLen / 2 + gantryProgressX * railLen;
-        const carriageY = gantryY - railHeight / 2 + gantryProgressY * railHeight;
-
-        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.35)' : 'rgba(14, 116, 144, 0.30)';
-        ctx.lineWidth = 2;
-        ctx.strokeRect(gantryX - railLen / 2, gantryY - railHeight / 2, railLen, railHeight);
-
-        ctx.fillStyle = isDarkMode ? '#090d16' : '#ffffff';
-        ctx.strokeStyle = '#38bdf8';
-        ctx.lineWidth = 1.8;
-        ctx.fillRect(carriageX - 16, carriageY - 16, 32, 32);
-        ctx.strokeRect(carriageX - 16, carriageY - 16, 32, 32);
-
-        ctx.restore();
-      }
-
-      // =========================================================================
-      // ENGINE 4: SCADA TELEMETRY DATA WATERFALL
-      // =========================================================================
-      else if (mode === 'matrix_telemetry') {
-        ctx.save();
-        const cols = columnsRef.current;
-        ctx.font = '600 10px "JetBrains Mono", ui-monospace, monospace';
-        ctx.textAlign = 'center';
-
-        cols.forEach((col) => {
-          if (!shouldReduce) {
-            col.yOffset += col.speed;
-            if (col.yOffset > 40) col.yOffset = 0;
-          }
-          const colX = col.xRel * width;
-          const colHeight = height + 100;
-
-          col.chars.forEach((char, cIdx) => {
-            const y = (cIdx * 24 + col.yOffset) % colHeight - 20;
-            const alpha = (0.06 + (cIdx % 4) * 0.04) * effectiveIntensity;
-            ctx.fillStyle = isDarkMode ? `rgba(56, 189, 248, ${alpha})` : `rgba(14, 116, 144, ${alpha})`;
-            ctx.fillText(char, colX, y);
-          });
+        wire.points.forEach((pt, idx) => {
+          if (idx === 0) ctx.moveTo(pt.x, pt.y);
+          else ctx.lineTo(pt.x, pt.y);
         });
-        ctx.restore();
-      }
+        ctx.stroke();
 
-      // =========================================================================
-      // ENGINE 5: MULTI-CHANNEL SPECTRAL FFT AUDIO LAB
-      // =========================================================================
-      else if (mode === 'oscilloscope_spectral') {
-        ctx.save();
-        const numBars = isMobile ? 32 : 64;
-        const barWidth = width / numBars;
-        const baseY = height - 40;
+        // Terminal Via Rings
+        wire.points.forEach((pt, pIdx) => {
+          if (pIdx === 0 || pIdx === wire.points.length - 1) {
+            ctx.fillStyle = isDarkMode ? 'rgba(56, 189, 248, 0.18)' : 'rgba(14, 116, 144, 0.16)';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        });
 
-        for (let b = 0; b < numBars; b++) {
-          const freq = (b / numBars) * 12;
-          const amplitude =
-            Math.sin(freq - time * 4) * 0.4 +
-            Math.sin(freq * 2.5 + time * 6) * 0.3;
-          const barHeight = Math.max(4, Math.abs(amplitude) * 90);
-          const bx = b * barWidth;
-          const by = baseY - barHeight;
+        // Traveling Photon Data Packet
+        wire.packetProgress = (wire.packetProgress + wire.speed) % 1.0;
+        const totalSegments = wire.points.length - 1;
+        const segIndex = Math.min(totalSegments - 1, Math.floor(wire.packetProgress * totalSegments));
+        const segSubProgress = (wire.packetProgress * totalSegments) - segIndex;
+        const pA = wire.points[segIndex];
+        const pB = wire.points[segIndex + 1];
 
-          ctx.fillStyle = isDarkMode ? 'rgba(56, 189, 248, 0.4)' : 'rgba(14, 116, 144, 0.35)';
-          ctx.fillRect(bx + 1, by, barWidth - 2, barHeight);
+        if (pA && pB) {
+          const packetX = pA.x + (pB.x - pA.x) * segSubProgress;
+          const packetY = pA.y + (pB.y - pA.y) * segSubProgress;
+
+          // Packet core
+          ctx.fillStyle = wire.color;
+          ctx.shadowColor = wire.color;
+          ctx.shadowBlur = 6;
+          ctx.beginPath();
+          ctx.arc(packetX, packetY, 2.4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
         }
-        ctx.restore();
+      });
+
+      // PCB Logic Chips
+      chipsRef.current.forEach((chip) => {
+        const cx = chip.relX * width;
+        const cy = chip.relY * height;
+        const halfW = chip.width / 2;
+        const halfH = chip.height / 2;
+
+        ctx.fillStyle = isDarkMode ? 'rgba(15, 23, 42, 0.55)' : 'rgba(241, 245, 249, 0.65)';
+        ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.22)' : 'rgba(14, 116, 144, 0.20)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(cx - halfW, cy - halfH, chip.width, chip.height);
+        ctx.fillRect(cx - halfW, cy - halfH, chip.width, chip.height);
+
+        // Chip Monospace Text
+        ctx.fillStyle = isDarkMode ? 'rgba(56, 189, 248, 0.70)' : 'rgba(14, 116, 144, 0.75)';
+        ctx.font = '600 8.5px "JetBrains Mono", ui-monospace, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(chip.name, cx, cy - 1);
+        ctx.fillStyle = isDarkMode ? 'rgba(148, 163, 184, 0.50)' : 'rgba(100, 116, 139, 0.60)';
+        ctx.font = '500 7px "JetBrains Mono", ui-monospace, monospace';
+        ctx.fillText(chip.code, cx, cy + 8);
+      });
+      ctx.restore();
+
+      // =========================================================================
+      // LAYER 3: CAD CARTESIAN GANTRY WIREFRAME & DIMENSION CALIPER
+      // =========================================================================
+      ctx.save();
+      const railY = 46;
+      // Top Drafting Rail
+      ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.12)' : 'rgba(14, 116, 144, 0.10)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, railY);
+      ctx.lineTo(width, railY);
+      ctx.stroke();
+
+      // Millimeter Tick Marks
+      ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.08)' : 'rgba(14, 116, 144, 0.07)';
+      for (let tx = 0; tx <= width; tx += 20) {
+        ctx.beginPath();
+        ctx.moveTo(tx, railY - 3);
+        ctx.lineTo(tx, railY + 3);
+        ctx.stroke();
       }
 
-      if (!shouldReduce) {
-        animFrameRef.current = requestAnimationFrame(render);
+      // Smooth drifting CNC Gantry Carriage
+      const gantryProgressX = (Math.sin(elapsed * 0.15) + 1) * 0.5;
+      const gantryX = width * 0.18 + gantryProgressX * (width * 0.64);
+      const carriageW = 38;
+      const carriageH = 14;
+
+      // Carriage block
+      ctx.fillStyle = isDarkMode ? 'rgba(15, 23, 42, 0.65)' : 'rgba(241, 245, 249, 0.75)';
+      ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.35)' : 'rgba(14, 116, 144, 0.30)';
+      ctx.lineWidth = 1;
+      ctx.fillRect(gantryX - carriageW / 2, railY - carriageH / 2, carriageW, carriageH);
+      ctx.strokeRect(gantryX - carriageW / 2, railY - carriageH / 2, carriageW, carriageH);
+
+      // Toolhead Dropper Laser Guideline
+      const toolheadY = railY + 70 + Math.sin(elapsed * 0.4) * 20;
+      ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.20)' : 'rgba(14, 116, 144, 0.16)';
+      ctx.setLineDash([3, 4]);
+      ctx.beginPath();
+      ctx.moveTo(gantryX, railY + carriageH / 2);
+      ctx.lineTo(gantryX, toolheadY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Toolhead Reticle
+      ctx.strokeStyle = isDarkMode ? '#38bdf8' : '#0284c7';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(gantryX, toolheadY, 4, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Dimension Readout
+      ctx.fillStyle = isDarkMode ? 'rgba(56, 189, 248, 0.60)' : 'rgba(14, 116, 144, 0.65)';
+      ctx.font = '600 8px "JetBrains Mono", ui-monospace, monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(`AXIS X: ${(gantryProgressX * 1200).toFixed(1)} mm`, gantryX + 8, railY - 8);
+      ctx.restore();
+
+      // =========================================================================
+      // LAYER 4: PERIPHERAL MONOSPACE TELEMETRY WATERFALL STREAMS
+      // =========================================================================
+      ctx.save();
+      ctx.font = '500 9px "JetBrains Mono", ui-monospace, monospace';
+      ctx.textAlign = 'center';
+
+      streamsRef.current.forEach((stream) => {
+        stream.yOffset = (stream.yOffset + stream.speed) % 180;
+        const rowHeight = 22;
+
+        stream.readouts.forEach((text, rIdx) => {
+          const rawY = (rIdx * rowHeight + stream.yOffset) % (height + 60);
+          const y = rawY - 20;
+          const alpha = (0.05 + (rIdx % 3) * 0.025) * effectiveIntensity;
+
+          ctx.fillStyle = isDarkMode ? `rgba(56, 189, 248, ${alpha})` : `rgba(14, 116, 144, ${alpha})`;
+          ctx.fillText(text, stream.x, y);
+        });
+      });
+      ctx.restore();
+
+      // =========================================================================
+      // LAYER 5: DUAL-CHANNEL ACOUSTIC RESONANCE OSCILLOSCOPE & FFT BARS
+      // =========================================================================
+      ctx.save();
+      // 1. Dual-Channel Oscilloscope Horizon Wave
+      const waveY = height * 0.74;
+      ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.16)' : 'rgba(14, 116, 144, 0.14)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      for (let x = 0; x <= width; x += 6) {
+        const t = (x / width) * 4 * Math.PI + elapsed * 1.8;
+        const y = waveY + Math.sin(t * 1.5) * 14 + Math.cos(t * 0.7) * 8;
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
       }
+      ctx.stroke();
+
+      // 2. Spectral FFT Vibration Bars along the bottom edge
+      const numBars = 32;
+      const barWidth = Math.min(22, (width * 0.45) / numBars);
+      const startX = width * 0.275;
+      const baseY = height - 12;
+
+      for (let b = 0; b < numBars; b++) {
+        const freq = (b / numBars) * 10;
+        const amp = Math.sin(freq - elapsed * 3.5) * 0.45 + Math.sin(freq * 2.2 + elapsed * 5.0) * 0.35;
+        const barHeight = Math.max(3, Math.abs(amp) * 36);
+        const bx = startX + b * (barWidth + 2);
+        const by = baseY - barHeight;
+
+        ctx.fillStyle = isDarkMode ? 'rgba(56, 189, 248, 0.18)' : 'rgba(14, 116, 144, 0.16)';
+        ctx.fillRect(bx, by, barWidth, barHeight);
+      }
+      ctx.restore();
+
+      // =========================================================================
+      // LAYER 6: AMBIENT CONSTELLATION MICRO-NODES & CURSOR ILLUMINATION
+      // =========================================================================
+      ctx.save();
+      const nodes = nodesRef.current;
+      const currentNodes = nodes.map((n) => {
+        const x = n.baseX + Math.sin(elapsed * 0.6 + n.phaseX) * 25;
+        const y = n.baseY + Math.cos(elapsed * 0.5 + n.phaseY) * 20;
+        return { x, y, size: n.size };
+      });
+
+      // Constellation threads between near nodes
+      ctx.strokeStyle = isDarkMode ? 'rgba(56, 189, 248, 0.08)' : 'rgba(14, 116, 144, 0.07)';
+      ctx.lineWidth = 0.8;
+      for (let i = 0; i < currentNodes.length; i++) {
+        for (let j = i + 1; j < currentNodes.length; j++) {
+          const dx = currentNodes[i].x - currentNodes[j].x;
+          const dy = currentNodes[i].y - currentNodes[j].y;
+          const dist = Math.hypot(dx, dy);
+          if (dist < 110) {
+            const threadAlpha = (1 - dist / 110) * 0.12 * effectiveIntensity;
+            ctx.strokeStyle = isDarkMode ? `rgba(56, 189, 248, ${threadAlpha})` : `rgba(14, 116, 144, ${threadAlpha})`;
+            ctx.beginPath();
+            ctx.moveTo(currentNodes[i].x, currentNodes[i].y);
+            ctx.lineTo(currentNodes[j].x, currentNodes[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      // Micro-node dots
+      currentNodes.forEach((node) => {
+        ctx.fillStyle = isDarkMode ? 'rgba(56, 189, 248, 0.35)' : 'rgba(14, 116, 144, 0.30)';
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, node.size, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Cursor Radial Illumination Glow
+      const mx = mouseRef.current.currentX;
+      const my = mouseRef.current.currentY;
+      if (mx > 0 && my > 0) {
+        const grad = ctx.createRadialGradient(mx, my, 0, mx, my, 280);
+        grad.addColorStop(0, isDarkMode ? 'rgba(56, 189, 248, 0.06)' : 'rgba(14, 116, 144, 0.05)');
+        grad.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, width, height);
+      }
+      ctx.restore();
+
+      animFrameRef.current = requestAnimationFrame(render);
     };
 
-    render();
+    animFrameRef.current = requestAnimationFrame(render);
 
     return () => {
       cancelAnimationFrame(animFrameRef.current);
       window.removeEventListener('resize', handleResize);
     };
-  }, [isDarkMode, enabled, intensity, mode, isDocVisible, shouldReduce]);
+  }, [enabled, isDarkMode, intensity, shouldReduce, isDocVisible]);
 
-  if (!enabled) return null;
+  if (!enabled || shouldReduce) return null;
 
   return (
     <canvas
       ref={canvasRef}
       className={`fixed inset-0 pointer-events-none z-0 transition-opacity duration-700 ${
-        isDarkMode ? 'opacity-50' : 'opacity-35'
+        isDarkMode ? 'opacity-45' : 'opacity-30'
       }`}
       style={{ willChange: 'transform, opacity' }}
       aria-hidden="true"

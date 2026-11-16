@@ -48,7 +48,7 @@ import {
 } from './types';
 import { getCurrencyForSite, SiteCurrency } from './lib/currency';
 import { MANUFACTURING_HUBS } from './lib/manufacturingHubs';
-import { SingularityBackdrop, BackdropMode, BACKDROP_ENGINES } from './components/dashboard/SingularityBackdrop';
+import { SingularityBackdrop } from './components/dashboard/SingularityBackdrop';
 
 const LazyGeoMapAssist = lazy(() => import('./GeoMapAssist'));
 const LazyDigitalTwinFloor = lazy(() =>
@@ -1942,22 +1942,6 @@ export default function DashboardWorkspace({
     }
     return true;
   });
-  const [backdropMode, setBackdropMode] = useState<BackdropMode>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('synapsys_backdrop_mode');
-      if (
-        saved === 'ambient_lattice' ||
-        saved === 'circuit_matrix' ||
-        saved === 'cad_robotic_gantry' ||
-        saved === 'matrix_telemetry' ||
-        saved === 'oscilloscope_spectral'
-      ) {
-        return saved as BackdropMode;
-      }
-    }
-    return 'ambient_lattice';
-  });
-  const [showBackdropMenu, setShowBackdropMenu] = useState<boolean>(false);
   const [copilotLoading, setCopilotLoading] = useState<boolean>(false);
   const [csvIsLoading, setCsvIsLoading] = useState<boolean>(false);
   const [csvFeedback, setCsvFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -4054,7 +4038,7 @@ export default function DashboardWorkspace({
 
       {/* Subtle Engineering Blueprint Backdrop & Ambient Gravitational Singularity Vortex */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
-        <SingularityBackdrop isDarkMode={isDarkMode} enabled={showVortexBg} mode={backdropMode} />
+        <SingularityBackdrop isDarkMode={isDarkMode} enabled={showVortexBg} />
         <div className="absolute inset-0 hero-blueprint-grid opacity-20" />
         <div className="absolute -top-40 -right-40 w-[540px] h-[540px] rounded-full hero-ambient-glow-blue opacity-25" />
         <div className="absolute -bottom-48 -left-48 w-[520px] h-[520px] rounded-full hero-ambient-glow-purple opacity-20" />
@@ -4263,59 +4247,6 @@ export default function DashboardWorkspace({
             </svg>
           </button>
 
-          {/* Ambient Engine Switcher Pill (Active when FX enabled) */}
-          {showVortexBg && (
-            <div className="relative hidden md:block">
-              <button
-                type="button"
-                onClick={() => setShowBackdropMenu(!showBackdropMenu)}
-                className="px-2.5 py-1.5 rounded-lg text-xs font-mono font-medium border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
-                title="Select Ambient SCADA CAD / Circuit Engine"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                <span className="truncate max-w-[130px]">{BACKDROP_ENGINES.find((e) => e.id === backdropMode)?.name || 'Ambient Fiber Flow'}</span>
-                <svg className="w-3 h-3 text-cyan-400/80 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                </svg>
-              </button>
-              <MotionPopover
-                isOpen={showBackdropMenu}
-                className="absolute right-0 mt-1.5 w-72 bg-g-surface border border-g-border rounded-xl shadow-xl py-1.5 z-50 text-[13px]"
-              >
-                <div className="px-3.5 py-2 border-b border-g-border flex items-center justify-between">
-                  <span className="text-[11px] font-mono font-bold tracking-wider text-g-textSecondary uppercase">Ambient SCADA Engines</span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-400 font-semibold">{BACKDROP_ENGINES.length} ENGINES</span>
-                </div>
-                <div className="py-1">
-                  {BACKDROP_ENGINES.map((eng) => (
-                    <button
-                      key={eng.id}
-                      type="button"
-                      onClick={() => {
-                        setBackdropMode(eng.id);
-                        if (typeof window !== 'undefined') {
-                          localStorage.setItem('synapsys_backdrop_mode', eng.id);
-                        }
-                        setShowBackdropMenu(false);
-                      }}
-                      className={`w-full text-left px-3.5 py-2 hover:bg-g-surfaceElevated flex items-start gap-2.5 transition-colors cursor-pointer ${
-                        backdropMode === eng.id ? 'bg-cyan-500/10 text-cyan-400 font-semibold' : 'text-g-text'
-                      }`}
-                    >
-                      <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${backdropMode === eng.id ? 'bg-cyan-400 ring-2 ring-cyan-400/30' : 'bg-g-border'}`} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium text-g-text">{eng.name}</span>
-                          <span className="text-[9px] font-mono px-1 rounded bg-g-surfaceSubtle text-g-textMuted border border-g-border/50">{eng.badge}</span>
-                        </div>
-                        <p className="text-[11px] text-g-textMuted truncate">{eng.tagline}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </MotionPopover>
-            </div>
-          )}
 
           {/* More Dropdown */}
           <div className="relative">
@@ -4391,39 +4322,12 @@ export default function DashboardWorkspace({
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 9h6v6H9z" />
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 1v4M15 1v4M9 19v4M15 19v4M1 9h4M1 15h4M19 9h4M19 15h4" />
                     </svg>
-                    <span>Circuit Highway FX</span>
+                    <span>Ambient SCADA Backdrop FX</span>
                   </span>
                   <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${showVortexBg ? 'bg-cyan-500/20 text-cyan-300' : 'bg-g-surfaceSubtle text-g-textMuted'}`}>
                     {showVortexBg ? 'ON' : 'OFF'}
                   </span>
                 </button>
-
-                {showVortexBg && (
-                  <div className="px-3.5 py-1.5 bg-g-surfaceSubtle/60 border-y border-g-border/50">
-                    <div className="text-[10px] font-mono font-semibold text-g-textMuted uppercase mb-1">Backdrop Engine</div>
-                    <div className="grid grid-cols-1 gap-1">
-                      {BACKDROP_ENGINES.map((eng) => (
-                        <button
-                          key={eng.id}
-                          type="button"
-                          onClick={() => {
-                            setBackdropMode(eng.id);
-                            if (typeof window !== 'undefined') {
-                              localStorage.setItem('synapsys_backdrop_mode', eng.id);
-                            }
-                            setShowMoreMenu(false);
-                          }}
-                          className={`text-left px-2 py-1 rounded text-xs flex items-center justify-between transition-colors cursor-pointer ${
-                            backdropMode === eng.id ? 'bg-cyan-500/15 text-cyan-400 font-semibold' : 'text-g-textSecondary hover:bg-g-surfaceElevated'
-                          }`}
-                        >
-                          <span className="truncate">{eng.name}</span>
-                          <span className="text-[9px] font-mono opacity-70">{eng.badge}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 <div className="border-t border-g-border my-1" />
                 <div className="px-3.5 py-2 text-[13px] text-g-textSecondary flex items-center justify-between">
