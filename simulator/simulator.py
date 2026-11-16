@@ -7,8 +7,36 @@ import sys
 import time
 import random
 import os
+import json
 from datetime import datetime, timezone
-import requests
+
+# Zero-dependency HTTP transport: prefer requests if available, fallback to standard library urllib
+try:
+    import requests
+
+    def post_telemetry(url: str, payload: dict, timeout: float = 2.5) -> int:
+        res = requests.post(url, json=payload, timeout=timeout)
+        return res.status_code
+
+    NetworkError = requests.exceptions.RequestException
+except ImportError:
+    import urllib.request
+    import urllib.error
+
+    def post_telemetry(url: str, payload: dict, timeout: float = 2.5) -> int:
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=data,
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return resp.status
+        except urllib.error.HTTPError as err:
+            return err.code
+
+    NetworkError = (urllib.error.URLError, TimeoutError, OSError)
 
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8000/api/telemetry")
 TICK_INTERVAL_SEC = 2.0
@@ -299,15 +327,14 @@ def main():
                 alarm_str = f" | {COLOR_RED}FAULT: {payload['active_alarm']} ({payload['alarm_code']}){COLOR_RESET}" if payload["active_alarm"] else ""
 
                 try:
-                    res = requests.post(BACKEND_URL, json=payload, timeout=2.5)
-                    http_code = res.status_code
+                    http_code = post_telemetry(BACKEND_URL, payload, timeout=2.5)
                     code_color = COLOR_GREEN if http_code == 201 else COLOR_YELLOW
                     print(
                         f"  [{code_color}{http_code}{COLOR_RESET}] {COLOR_BOLD}{machine.machine_id:<8}{COLOR_RESET} "
                         f"{status_colored} | Output: {payload['output_count']:>3}/{payload['target_output']} "
                         f"| Cycle: {payload['cycle_time_sec']:>4.1f}s{sensor_str}{alarm_str}"
                     )
-                except requests.exceptions.RequestException as exc:
+                except NetworkError as exc:
                     print(
                         f"  [{COLOR_RED}FAIL{COLOR_RESET}] {COLOR_BOLD}{machine.machine_id:<8}{COLOR_RESET} "
                         f"Backend unreachable at {BACKEND_URL} ({type(exc).__name__})"
