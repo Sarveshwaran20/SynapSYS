@@ -1946,6 +1946,7 @@ export default function DashboardWorkspace({
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('synapsys_backdrop_mode');
       if (
+        saved === 'ambient_lattice' ||
         saved === 'circuit_matrix' ||
         saved === 'cad_robotic_gantry' ||
         saved === 'matrix_telemetry' ||
@@ -1954,7 +1955,7 @@ export default function DashboardWorkspace({
         return saved as BackdropMode;
       }
     }
-    return 'circuit_matrix';
+    return 'ambient_lattice';
   });
   const [showBackdropMenu, setShowBackdropMenu] = useState<boolean>(false);
   const [copilotLoading, setCopilotLoading] = useState<boolean>(false);
@@ -4272,7 +4273,7 @@ export default function DashboardWorkspace({
                 title="Select Ambient SCADA CAD / Circuit Engine"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                <span className="truncate max-w-[130px]">{BACKDROP_ENGINES.find((e) => e.id === backdropMode)?.name || 'Circuit Highway'}</span>
+                <span className="truncate max-w-[130px]">{BACKDROP_ENGINES.find((e) => e.id === backdropMode)?.name || 'Ambient Fiber Flow'}</span>
                 <svg className="w-3 h-3 text-cyan-400/80 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
                 </svg>
@@ -4283,7 +4284,7 @@ export default function DashboardWorkspace({
               >
                 <div className="px-3.5 py-2 border-b border-g-border flex items-center justify-between">
                   <span className="text-[11px] font-mono font-bold tracking-wider text-g-textSecondary uppercase">Ambient SCADA Engines</span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-400 font-semibold">4 ENGINES</span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-400 font-semibold">{BACKDROP_ENGINES.length} ENGINES</span>
                 </div>
                 <div className="py-1">
                   {BACKDROP_ENGINES.map((eng) => (
