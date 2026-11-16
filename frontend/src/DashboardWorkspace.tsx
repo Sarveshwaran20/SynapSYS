@@ -1902,6 +1902,13 @@ export default function DashboardWorkspace({
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<'cards' | 'health' | 'dense' | 'scope'>('cards');
   const [scopeFocusMachineId, setScopeFocusMachineId] = useState<string | null>(null);
+  const [acousticMachineId, setAcousticMachineId] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('synapsys_acoustic_machine');
+      if (saved) return saved;
+    }
+    return '';
+  });
   const [firebaseStatus, setFirebaseStatus] = useState<FirebaseConnectionStatus>(DEFAULT_FIREBASE_STATUS);
   const [activeShift, setActiveShift] = useState<'shift1' | 'shift2' | 'shift3'>('shift1');
   const [showEventPopover, setShowEventPopover] = useState<boolean>(false);
@@ -6464,6 +6471,13 @@ export default function DashboardWorkspace({
               <Suspense fallback={<ChunkPanelFallback label="Initializing Acoustic AI Harmonic Twin & Heterodyne Synthesizer..." />}>
                 <LazyAcousticResonanceLab
                   machines={data.machines}
+                  selectedMachineId={acousticMachineId}
+                  onSelectMachineId={(mId: string) => {
+                    setAcousticMachineId(mId);
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('synapsys_acoustic_machine', mId);
+                    }
+                  }}
                   isDarkMode={isDarkMode}
                 />
               </Suspense>

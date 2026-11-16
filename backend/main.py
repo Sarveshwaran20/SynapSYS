@@ -2559,6 +2559,12 @@ def ingest_telemetry(payload: TelemetryPayload):
         if not payload.active_alarm or not payload.active_alarm.strip():
             alarm_ack_state.pop(machine_id, None)
 
+    # Extract sensor values safely from nested sensors object
+    sensors = payload.sensors
+    temp_c = sensors.temperature_c if sensors else None
+    vib_mm_s = sensors.vibration_mm_s if sensors else None
+    pwr_kw = sensors.power_kw if sensors else None
+
     firebase_store.add_document(
         "telemetry",
         {
@@ -2570,9 +2576,9 @@ def ingest_telemetry(payload: TelemetryPayload):
             "good_count": payload.good_count,
             "scrap_count": payload.scrap_count,
             "cycle_time_sec": payload.cycle_time_sec,
-            "temperature_c": payload.temperature_c,
-            "vibration_mm_s": payload.vibration_mm_s,
-            "power_kw": payload.power_kw,
+            "temperature_c": temp_c,
+            "vibration_mm_s": vib_mm_s,
+            "power_kw": pwr_kw,
             "active_alarm": payload.active_alarm,
         },
     )
@@ -2613,20 +2619,45 @@ def get_dashboard(site_id: Optional[str] = Query(default=None), company_domain: 
                 active_alarms=[],
                 work_orders=[],
                 summary=DashboardSummary(
-                    overall_oee=0.0,
-                    availability=0.0,
-                    performance=0.0,
-                    quality=0.0,
+                    overall_plant_oee=0.0,
+                    overall_availability=0.0,
+                    overall_performance=0.0,
+                    overall_quality=0.0,
                     total_output=0,
-                    target_output=0,
+                    total_target=0,
                     total_good=0,
                     total_scrap=0,
+                    total_machines=0,
                     running_machines=0,
                     idle_machines=0,
                     down_machines=0,
-                    total_downtime_hours=0.0,
-                    financial_yield=0.0,
-                    fleet_power_kw=0.0,
+                    active_alarms_count=0,
+                    last_updated=datetime.now(timezone.utc).isoformat(),
+                    financial_roi=FinancialROI(
+                        revenue_generated_usd=0.0,
+                        downtime_cost_usd=0.0,
+                        scrap_waste_cost_usd=0.0,
+                        net_shift_value_usd=0.0,
+                        potential_savings_usd=0.0,
+                        currency_symbol="$",
+                        currency_code="USD",
+                        unit_baseline=100.0,
+                        downtime_hourly_rate=1000.0,
+                        scrap_unit_cost=50.0,
+                    ),
+                    takt_time_sec=12.0,
+                    mean_line_speed_sec=12.0,
+                    shift_name="Shift 1 (Day)",
+                    shift_elapsed_pct=0.0,
+                    energy=PlantEnergyMetrics(
+                        total_power_kw=0.0,
+                        specific_energy_kwh_per_unit=0.0,
+                        carbon_intensity_gco2_per_unit=0.0,
+                        energy_cost_usd=0.0,
+                        green_energy_pct=50.0,
+                    ),
+                    data_source_mode="hybrid",
+                    active_connectors_count=0,
                 ),
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )
@@ -3586,6 +3617,7 @@ def sync_baseline_to_firebase():
 
     synced_tel = 0
     for m_id, p in latest_telemetry.items():
+        p_sensors = p.sensors
         doc = {
             "site_id": (MACHINE_METADATA.get(m_id) or {}).get("site_id"),
             "machine_id": m_id,
@@ -3595,9 +3627,9 @@ def sync_baseline_to_firebase():
             "good_count": p.good_count,
             "scrap_count": p.scrap_count,
             "cycle_time_sec": p.cycle_time_sec,
-            "temperature_c": p.temperature_c,
-            "vibration_mm_s": p.vibration_mm_s,
-            "power_kw": p.power_kw,
+            "temperature_c": p_sensors.temperature_c if p_sensors else None,
+            "vibration_mm_s": p_sensors.vibration_mm_s if p_sensors else None,
+            "power_kw": p_sensors.power_kw if p_sensors else None,
             "active_alarm": p.active_alarm,
         }
         if firebase_store.add_document("telemetry", doc):

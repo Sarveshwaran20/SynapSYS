@@ -6,6 +6,8 @@ import { AnimatedNumber } from '../motion';
 export interface AcousticResonanceLabProps {
   machines: MachineDashboardState[];
   isDarkMode?: boolean;
+  selectedMachineId?: string;
+  onSelectMachineId?: (id: string) => void;
 }
 
 interface ProbePoint {
@@ -24,75 +26,131 @@ interface ProbePoint {
 export const AcousticResonanceLab: React.FC<AcousticResonanceLabProps> = ({
   machines,
   isDarkMode = true,
+  selectedMachineId: propSelectedMachineId,
+  onSelectMachineId,
 }) => {
-  const [selectedMachineId, setSelectedMachineId] = useState<string>(() => {
-    return machines[0]?.machine_id || 'CNC-101';
+  const [internalMachineId, setInternalMachineId] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('synapsys_acoustic_machine');
+      if (saved) return saved;
+    }
+    return propSelectedMachineId || machines[0]?.machine_id || 'CNC-101';
   });
 
+  const effectiveMachineId = propSelectedMachineId || internalMachineId;
+
+  // Sync internal machine ID if prop updates from outside
+  useEffect(() => {
+    if (propSelectedMachineId && propSelectedMachineId !== internalMachineId) {
+      setInternalMachineId(propSelectedMachineId);
+    }
+  }, [propSelectedMachineId, internalMachineId]);
+
   const selectedMachine = useMemo(() => {
-    return machines.find((m) => m.machine_id === selectedMachineId) || machines[0];
-  }, [machines, selectedMachineId]);
+    const match = machines.find((m) => m.machine_id === effectiveMachineId);
+    if (match) return match;
+    const ciMatch = machines.find((m) => m.machine_id.toLowerCase() === effectiveMachineId.toLowerCase());
+    if (ciMatch) return ciMatch;
+    return machines[0] || null;
+  }, [machines, effectiveMachineId]);
+
+  const handleSelectMachine = useCallback(
+    (machineId: string) => {
+      setInternalMachineId(machineId);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('synapsys_acoustic_machine', machineId);
+      }
+      onSelectMachineId?.(machineId);
+    },
+    [onSelectMachineId]
+  );
 
   // Virtual Stethoscope Probe Points on the Spindle & Drive Mechanism
-  const PROBE_POINTS: ProbePoint[] = useMemo(() => [
-    {
-      id: 'spindle_front',
-      name: 'Spindle Front Ceramic Bearing (BPFO)',
-      location: 'Spindle Nose Housing - Drive End',
-      harmonicFreq: 142.5,
-      defectSeverity: selectedMachine?.status === 'Down' ? 78 : selectedMachine?.status === 'Idle' ? 12 : 24,
-      description: 'Angular contact hybrid ceramic bearing assembly. Monitored for outer race micro-spalling.',
-      kurtosis: 3.42,
-      crestFactor: 4.85,
-      thdPct: 1.84,
-      defectType: 'Outer Raceway Ball Pass Frequency (BPFO)',
-    },
-    {
-      id: 'gearbox_mesh',
-      name: 'Planetary Gearbox Mesh (GMF)',
-      location: 'Primary Reduction Gearbox - Mid Section',
-      harmonicFreq: 312.0,
-      defectSeverity: selectedMachine?.status === 'Down' ? 88 : 18,
-      description: 'Helical sun-planet gear interface. High-frequency ultrasonic acoustic tooth mesh signature.',
-      kurtosis: 4.15,
-      crestFactor: 5.21,
-      thdPct: 2.92,
-      defectType: 'Tooth Contact Resonance (Gear Mesh Harmonic)',
-    },
-    {
-      id: 'rear_thrust',
-      name: 'Rear Pre-Load Thrust Bearing (BPFI)',
-      location: 'Motor Coupling Flange - Non-Drive End',
-      harmonicFreq: 96.0,
-      defectSeverity: 8,
-      description: 'Axial pre-load spring and duplex ground bearing stack.',
-      kurtosis: 2.98,
-      crestFactor: 3.45,
-      thdPct: 0.95,
-      defectType: 'Inner Raceway Ball Pass Frequency (BPFI)',
-    },
-    {
-      id: 'stator_airgap',
-      name: 'Stator Electromagnetic Flux Core',
-      location: 'High-Torque Permanent Magnet Synchronous Stator',
-      harmonicFreq: 120.0,
-      defectSeverity: 5,
-      description: 'Electromagnetic magnetic flux air-gap acoustic resonance (2x line frequency humming).',
-      kurtosis: 3.01,
-      crestFactor: 3.12,
-      thdPct: 0.65,
-      defectType: 'Electromagnetic Pole Frequency Harmonic',
-    },
-  ], [selectedMachine]);
+  const PROBE_POINTS: ProbePoint[] = useMemo(() => {
+    const isDown = selectedMachine?.status === 'Down';
+    const isIdle = selectedMachine?.status === 'Idle';
+    const baseVib = selectedMachine?.sensors?.vibration_mm_s ?? 1.25;
+    const anomalyScore = selectedMachine?.predictive?.anomaly_score ?? 15.0;
+    const componentName = selectedMachine?.predictive?.component_at_risk || 'Primary Spindle Bearing Cluster';
 
-  const [activeProbe, setActiveProbe] = useState<ProbePoint>(PROBE_POINTS[0]);
-  const [defectSlider, setDefectSlider] = useState<number>(PROBE_POINTS[0].defectSeverity);
+    const p1Severity = isDown ? 84 : isIdle ? 12 : Math.min(95, Math.max(10, Math.round(anomalyScore * 1.5 + baseVib * 7)));
+    const p2Severity = isDown ? 88 : isIdle ? 10 : Math.min(95, Math.max(8, Math.round(anomalyScore * 1.2 + baseVib * 5)));
 
-  // Sync active probe when machine changes
+    return [
+      {
+        id: 'spindle_front',
+        name: `${componentName} (BPFO)`,
+        location: `${selectedMachine?.location || 'Primary Machining Cell'} - Drive End`,
+        harmonicFreq: 142.5,
+        defectSeverity: p1Severity,
+        description: 'Angular contact hybrid ceramic bearing assembly. Monitored for outer race micro-spalling.',
+        kurtosis: 3.42,
+        crestFactor: 4.85,
+        thdPct: 1.84,
+        defectType: 'Outer Raceway Ball Pass Frequency (BPFO)',
+      },
+      {
+        id: 'gearbox_mesh',
+        name: 'Primary Drive Gearbox Mesh (GMF)',
+        location: `${selectedMachine?.location || 'Primary Machining Cell'} - Reduction Stage`,
+        harmonicFreq: 312.0,
+        defectSeverity: p2Severity,
+        description: 'High-frequency ultrasonic tooth contact mesh resonance and hydrodynamic shear harmonics.',
+        kurtosis: 4.15,
+        crestFactor: 5.21,
+        thdPct: 2.92,
+        defectType: 'Tooth Contact Resonance (Gear Mesh Harmonic)',
+      },
+      {
+        id: 'rear_thrust',
+        name: 'Non-Drive End Thrust Bearing (BPFI)',
+        location: `${selectedMachine?.location || 'Primary Machining Cell'} - Rear Motor Flange`,
+        harmonicFreq: 96.0,
+        defectSeverity: isDown ? 65 : 8,
+        description: 'Axial pre-load ground bearing stack. Monitored for inner raceway defect frequencies.',
+        kurtosis: 2.98,
+        crestFactor: 3.45,
+        thdPct: 0.95,
+        defectType: 'Inner Raceway Ball Pass Frequency (BPFI)',
+      },
+      {
+        id: 'stator_airgap',
+        name: 'Stator Electromagnetic Flux Core',
+        location: `${selectedMachine?.location || 'Primary Machining Cell'} - Motor Core`,
+        harmonicFreq: 120.0,
+        defectSeverity: isDown ? 50 : 5,
+        description: 'Electromagnetic magnetic flux air-gap acoustic resonance (2x line frequency humming).',
+        kurtosis: 3.01,
+        crestFactor: 3.12,
+        thdPct: 0.65,
+        defectType: 'Electromagnetic Pole Frequency Harmonic',
+      },
+    ];
+  }, [
+    selectedMachine?.machine_id,
+    selectedMachine?.status,
+    selectedMachine?.predictive?.anomaly_score,
+    selectedMachine?.sensors?.vibration_mm_s,
+    selectedMachine?.predictive?.component_at_risk,
+    selectedMachine?.location,
+  ]);
+
+  const [activeProbeId, setActiveProbeId] = useState<string>('spindle_front');
+  const activeProbe = useMemo(() => {
+    return PROBE_POINTS.find((p) => p.id === activeProbeId) || PROBE_POINTS[0];
+  }, [PROBE_POINTS, activeProbeId]);
+
+  const [defectSlider, setDefectSlider] = useState<number>(() => PROBE_POINTS[0].defectSeverity);
+
+  // Sync defect slider ONLY when machine or active probe ID changes, NEVER on telemetry poll intervals!
+  const prevProbeKeyRef = useRef<string>(`${selectedMachine?.machine_id}_${activeProbe.id}`);
   useEffect(() => {
-    setActiveProbe(PROBE_POINTS[0]);
-    setDefectSlider(PROBE_POINTS[0].defectSeverity);
-  }, [PROBE_POINTS]);
+    const currentKey = `${selectedMachine?.machine_id}_${activeProbe.id}`;
+    if (currentKey !== prevProbeKeyRef.current) {
+      prevProbeKeyRef.current = currentKey;
+      setDefectSlider(activeProbe.defectSeverity);
+    }
+  }, [selectedMachine?.machine_id, activeProbe.id, activeProbe.defectSeverity]);
 
   // ---------------------------------------------------------------------------
   // Web Audio API: Heterodyne Ultrasonic-to-Audible Synthesizer
@@ -373,7 +431,7 @@ export const AcousticResonanceLab: React.FC<AcousticResonanceLabProps> = ({
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
             <span className="text-xs font-mono text-cyan-400 font-semibold">
-              Sampling Bus: 48.0 kS/s &bull; ISO-10816 Class II
+              Active Unit: {selectedMachine?.machine_id} &bull; {selectedMachine?.status}
             </span>
           </div>
         </div>
@@ -386,7 +444,8 @@ export const AcousticResonanceLab: React.FC<AcousticResonanceLabProps> = ({
         </h2>
         <p className="text-xs sm:text-sm text-g-textSecondary mt-1.5 max-w-4xl leading-relaxed">
           The first industrial SCADA software to synthesize and analyze live machine bearing acoustics in real time.
-          Touch the virtual acoustic probe onto CNC spindle components to hear heterodyne ultrasound, observe 24-band FFT resonance,
+          Currently monitoring <strong className="text-cyan-300 font-mono">{selectedMachine?.machine_name || selectedMachine?.machine_id}</strong> ({selectedMachine?.location}).
+          Touch the virtual acoustic probe onto CNC spindle components to hear heterodyne ultrasound, observe 48-band FFT resonance,
           and identify micro-pitting weeks before traditional vibration sensors trip.
         </p>
 
@@ -394,20 +453,23 @@ export const AcousticResonanceLab: React.FC<AcousticResonanceLabProps> = ({
         <div className="mt-4 pt-4 border-t border-g-border/60 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-mono text-g-textMuted">Active Telemetry Unit:</span>
-            {machines.map((m) => (
-              <button
-                key={m.machine_id}
-                type="button"
-                onClick={() => setSelectedMachineId(m.machine_id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer border ${
-                  selectedMachineId === m.machine_id
-                    ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400 shadow-xs ring-1 ring-cyan-500/30'
-                    : 'bg-g-surfaceElevated text-g-textSecondary border-g-border hover:border-cyan-500/40'
-                }`}
-              >
-                {m.machine_id} &bull; {m.machine_name.split(' ')[0]}
-              </button>
-            ))}
+            {machines.map((m) => {
+              const isSelected = selectedMachine?.machine_id === m.machine_id;
+              return (
+                <button
+                  key={m.machine_id}
+                  type="button"
+                  onClick={() => handleSelectMachine(m.machine_id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer border ${
+                    isSelected
+                      ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400 shadow-xs ring-1 ring-cyan-500/30'
+                      : 'bg-g-surfaceElevated text-g-textSecondary border-g-border hover:border-cyan-500/40'
+                  }`}
+                >
+                  {m.machine_id} &bull; {m.machine_name.split(' ')[0]}
+                </button>
+              );
+            })}
           </div>
 
           {/* Audio Controls */}
@@ -480,7 +542,7 @@ export const AcousticResonanceLab: React.FC<AcousticResonanceLabProps> = ({
                   key={probe.id}
                   type="button"
                   onClick={() => {
-                    setActiveProbe(probe);
+                    setActiveProbeId(probe.id);
                     setDefectSlider(probe.defectSeverity);
                   }}
                   className={`w-full p-3 rounded-xl border text-left transition-all cursor-pointer ${
