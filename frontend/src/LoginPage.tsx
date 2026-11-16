@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence, useReducedMotion, type Variants } from 'framer-motion';
 import { AuthSession, UserRole } from './types';
 import {
@@ -8,6 +8,7 @@ import {
 } from './lib/auth';
 import { SynapsysLogo } from './SynapsysLogo';
 import { dur, ease } from './lib/motion';
+import { SingularityBackdrop } from './components/dashboard/SingularityBackdrop';
 
 interface LoginPageProps {
   onLoginSuccess: (session: AuthSession) => void;
@@ -67,7 +68,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [shakeCard, setShakeCard] = useState(false);
   const [shakeOtp, setShakeOtp] = useState(false);
-  const [mousePos, setMousePos] = useState({ x: -1000, y: -1000 });
   const [emailDeliveryInfo, setEmailDeliveryInfo] = useState<{
     delivered: boolean;
     recipient: string;
@@ -78,11 +78,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const shouldReduce = useReducedMotion();
-
-  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType === 'touch') return;
-    setMousePos({ x: e.clientX, y: e.clientY });
-  }, []);
 
   const triggerCardShake = () => {
     setShakeCard(true);
@@ -261,54 +256,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
   return (
     <div
-      onPointerMove={handlePointerMove}
       className="min-h-screen w-full bg-g-bg text-g-text flex flex-col justify-between relative overflow-x-clip font-sans select-none transition-colors duration-200"
     >
-      {/* Animated SCADA Blueprint & Ambient Orbit Background */}
+      {/* Unified Industrial SCADA Animated Backdrop */}
+      <SingularityBackdrop isDarkMode={isDarkMode} enabled={true} intensity={0.65} />
+
+      {/* Subtle Ambient Vignette & Center Spotlight Glow */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
-        {/* Subtle coordinate blueprint grid */}
-        <div className="absolute inset-0 hero-blueprint-grid opacity-30" />
-
-        {/* Ambient Cursor Illumination Glow */}
-        {!shouldReduce && mousePos.x >= 0 && (
-          <div
-            className="absolute inset-0 transition-opacity duration-300 opacity-60"
-            style={{
-              background: `radial-gradient(650px circle at ${mousePos.x}px ${mousePos.y}px, rgba(76, 141, 246, 0.08), transparent 70%)`,
-            }}
-          />
-        )}
-
-        {/* Floating gradient ambient beacons with smooth harmonic drifting */}
-        <motion.div
-          animate={shouldReduce ? undefined : { x: [0, 24, 0], y: [0, -18, 0], scale: [1, 1.06, 1] }}
-          transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
-          className="absolute -top-40 -right-40 w-[540px] h-[540px] rounded-full hero-ambient-glow-blue opacity-30 blur-3xl"
-        />
-        <motion.div
-          animate={shouldReduce ? undefined : { x: [0, -28, 0], y: [0, 22, 0], scale: [1, 1.05, 1] }}
-          transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut' }}
-          className="absolute -bottom-48 -left-48 w-[520px] h-[520px] rounded-full hero-ambient-glow-purple opacity-20 blur-3xl"
-        />
-
-        {/* Concentric rotating radar rings in background */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[720px] h-[720px] pointer-events-none opacity-20">
-          <motion.div
-            animate={shouldReduce ? undefined : { rotate: 360 }}
-            transition={{ repeat: Infinity, duration: 80, ease: 'linear' }}
-            className="w-full h-full rounded-full border border-dashed border-aegean/30 flex items-center justify-center"
-          >
-            <div className="w-[520px] h-[520px] rounded-full border border-silver/15 flex items-center justify-center">
-              <motion.div
-                animate={shouldReduce ? undefined : { rotate: -360 }}
-                transition={{ repeat: Infinity, duration: 60, ease: 'linear' }}
-                className="w-[320px] h-[320px] rounded-full border border-dashed border-cyan-400/25 flex items-center justify-center"
-              >
-                <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/50" />
-              </motion.div>
-            </div>
-          </motion.div>
-        </div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[720px] h-[720px] rounded-full bg-cyan-500/5 blur-3xl pointer-events-none" />
       </div>
 
       {/* Top Professional Navigation Bar */}
