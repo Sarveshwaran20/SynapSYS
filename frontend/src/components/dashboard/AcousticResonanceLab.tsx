@@ -141,8 +141,16 @@ export const AcousticResonanceLab: React.FC<AcousticResonanceLabProps> = ({
   }, [PROBE_POINTS, activeProbeId]);
 
   const [defectSlider, setDefectSlider] = useState<number>(() => PROBE_POINTS[0].defectSeverity);
+  const [autoSyncTelemetry, setAutoSyncTelemetry] = useState<boolean>(true);
 
-  // Sync defect slider ONLY when machine or active probe ID changes, NEVER on telemetry poll intervals!
+  // Keep defectSlider synchronized with live telemetry when autoSyncTelemetry is active
+  useEffect(() => {
+    if (autoSyncTelemetry) {
+      setDefectSlider(activeProbe.defectSeverity);
+    }
+  }, [autoSyncTelemetry, activeProbe.defectSeverity]);
+
+  // Sync defect slider when machine or active probe ID changes
   const prevProbeKeyRef = useRef<string>(`${selectedMachine?.machine_id}_${activeProbe.id}`);
   useEffect(() => {
     const currentKey = `${selectedMachine?.machine_id}_${activeProbe.id}`;
@@ -155,20 +163,127 @@ export const AcousticResonanceLab: React.FC<AcousticResonanceLabProps> = ({
   // ---------------------------------------------------------------------------
   // Web Audio API: Heterodyne Ultrasonic-to-Audible Synthesizer
   // Converts high-frequency mechanical vibrations (20-40 kHz) into audible audio
+  // Dynamically modulates audio parameters in real time on the go without restarts
   // ---------------------------------------------------------------------------
   const [isPlayingAudio, setIsPlayingAudio] = useState<boolean>(false);
   const [audioVolume, setAudioVolume] = useState<number>(0.35);
+
   const audioCtxRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const carrierOscRef = useRef<OscillatorNode | null>(null);
+  const carrierGainRef = useRef<GainNode | null>(null);
   const harmonicOscRef = useRef<OscillatorNode | null>(null);
-  const noiseNodeRef = useRef<AudioNode | null>(null);
-  const impulseIntervalRef = useRef<number | null>(null);
+  const harmonicGainRef = useRef<GainNode | null>(null);
+  const noiseNodeRef = useRef<AudioBufferSourceNode | null>(null);
+  const noiseGainRef = useRef<GainNode | null>(null);
+  const bandpassFilterRef = useRef<BiquadFilterNode | null>(null);
+  const impulseTimeoutRef = useRef<number | null>(null);
+
+  // Live mutable refs to eliminate closure staleness in recursive audio loops
+  const defectSliderRef = useRef<number>(defectSlider);
+  defectSliderRef.current = defectSlider;
+  const isPlayingAudioRef = useRef<boolean>(isPlayingAudio);
+  isPlayingAudioRef.current = isPlayingAudio;
+  const activeProbeRef = useRef<ProbePoint>(activeProbe);
+  activeProbeRef.current = activeProbe;
+  const selectedMachineRef = useRef<MachineDashboardState | null>(selectedMachine);
+  selectedMachineRef.current = selectedMachine;
+
+  // Trigger instantaneous mechanical click impulse (micro-impact spalling)
+  const triggerImpulseClick = useCallback(() => {
+    const ctx = audioCtxRef.current;
+    const masterGain = masterGainRef.current;
+    if (!ctx || ctx.state === 'closed' || !masterGain) return;
+
+    const currentDefect = defectSliderRef.current;
+    const currentMachine = selectedMachineRef.current;
+    const isIdle = currentMachine?.status === 'Idle';
+    if (isIdle || currentDefect < 1) return;
+
+    try {
+      const now = ctx.currentTime;
+      const clickOsc = ctx.createOscillator();
+      const clickGain = ctx.createGain();
+
+      clickOsc.type = 'square';
+      const baseClickFreq = 1100 + (currentDefect / 100) * 1500 + Math.random() * 400;
+      clickOsc.frequency.setValueAtTime(baseClickFreq, now);
+
+      const clickVolume = Math.min(0.85, (currentDefect / 100) * 0.7);
+      clickGain.gain.setValueAtTime(clickVolume, now);
+      clickGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.035);
+
+      clickOsc.connect(clickGain);
+      clickGain.connect(masterGain);
+      clickOsc.start(now);
+      clickOsc.stop(now + 0.04);
+    } catch {
+      // ignore transient click scheduling errors
+    }
+  }, []);
+
+  // Recursive impulse scheduler: recalculates click period on the fly on every single tick
+  const scheduleNextImpulse = useCallback(() => {
+    if (!isPlayingAudioRef.current) return;
+
+    triggerImpulseClick();
+
+    const currentDefect = defectSliderRef.current;
+    const nextPeriodMs = Math.max(45, 420 - currentDefect * 3.75);
+
+    impulseTimeoutRef.current = window.setTimeout(scheduleNextImpulse, nextPeriodMs);
+  }, [triggerImpulseClick]);
+
+  // Smoothly update running audio graph parameters on the fly
+  const updateAudioParametersOnTheGo = useCallback(() => {
+    const ctx = audioCtxRef.current;
+    if (!ctx || ctx.state === 'closed') return;
+
+    const probe = activeProbeRef.current;
+    const machine = selectedMachineRef.current;
+    const severity = defectSliderRef.current;
+    const isDown = machine?.status === 'Down';
+    const isIdle = machine?.status === 'Idle';
+    const baseVib = machine?.sensors?.vibration_mm_s ?? 1.25;
+
+    const now = ctx.currentTime;
+
+    // Carrier frequency & harmonic pitch glide (50ms smooth exponential time constant)
+    const speedFactor = isDown ? 0.55 : isIdle ? 0.75 : 1 + (baseVib - 1.5) * 0.05;
+    const targetCarrierFreq = Math.max(30, probe.harmonicFreq * speedFactor);
+    const targetHarmonicFreq = targetCarrierFreq * 2.14;
+
+    if (carrierOscRef.current) {
+      carrierOscRef.current.frequency.setTargetAtTime(targetCarrierFreq, now, 0.05);
+    }
+    if (harmonicOscRef.current) {
+      harmonicOscRef.current.frequency.setTargetAtTime(targetHarmonicFreq, now, 0.05);
+    }
+
+    // Dynamic gain levels based on machine operating envelope
+    const carrierLevel = isDown ? 0.2 : isIdle ? 0.15 : 0.4;
+    const harmonicLevel = isDown ? 0.45 : 0.12 + (severity / 100) * 0.35;
+    const noiseLevel = isIdle ? 0.08 : 0.15 + (severity / 100) * 0.28;
+
+    if (carrierGainRef.current) {
+      carrierGainRef.current.gain.setTargetAtTime(carrierLevel, now, 0.05);
+    }
+    if (harmonicGainRef.current) {
+      harmonicGainRef.current.gain.setTargetAtTime(harmonicLevel, now, 0.05);
+    }
+    if (noiseGainRef.current) {
+      noiseGainRef.current.gain.setTargetAtTime(noiseLevel, now, 0.05);
+    }
+    if (bandpassFilterRef.current) {
+      const filterFreq = 1200 + severity * 8;
+      bandpassFilterRef.current.frequency.setTargetAtTime(filterFreq, now, 0.05);
+    }
+  }, []);
 
   const stopAudio = useCallback(() => {
-    if (impulseIntervalRef.current) {
-      window.clearInterval(impulseIntervalRef.current);
-      impulseIntervalRef.current = null;
+    if (impulseTimeoutRef.current) {
+      window.clearTimeout(impulseTimeoutRef.current);
+      impulseTimeoutRef.current = null;
     }
     if (audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
       try {
@@ -178,15 +293,29 @@ export const AcousticResonanceLab: React.FC<AcousticResonanceLabProps> = ({
       }
       audioCtxRef.current = null;
     }
+    masterGainRef.current = null;
+    carrierOscRef.current = null;
+    carrierGainRef.current = null;
+    harmonicOscRef.current = null;
+    harmonicGainRef.current = null;
+    noiseNodeRef.current = null;
+    noiseGainRef.current = null;
+    bandpassFilterRef.current = null;
     setIsPlayingAudio(false);
+    isPlayingAudioRef.current = false;
   }, []);
 
-  const startAudio = useCallback(() => {
+  const startAudio = useCallback(async () => {
     try {
+      stopAudio();
+
       const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioCtxClass) return;
 
       const ctx = new AudioCtxClass();
+      if (ctx.state === 'suspended') {
+        await ctx.resume();
+      }
       audioCtxRef.current = ctx;
 
       const masterGain = ctx.createGain();
@@ -205,6 +334,7 @@ export const AcousticResonanceLab: React.FC<AcousticResonanceLabProps> = ({
       carrierGain.connect(masterGain);
       carrier.start();
       carrierOscRef.current = carrier;
+      carrierGainRef.current = carrierGain;
 
       // 2. Harmonic overtone (tooth mesh / rolling element harmonics)
       const harmonic = ctx.createOscillator();
@@ -217,6 +347,7 @@ export const AcousticResonanceLab: React.FC<AcousticResonanceLabProps> = ({
       harmonicGain.connect(masterGain);
       harmonic.start();
       harmonicOscRef.current = harmonic;
+      harmonicGainRef.current = harmonicGain;
 
       // 3. Pink noise hydrodynamic lubrication hiss (simulates real bearing film)
       const bufferSize = ctx.sampleRate * 2;
@@ -246,52 +377,36 @@ export const AcousticResonanceLab: React.FC<AcousticResonanceLabProps> = ({
       noiseGain.connect(masterGain);
       whiteNoise.start();
       noiseNodeRef.current = whiteNoise;
-
-      // 4. Periodic bearing defect impulse clicks (rate scales with defect severity)
-      const impulsePeriodMs = Math.max(60, 400 - defectSlider * 3.5);
-      impulseIntervalRef.current = window.setInterval(() => {
-        if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') return;
-        try {
-          const clickOsc = audioCtxRef.current.createOscillator();
-          const clickGain = audioCtxRef.current.createGain();
-          clickOsc.type = 'square';
-          clickOsc.frequency.setValueAtTime(1200 + Math.random() * 800, audioCtxRef.current.currentTime);
-
-          const clickVolume = (defectSlider / 100) * 0.6;
-          clickGain.gain.setValueAtTime(clickVolume, audioCtxRef.current.currentTime);
-          clickGain.gain.exponentialRampToValueAtTime(0.001, audioCtxRef.current.currentTime + 0.04);
-
-          clickOsc.connect(clickGain);
-          clickGain.connect(masterGainRef.current!);
-          clickOsc.start();
-          clickOsc.stop(audioCtxRef.current.currentTime + 0.05);
-        } catch {
-          // ignore transient click scheduling errors
-        }
-      }, impulsePeriodMs);
+      noiseGainRef.current = noiseGain;
+      bandpassFilterRef.current = bandpass;
 
       setIsPlayingAudio(true);
+      isPlayingAudioRef.current = true;
+
+      // Update parameters immediately to current live state
+      updateAudioParametersOnTheGo();
+
+      // Begin recursive impulse scheduler
+      scheduleNextImpulse();
     } catch {
       setIsPlayingAudio(false);
+      isPlayingAudioRef.current = false;
     }
-  }, [activeProbe.harmonicFreq, audioVolume, defectSlider]);
+  }, [audioVolume, activeProbe.harmonicFreq, stopAudio, updateAudioParametersOnTheGo, scheduleNextImpulse]);
 
-  // Adjust volume dynamically
+  // Update running audio parameters on the fly when defect slider, active probe, or telemetry changes
   useEffect(() => {
-    if (masterGainRef.current && audioCtxRef.current) {
+    if (isPlayingAudio) {
+      updateAudioParametersOnTheGo();
+    }
+  }, [isPlayingAudio, defectSlider, activeProbe, selectedMachine, updateAudioParametersOnTheGo]);
+
+  // Adjust volume dynamically on the fly
+  useEffect(() => {
+    if (masterGainRef.current && audioCtxRef.current && audioCtxRef.current.state !== 'closed') {
       masterGainRef.current.gain.setValueAtTime(audioVolume, audioCtxRef.current.currentTime);
     }
   }, [audioVolume]);
-
-  // Adjust frequencies dynamically when probe changes
-  useEffect(() => {
-    if (carrierOscRef.current && audioCtxRef.current) {
-      carrierOscRef.current.frequency.setValueAtTime(activeProbe.harmonicFreq, audioCtxRef.current.currentTime);
-    }
-    if (harmonicOscRef.current && audioCtxRef.current) {
-      harmonicOscRef.current.frequency.setValueAtTime(activeProbe.harmonicFreq * 2.14, audioCtxRef.current.currentTime);
-    }
-  }, [activeProbe]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -575,11 +690,31 @@ export const AcousticResonanceLab: React.FC<AcousticResonanceLabProps> = ({
           </div>
 
           {/* Defect Severity Injection Simulator Slider */}
-          <div className="p-4 rounded-xl bg-g-surfaceElevated border border-g-border space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-g-text">
-                Simulate Bearing Defect / Raceway Pitting
-              </span>
+          <div className="p-4 rounded-xl bg-g-surfaceElevated border border-g-border space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-g-text">
+                  Bearing Defect / Raceway Pitting
+                </span>
+                {autoSyncTelemetry ? (
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Live Telemetry
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAutoSyncTelemetry(true);
+                      setDefectSlider(activeProbe.defectSeverity);
+                    }}
+                    className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25 transition-colors cursor-pointer"
+                    title="Click to re-sync with live machine telemetry"
+                  >
+                    Manual Mode (Click to sync)
+                  </button>
+                )}
+              </div>
               <span className={`text-xs font-mono font-bold ${defectSlider > 50 ? 'text-rose-400' : 'text-emerald-400'}`}>
                 {defectSlider}% Severity
               </span>
@@ -589,12 +724,21 @@ export const AcousticResonanceLab: React.FC<AcousticResonanceLabProps> = ({
               min="0"
               max="100"
               value={defectSlider}
-              onChange={(e) => setDefectSlider(parseInt(e.target.value))}
+              onChange={(e) => {
+                setAutoSyncTelemetry(false);
+                setDefectSlider(parseInt(e.target.value));
+              }}
               className="w-full h-1.5 accent-cyan-400 cursor-pointer"
             />
-            <p className="text-[10px] text-g-textMuted leading-relaxed">
-              Drag slider to dynamically inject raceway spalling and impact noise into the synthesized audio and FFT spectrum.
-            </p>
+            <div className="flex items-center justify-between text-[10px] text-g-textMuted font-mono">
+              <span>Updates audio in real time on the fly</span>
+              {isPlayingAudio && (
+                <span className="text-cyan-400 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+                  Live Modulating
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
