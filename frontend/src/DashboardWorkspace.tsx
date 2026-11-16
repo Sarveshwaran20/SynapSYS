@@ -81,6 +81,11 @@ const LazyAcousticResonanceLab = lazy(() =>
     default: m.AcousticResonanceLab,
   }))
 );
+const LazyProcessSandboxDeck = lazy(() =>
+  import('./components/dashboard/ProcessSandboxDeck').then((m) => ({
+    default: m.ProcessSandboxDeck,
+  }))
+);
 
 // Initial baseline data for immediate presentation
 const INITIAL_DASHBOARD: DashboardResponse = {
@@ -1880,7 +1885,7 @@ export default function DashboardWorkspace({
   const [data, setData] = useState<DashboardResponse>(() => {
     return getMockDataForSite(currentProject, activeSite?.name, activeSite);
   });
-  const [activeTab, setActiveTab] = useState<'overview' | 'connectors' | 'twin' | 'losses' | 'workorders' | 'alarms' | 'inventory' | 'acoustic_ai'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'connectors' | 'twin' | 'losses' | 'workorders' | 'alarms' | 'inventory' | 'acoustic_ai' | 'sandbox'>('overview');
   const [statusFilter, setStatusFilter] = useState<'all' | 'running' | 'idle' | 'down'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
@@ -2276,6 +2281,10 @@ export default function DashboardWorkspace({
         setActiveTab('alarms');
       } else if (e.key === '7') {
         setActiveTab('inventory');
+      } else if (e.key === '8') {
+        setActiveTab('acoustic_ai');
+      } else if (e.key === '9') {
+        setActiveTab('sandbox');
       } else if (e.key === ' ') {
         e.preventDefault();
         setAutoRefresh((prev) => !prev);
@@ -3522,6 +3531,26 @@ export default function DashboardWorkspace({
         onSelect: () => setActiveTab('inventory'),
       },
       {
+        id: 'nav-acoustic',
+        category: 'Navigation',
+        title: '08 Acoustic AI Twin',
+        subtitle: 'Ultrasonic heterodyne FFT stethoscope for bearing micro-pitting detection',
+        badge: 'Tab 8',
+        badgeTone: 'blue',
+        keywords: 'acoustic sound audio stethoscope ultrasound bearing vibration fft heterodyne',
+        onSelect: () => setActiveTab('acoustic_ai'),
+      },
+      {
+        id: 'nav-sandbox',
+        category: 'Navigation',
+        title: '09 Process Sandbox & What-If Twin',
+        subtitle: 'Prescriptive analytics, Weibull reliability modeling & live chaos fault injection drills',
+        badge: 'Tab 9',
+        badgeTone: 'blue',
+        keywords: 'sandbox what-if scenario prescriptive weibull reliability tool wear chaos fault injection',
+        onSelect: () => setActiveTab('sandbox'),
+      },
+      {
         id: 'view-cards',
         category: 'Navigation',
         title: 'Fleet Cards View',
@@ -4548,6 +4577,13 @@ export default function DashboardWorkspace({
                   label: 'Acoustic AI Twin',
                   subtitle: 'Ultrasonic Stethoscope',
                   badge: 'NEW',
+                },
+                {
+                  id: 'sandbox',
+                  numeral: '09',
+                  label: 'Process Sandbox',
+                  subtitle: 'What-If Twin & Weibull',
+                  badge: 'PRESCRIPTIVE',
                 },
               ].map((tab) => {
                 const isActive = activeTab === tab.id;
@@ -6481,6 +6517,26 @@ export default function DashboardWorkspace({
                     }
                   }}
                   isDarkMode={isDarkMode}
+                />
+              </Suspense>
+            </motion.div>
+          )}
+
+          {/* TAB 9: Process Sandbox & Prescriptive What-If Digital Twin */}
+          {activeTab === 'sandbox' && (
+            <motion.div
+              key="tab-sandbox"
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <Suspense fallback={<ChunkPanelFallback label="Loading Prescriptive Process Sandbox & Weibull Engine..." />}>
+                <LazyProcessSandboxDeck
+                  siteCurrency={siteCurrency}
+                  machines={data.machines}
+                  plantOee={data.summary.overall_plant_oee}
+                  onPushEvent={pushEvent}
                 />
               </Suspense>
             </motion.div>
@@ -8450,6 +8506,20 @@ export default function DashboardWorkspace({
                           <span>Acoustic AI Twin</span>
                         </span>
                         <span className="text-xs font-mono text-purple-400 font-bold">NEW</span>
+                      </button>
+
+                      <button
+                        onClick={() => { setActiveTab('sandbox'); setSidebarOpen(false); }}
+                        className={`w-full px-3 py-2.5 rounded-lg text-left font-medium flex items-center justify-between transition-colors ${activeTab === 'sandbox' ? 'bg-g-blue text-white shadow-sm' : 'text-g-text hover:bg-g-surfaceElevated'
+                          }`}
+                      >
+                        <span className="flex items-center gap-2.5">
+                          <svg className="w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                          </svg>
+                          <span>Process Sandbox</span>
+                        </span>
+                        <span className="text-xs font-mono text-cyan-400 font-bold">TWIN</span>
                       </button>
                     </div>
                   </div>
