@@ -9437,7 +9437,7 @@ export default function DashboardWorkspace({
                 <div className="flex justify-between gap-2">
                   <span className="text-g-textMuted">Persistence Engine:</span>
                   <span className="text-cyan-700 dark:text-cyan-400 font-semibold">
-                    {firebaseStatus.connected ? 'Firebase Firestore Synced' : 'SQLite + Firebase Ready'}
+                    {firebaseStatus.connected ? 'Cloud Synchronized' : 'Local Edge Active'}
                   </span>
                 </div>
                 <div className="flex justify-between gap-2">

@@ -155,7 +155,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
       if (res.delivered) {
         setSuccessMessage(
-          `Security code dispatched to ${res.recipient} via SMTP! Please check your email inbox.`
+          `Security code dispatched to ${res.recipient} via SMTP. Please check your email inbox.`
         );
       } else {
         setSuccessMessage(null);
@@ -165,7 +165,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
       setMode('otp_verify');
     } catch (err) {
       setErrorMessage(
-        err instanceof Error ? err.message : 'Unable to initiate 2FA security registration. Try again.'
+        err instanceof Error ? err.message : 'Unable to initiate security registration. Please try again.'
       );
       triggerCardShake();
     } finally {
@@ -179,7 +179,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
     const fullCode = otpDigits.join('').trim();
     if (fullCode.length < 6) {
-      setErrorMessage('Please enter all 6 digits of the 2FA confirmation code.');
+      setErrorMessage('Please enter all 6 digits of the verification code.');
       triggerOtpShake();
       return;
     }
@@ -194,13 +194,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         role: selectedRole,
       });
 
-      setSuccessMessage('2FA Verified! Provisioning isolated company twin and signing in...');
+      setSuccessMessage('Verification confirmed. Initializing plant workspace...');
       setTimeout(() => {
         onLoginSuccess(session);
       }, 700);
     } catch (err) {
       setErrorMessage(
-        err instanceof Error ? err.message : 'Invalid 2FA verification code. Please check and retry.'
+        err instanceof Error ? err.message : 'Invalid verification code. Please check and retry.'
       );
       triggerOtpShake();
     } finally {
@@ -337,11 +337,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span className="text-g-text font-medium text-xs">SQLite + Firebase Cloud</span>
+            <span className="text-g-text font-medium text-xs">System Operational</span>
           </div>
           <span className="hidden sm:inline text-g-border">|</span>
           <span className="hidden sm:inline text-g-textSecondary font-cinzel font-semibold text-[13px] tracking-wider">
-            2FA Security Engine
+            Enterprise Security
           </span>
           {onToggleTheme && (
             <motion.button
@@ -414,14 +414,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 ? 'Workspace Sign In'
                 : mode === 'signup'
                 ? 'Create Workspace Account'
-                : 'Two-Factor Authentication'}
+                : 'Security Verification'}
             </motion.h1>
             <p className="text-xs text-g-textSecondary mt-1 font-sans">
               {mode === 'signin'
                 ? "Enter your credentials to access your plant's supervisory workspace"
                 : mode === 'signup'
-                ? 'Register your organization with automated 2FA security dispatch'
-                : 'Security verification code for corporate supervisor'}
+                ? 'Register your organization to provision plant workspace'
+                : 'Enter the verification code sent to your authorized supervisor'}
             </p>
 
             {/* Custom Animated Mode Switcher Tabs */}
@@ -466,7 +466,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       transition={{ type: 'spring', stiffness: 420, damping: 32 }}
                     />
                   )}
-                  <span className="relative z-10">Sign Up (2FA)</span>
+                  <span className="relative z-10">Sign Up</span>
                 </button>
               </div>
             )}
@@ -558,10 +558,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 <motion.div variants={formItemVariants}>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-xs font-semibold text-g-textSecondary font-sans">
-                      Enter 6-Digit 2FA Code
+                      Enter 6-Digit Verification Code
                     </label>
                     <span className="text-[10px] font-mono text-silver/80">
-                      Autofill Disabled &bull; Manual Entry Required
+                      Manual Entry Required
                     </span>
                   </div>
                   <motion.div
@@ -611,10 +611,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     {isLoading ? (
                       <>
                         <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
-                        <span>Verifying 2FA Code...</span>
+                        <span>Verifying Code...</span>
                       </>
                     ) : (
-                      <span>Verify &amp; Launch Workspace →</span>
+                      <span>Verify &amp; Access Workspace →</span>
                     )}
                   </motion.button>
                 </motion.div>
@@ -821,7 +821,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   />
                 </motion.div>
 
-                {/* 2FA Dispatch Notice */}
+                {/* Security Verification Notice */}
                 <motion.div
                   variants={formItemVariants}
                   className="p-3 rounded-lg bg-g-surfaceElevated border border-g-border text-g-textSecondary text-xs leading-relaxed font-sans shadow-xs"
@@ -829,7 +829,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   <div className="flex items-start gap-2">
                     <span className="w-2 h-2 rounded-full bg-cyan-400 mt-1.5 shrink-0 animate-pulse" />
                     <span>
-                      <strong className="text-g-text font-cinzel">2FA Supervisor Guard:</strong> Submitting registers your account and dispatches a 6-digit confirmation challenge to supervisor (<span className="text-cyan-400 font-mono">sarveshwaran.k2008@gmail.com</span>).
+                      <strong className="text-g-text font-cinzel">Supervisor Authorization:</strong> Registration creates your profile and dispatches a 6-digit confirmation code to supervisor (<span className="text-cyan-400 font-mono">sarveshwaran.k2008@gmail.com</span>).
                     </span>
                   </div>
                 </motion.div>
@@ -849,10 +849,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                     {isLoading ? (
                       <>
                         <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
-                        <span>Initiating 2FA Security Challenge...</span>
+                        <span>Creating Workspace Account...</span>
                       </>
                     ) : (
-                      <span>Create Account &amp; Send 2FA Code →</span>
+                      <span>Create Account &amp; Continue →</span>
                     )}
                   </motion.button>
                 </motion.div>
@@ -992,7 +992,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
         <div>
           <span className="text-g-text font-medium">SynapSYS Enterprise Manufacturing Platform</span>
           <span className="mx-2 text-g-border">•</span>
-          <span>Google Cloud Firestore + Multi-Tenant 2FA</span>
+          <span>High-Availability Industrial Edge</span>
         </div>
         <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
           <span>ISO-22400 (OEE)</span>
