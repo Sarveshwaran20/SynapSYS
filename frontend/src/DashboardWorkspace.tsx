@@ -90,37 +90,37 @@ const LazyProcessSandboxDeck = lazy(() =>
 // Initial baseline data for immediate presentation
 const INITIAL_DASHBOARD: DashboardResponse = {
   summary: {
-    overall_plant_oee: 89.4,
-    overall_availability: 93.2,
-    overall_performance: 97.5,
-    overall_quality: 98.4,
-    total_output: 184,
-    total_target: 910,
-    total_good: 181,
-    total_scrap: 3,
-    total_machines: 3,
-    running_machines: 2,
-    idle_machines: 1,
+    overall_plant_oee: 88.5,
+    overall_availability: 95.1,
+    overall_performance: 98.6,
+    overall_quality: 98.2,
+    total_output: 898,
+    total_target: 1310,
+    total_good: 882,
+    total_scrap: 16,
+    total_machines: 4,
+    running_machines: 4,
+    idle_machines: 0,
     down_machines: 0,
-    active_alarms_count: 1,
+    active_alarms_count: 0,
     last_updated: new Date().toISOString(),
     takt_time_sec: 12.0,
     mean_line_speed_sec: 12.4,
     shift_name: 'Shift 1 (Day)',
-    shift_elapsed_pct: 68.0,
+    shift_elapsed_pct: 68.5,
     energy: {
-      total_power_kw: 79.3,
-      specific_energy_kwh_per_unit: 0.43,
-      carbon_intensity_gco2_per_unit: 165.5,
-      energy_cost_usd: 69.78,
+      total_power_kw: 90.4,
+      specific_energy_kwh_per_unit: 0.44,
+      carbon_intensity_gco2_per_unit: 162.0,
+      energy_cost_usd: 84.50,
       green_energy_pct: 44.5,
     },
     financial_roi: {
-      revenue_generated_usd: 27880.0,
-      downtime_cost_usd: 435.67,
-      scrap_waste_cost_usd: 135.0,
-      net_shift_value_usd: 27309.33,
-      potential_savings_usd: 390.0,
+      revenue_generated_usd: 74970.0,
+      downtime_cost_usd: 128.50,
+      scrap_waste_cost_usd: 720.0,
+      net_shift_value_usd: 74121.50,
+      potential_savings_usd: 540.0,
       currency_symbol: '$',
       currency_code: 'USD',
       unit_baseline: 85,
@@ -137,27 +137,27 @@ const INITIAL_DASHBOARD: DashboardResponse = {
       timestamp: new Date().toISOString(),
       location: 'Bay 02 - Machining Cell A',
       operator: 'K. Miller [Shift 1]',
-      output_count: 899,
+      output_count: 172,
       target_output: 250,
-      good_count: 871,
-      scrap_count: 28,
-      cycle_time_sec: 12.1,
+      good_count: 168,
+      scrap_count: 4,
+      cycle_time_sec: 12.2,
       ideal_cycle_time_sec: 12.0,
-      uptime_seconds: 10840.0,
-      downtime_seconds: 180.0,
+      uptime_seconds: 2064.0,
+      downtime_seconds: 110.0,
       oee_metrics: {
-        availability: 0.970,
-        performance: 0.922,
-        quality: 0.969,
-        oee: 0.866,
-        oee_percentage: 86.6,
+        availability: 0.949,
+        performance: 0.984,
+        quality: 0.977,
+        oee: 0.912,
+        oee_percentage: 91.2,
         benchmark_status: 'World-Class',
       },
       active_alarm: null,
       alarm_severity: 'None',
       alarm_acknowledged: false,
       alarm_duration_sec: 0,
-      recent_cycle_times: [12.1, 12.3, 11.9, 12.4, 12.0, 12.2, 12.1, 12.1],
+      recent_cycle_times: [12.1, 12.3, 11.9, 12.4, 12.0, 12.2, 12.1, 12.2],
       sensors: {
         temperature_c: 53.7,
         vibration_mm_s: 1.45,
@@ -177,16 +177,16 @@ const INITIAL_DASHBOARD: DashboardResponse = {
         part_name: 'Aerospace Turbine Impeller',
         customer: 'Pratt & Whitney Aerostructures',
         batch_target: 250,
-        batch_completed: 899,
+        batch_completed: 172,
         start_time: '06:00 UTC',
-        estimated_completion: '13:30 UTC',
+        estimated_completion: '14:00 UTC',
       },
       losses: {
-        equipment_failure_sec: 12.0,
-        setup_adjustment_sec: 8.0,
-        idling_minor_stops_sec: 12.0,
-        reduced_speed_sec: 14.4,
-        process_defects_units: 1,
+        equipment_failure_sec: 0.0,
+        setup_adjustment_sec: 10.0,
+        idling_minor_stops_sec: 14.0,
+        reduced_speed_sec: 8.4,
+        process_defects_units: 4,
         startup_rejects_units: 0,
       },
     },
@@ -198,32 +198,32 @@ const INITIAL_DASHBOARD: DashboardResponse = {
       timestamp: new Date().toISOString(),
       location: 'Bay 04 - Polymers Line',
       operator: 'T. Vance [Shift 1]',
-      output_count: 1488,
+      output_count: 342,
       target_output: 500,
-      good_count: 1451,
-      scrap_count: 37,
-      cycle_time_sec: 6.7,
+      good_count: 336,
+      scrap_count: 6,
+      cycle_time_sec: 6.6,
       ideal_cycle_time_sec: 6.5,
-      uptime_seconds: 9940.0,
-      downtime_seconds: 140.0,
+      uptime_seconds: 2223.0,
+      downtime_seconds: 120.0,
       oee_metrics: {
-        availability: 0.973,
-        performance: 0.838,
-        quality: 0.976,
-        oee: 0.797,
-        oee_percentage: 79.7,
-        benchmark_status: 'Acceptable',
+        availability: 0.949,
+        performance: 0.985,
+        quality: 0.982,
+        oee: 0.918,
+        oee_percentage: 91.8,
+        benchmark_status: 'World-Class',
       },
       active_alarm: null,
       alarm_severity: 'None',
       alarm_acknowledged: false,
       alarm_duration_sec: 0,
-      recent_cycle_times: [6.4, 6.7, 6.5, 6.6, 6.5, 6.8, 6.7],
+      recent_cycle_times: [6.4, 6.7, 6.5, 6.6, 6.5, 6.8, 6.6],
       sensors: {
-        temperature_c: 53.3,
-        vibration_mm_s: 1.59,
-        power_kw: 24.4,
-        pressure_bar: 142.0,
+        temperature_c: 68.4,
+        vibration_mm_s: 1.38,
+        power_kw: 36.8,
+        pressure_bar: 142.5,
       },
       predictive: {
         anomaly_score: 16.2,
@@ -238,16 +238,16 @@ const INITIAL_DASHBOARD: DashboardResponse = {
         part_name: 'Automotive Sensor Housing',
         customer: 'Apex Precision Assembly',
         batch_target: 500,
-        batch_completed: 1488,
+        batch_completed: 342,
         start_time: '06:00 UTC',
-        estimated_completion: '12:45 UTC',
+        estimated_completion: '14:00 UTC',
       },
       losses: {
         equipment_failure_sec: 0.0,
-        setup_adjustment_sec: 10.0,
+        setup_adjustment_sec: 8.0,
         idling_minor_stops_sec: 12.0,
-        reduced_speed_sec: 8.4,
-        process_defects_units: 1,
+        reduced_speed_sec: 6.2,
+        process_defects_units: 6,
         startup_rejects_units: 0,
       },
     },
@@ -259,32 +259,32 @@ const INITIAL_DASHBOARD: DashboardResponse = {
       timestamp: new Date().toISOString(),
       location: 'Bay 01 - Fabrication Cell C',
       operator: 'A. Chen [Shift 1]',
-      output_count: 510,
+      output_count: 110,
       target_output: 160,
-      good_count: 504,
-      scrap_count: 6,
-      cycle_time_sec: 16.2,
+      good_count: 108,
+      scrap_count: 2,
+      cycle_time_sec: 18.2,
       ideal_cycle_time_sec: 18.0,
-      uptime_seconds: 8260.0,
+      uptime_seconds: 1980.0,
       downtime_seconds: 90.0,
       oee_metrics: {
-        availability: 0.982,
-        performance: 0.948,
+        availability: 0.957,
+        performance: 0.989,
         quality: 0.982,
-        oee: 0.900,
-        oee_percentage: 90.0,
+        oee: 0.929,
+        oee_percentage: 92.9,
         benchmark_status: 'World-Class',
       },
       active_alarm: null,
       alarm_severity: 'None',
       alarm_acknowledged: false,
       alarm_duration_sec: 0,
-      recent_cycle_times: [16.2, 16.0, 16.3, 16.1, 16.2, 16.4],
+      recent_cycle_times: [18.2, 18.0, 18.3, 18.1, 18.2, 18.4],
       sensors: {
-        temperature_c: 53.1,
-        vibration_mm_s: 1.78,
-        power_kw: 24.5,
-        pressure_bar: 5.8,
+        temperature_c: 42.1,
+        vibration_mm_s: 0.42,
+        power_kw: 15.4,
+        pressure_bar: 5.9,
       },
       predictive: {
         anomaly_score: 18.0,
@@ -299,16 +299,16 @@ const INITIAL_DASHBOARD: DashboardResponse = {
         part_name: 'Structural Chassis Subframe',
         customer: 'Ford EV Platform Group',
         batch_target: 160,
-        batch_completed: 510,
+        batch_completed: 110,
         start_time: '06:00 UTC',
-        estimated_completion: '14:15 UTC',
+        estimated_completion: '14:00 UTC',
       },
       losses: {
         equipment_failure_sec: 0.0,
         setup_adjustment_sec: 12.0,
         idling_minor_stops_sec: 15.0,
         reduced_speed_sec: 5.2,
-        process_defects_units: 1,
+        process_defects_units: 2,
         startup_rejects_units: 0,
       },
     },
@@ -320,18 +320,18 @@ const INITIAL_DASHBOARD: DashboardResponse = {
       timestamp: new Date().toISOString(),
       location: 'Bay 03 - Pack Assembly Cell D',
       operator: 'D. Kowalski [Shift 1]',
-      output_count: 388,
+      output_count: 274,
       target_output: 400,
-      good_count: 382,
-      scrap_count: 6,
+      good_count: 270,
+      scrap_count: 4,
       cycle_time_sec: 8.6,
       ideal_cycle_time_sec: 8.5,
-      uptime_seconds: 3340.0,
-      downtime_seconds: 45.0,
+      uptime_seconds: 2329.0,
+      downtime_seconds: 60.0,
       oee_metrics: {
-        availability: 0.986,
-        performance: 0.978,
-        quality: 0.984,
+        availability: 0.975,
+        performance: 0.988,
+        quality: 0.985,
         oee: 0.949,
         oee_percentage: 94.9,
         benchmark_status: 'World-Class',
@@ -360,7 +360,7 @@ const INITIAL_DASHBOARD: DashboardResponse = {
         part_name: '4680 Cylindrical Battery Cell Module',
         customer: 'Rivian Fleet Systems',
         batch_target: 400,
-        batch_completed: 388,
+        batch_completed: 274,
         start_time: '06:00 UTC',
         estimated_completion: '14:00 UTC',
       },
@@ -369,7 +369,7 @@ const INITIAL_DASHBOARD: DashboardResponse = {
         setup_adjustment_sec: 5.0,
         idling_minor_stops_sec: 8.0,
         reduced_speed_sec: 2.1,
-        process_defects_units: 1,
+        process_defects_units: 4,
         startup_rejects_units: 0,
       },
     },
@@ -436,7 +436,7 @@ const STUTTGART_SITE_DATA: DashboardResponse = {
     overall_performance: 89.1,
     overall_quality: 96.2,
     total_output: 1490,
-    total_target: 1490,
+    total_target: 1850,
     total_good: 1442,
     total_scrap: 48,
     total_machines: 4,
@@ -2828,33 +2828,202 @@ export default function DashboardWorkspace({
     }
   };
 
-  const handleLoadSampleCsv = async () => {
+  const applyParsedCsvToState = (csvText: string, datasetName = 'Authentic Production Shift') => {
+    const lines = csvText.trim().split(/\r?\n/);
+    if (lines.length < 2) return false;
+    const headers = lines[0].split(',').map((h) => h.trim());
+    const rows = lines.slice(1).map((l) => {
+      const vals = l.split(',').map((v) => v.trim());
+      const obj: Record<string, string> = {};
+      headers.forEach((h, i) => { obj[h] = vals[i] || ''; });
+      return obj;
+    });
+
+    const byMachine: Record<string, Record<string, string>> = {};
+    const cycleHistory: Record<string, number[]> = {};
+
+    rows.forEach((r) => {
+      const mId = r.machine_id;
+      if (!mId) return;
+      byMachine[mId] = r;
+      if (!cycleHistory[mId]) cycleHistory[mId] = [];
+      const cyc = parseFloat(r.cycle_time_sec || '0');
+      if (cyc > 0) cycleHistory[mId].push(cyc);
+    });
+
+    const parsedMachineIds = Object.keys(byMachine);
+    if (parsedMachineIds.length === 0) return false;
+
+    setData((prev) => {
+      let totOut = 0;
+      let totTgt = 0;
+      let totGood = 0;
+      let totScrap = 0;
+      let runningC = 0;
+      let idleC = 0;
+      let downC = 0;
+      const alarms: AlarmEvent[] = [];
+
+      const updatedMachines = prev.machines.map((m) => {
+        const row = byMachine[m.machine_id];
+        if (!row) {
+          totOut += m.output_count;
+          totTgt += m.target_output;
+          totGood += m.good_count;
+          totScrap += m.scrap_count;
+          if (m.status === 'Running') runningC++;
+          else if (m.status === 'Idle') idleC++;
+          else downC++;
+          return m;
+        }
+
+        const out = parseInt(row.output_count || String(m.output_count), 10);
+        const tgt = parseInt(row.target_output || String(m.target_output), 10);
+        const scrap = parseInt(row.scrap_count || String(m.scrap_count), 10);
+        const good = parseInt(row.good_count || String(out - scrap), 10);
+        const status = (row.status === 'Down' ? 'Down' : (row.status === 'Idle' ? 'Idle' : 'Running')) as 'Running' | 'Idle' | 'Down';
+        const cyc = parseFloat(row.cycle_time_sec || String(m.cycle_time_sec));
+        const ideal = parseFloat(row.ideal_cycle_time_sec || String(m.ideal_cycle_time_sec));
+        const upS = parseFloat(row.uptime_sec || String(out * ideal));
+        const downS = parseFloat(row.downtime_sec || '0');
+
+        totOut += out;
+        totTgt += tgt;
+        totGood += good;
+        totScrap += scrap;
+        if (status === 'Running') runningC++;
+        else if (status === 'Idle') idleC++;
+        else downC++;
+
+        const avail = (upS + downS) > 0 ? upS / (upS + downS) : 0.95;
+        const perf = upS > 0 ? (ideal * out) / upS : 0.95;
+        const qual = out > 0 ? good / out : 0.98;
+        const oee = Math.min(1.0, avail * perf * qual);
+
+        if (row.active_alarm && row.active_alarm.trim()) {
+          alarms.push({
+            machine_id: m.machine_id,
+            machine_name: m.machine_name,
+            alarm: row.active_alarm,
+            severity: status === 'Down' ? 'Critical' : 'Warning',
+            timestamp: row.timestamp || new Date().toISOString(),
+          });
+        }
+
+        return {
+          ...m,
+          status,
+          output_count: out,
+          target_output: tgt,
+          good_count: good,
+          scrap_count: scrap,
+          cycle_time_sec: cyc,
+          uptime_seconds: upS,
+          downtime_seconds: downS,
+          oee_metrics: {
+            availability: avail,
+            performance: Math.min(1.05, perf),
+            quality: qual,
+            oee,
+            oee_percentage: Math.round(oee * 1000) / 10,
+            benchmark_status: oee >= 0.85 ? ('World-Class' as const) : ('Acceptable' as const),
+          },
+          active_alarm: row.active_alarm || null,
+          alarm_severity: status === 'Down' ? ('Critical' as const) : (row.active_alarm ? ('Warning' as const) : ('None' as const)),
+          recent_cycle_times: cycleHistory[m.machine_id]?.slice(-8) || m.recent_cycle_times,
+          sensors: {
+            temperature_c: parseFloat(row.temp_c || String(m.sensors?.temperature_c || 52)),
+            vibration_mm_s: parseFloat(row.vibration_rms || String(m.sensors?.vibration_mm_s || 1.4)),
+            power_kw: parseFloat(row.power_kw || String(m.sensors?.power_kw || 22)),
+            pressure_bar: parseFloat(row.pressure_bar || String(m.sensors?.pressure_bar || 6.2)),
+          },
+        };
+      });
+
+      const plantOee = updatedMachines.length > 0
+        ? updatedMachines.reduce((acc, m) => acc + (m.oee_metrics?.oee_percentage || 85), 0) / updatedMachines.length
+        : 88.5;
+
+      return {
+        ...prev,
+        machines: updatedMachines,
+        active_alarms: alarms,
+        summary: {
+          ...prev.summary,
+          overall_plant_oee: Math.round(plantOee * 10) / 10,
+          total_output: totOut,
+          total_target: totTgt,
+          total_good: totGood,
+          total_scrap: totScrap,
+          running_machines: runningC,
+          idle_machines: idleC,
+          down_machines: downC,
+          active_alarms_count: alarms.length,
+          data_source_mode: 'dataset_replay',
+        },
+      };
+    });
+
+    pushEvent(`Real-world dataset loaded: ${datasetName} (${rows.length} records parsed)`, 'Telemetry', 'emerald');
+    return true;
+  };
+
+  const handleLoadSampleCsv = async (datasetType: 'master' | 'aerospace' = 'master') => {
     setCsvIsLoading(true);
     setCsvFeedback(null);
-    try {
-      let sampleRes = await fetch('/api/data-source/sample-csv');
-      if (!sampleRes.ok) {
-        sampleRes = await fetch('http://localhost:8000/api/data-source/sample-csv');
-      }
-      const sampleJson = await sampleRes.json();
-      if (!sampleJson.csv_data) throw new Error('Empty CSV data');
+    const datasetLabel = datasetType === 'aerospace'
+      ? 'Aerospace 5-Axis Inconel Machining (241 Records)'
+      : 'Master 8-Hour Multi-Cell Shift (147 Records)';
+    const staticPath = datasetType === 'aerospace'
+      ? '/datasets/aerospace_5axis_cnc_shift.csv'
+      : '/datasets/real_machining_shift_sample.csv';
 
-      let importRes = await fetch('/api/telemetry/import-csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ csv_content: sampleJson.csv_data }),
-      });
-      if (!importRes.ok) {
-        importRes = await fetch('http://localhost:8000/api/telemetry/import-csv', {
+    try {
+      let csvContent = '';
+      try {
+        let sampleRes = await fetch(`/api/data-source/sample-csv?dataset=${datasetType}`);
+        if (!sampleRes.ok) {
+          sampleRes = await fetch(`http://localhost:8000/api/data-source/sample-csv?dataset=${datasetType}`);
+        }
+        if (sampleRes.ok) {
+          const sampleJson = await sampleRes.json();
+          csvContent = sampleJson.csv_data || '';
+        }
+      } catch {
+        // Backend offline, fallback to static public dataset
+      }
+
+      if (!csvContent) {
+        const staticRes = await fetch(staticPath);
+        if (staticRes.ok) {
+          csvContent = await staticRes.text();
+        }
+      }
+
+      if (!csvContent) throw new Error('Could not retrieve dataset from backend or local storage');
+
+      // Try streaming to backend if available
+      try {
+        let importRes = await fetch('/api/telemetry/import-csv', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ csv_content: sampleJson.csv_data }),
+          body: JSON.stringify({ csv_content: csvContent }),
         });
+        if (!importRes.ok) {
+          await fetch('http://localhost:8000/api/telemetry/import-csv', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ csv_content: csvContent }),
+          });
+        }
+      } catch {
+        // Backend offline, client-side parser takes over
       }
-      const importJson = await importRes.json();
+
+      applyParsedCsvToState(csvContent, datasetLabel);
       setCsvFeedback({
         type: 'success',
-        text: `Loaded ${importJson.imported_rows} telemetry records from real shift dataset (${sampleJson.filename}). ISO-22400 OEE & Nakajima metrics recalculated.`,
+        text: `Loaded authentic real-world dataset: ${datasetLabel}. ISO-22400 OEE & telemetry signals synchronized.`,
       });
       fetchDashboardData();
     } catch (err) {
@@ -2869,26 +3038,47 @@ export default function DashboardWorkspace({
     setCsvIsLoading(true);
     setCsvFeedback(null);
     try {
-      let importRes = await fetch('/api/telemetry/import-csv', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ csv_content: content }),
-      });
-      if (!importRes.ok) {
-        importRes = await fetch('http://localhost:8000/api/telemetry/import-csv', {
+      let importedViaBackend = false;
+      try {
+        let importRes = await fetch('/api/telemetry/import-csv', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ csv_content: content }),
         });
+        if (!importRes.ok) {
+          importRes = await fetch('http://localhost:8000/api/telemetry/import-csv', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ csv_content: content }),
+          });
+        }
+        if (importRes.ok) {
+          const importJson = await importRes.json();
+          setCsvFeedback({
+            type: 'success',
+            text: `Successfully ingested ${importJson.imported_rows} telemetry rows into engine state.`,
+          });
+          importedViaBackend = true;
+          fetchDashboardData();
+        }
+      } catch {
+        // Backend offline
       }
-      const importJson = await importRes.json();
-      setCsvFeedback({
-        type: 'success',
-        text: `Successfully parsed and ingested ${importJson.imported_rows} telemetry rows into engine state.`,
-      });
+
+      if (!importedViaBackend) {
+        const success = applyParsedCsvToState(content, 'Custom CSV Import');
+        if (success) {
+          setCsvFeedback({
+            type: 'success',
+            text: 'Successfully parsed and synchronized real-world shift records directly in SCADA state.',
+          });
+        } else {
+          throw new Error('Unable to parse CSV records. Verify machine_id, status, and output_count headers.');
+        }
+      }
+
       setShowCsvModal(false);
       setCustomCsvInput('');
-      fetchDashboardData();
     } catch (err) {
       setCsvFeedback({ type: 'error', text: `CSV Ingestion Error: ${String(err)}` });
     } finally {
@@ -5791,30 +5981,58 @@ export default function DashboardWorkspace({
 
                 {/* Two Ingestion Actions Side-by-Side */}
                 <RevealGroup immediate staggerDelay={0.07} className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {/* 1-Click Load Shift Dataset */}
+                  {/* 1-Click Load Shift Dataset: Master 8-Hour Multi-Cell */}
                   <RevealItem variant="grid" className="flex">
                   <SpotlightCard surface={false} notch={false} className="w-full bg-g-surfaceElevated border border-g-border rounded-xl p-5 flex flex-col justify-between gap-4">
                     <div>
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-semibold text-g-text text-[13px] uppercase font-mono tracking-wider">
-                          Production Shift 1 Dataset Replay
+                          Master 8-Hour Multi-Cell Shift
                         </span>
-                        <span className="text-xs font-mono text-g-textMuted">11 Frames • 3 Assets</span>
+                        <span className="text-xs font-mono text-emerald-400">147 Frames • 3 Cells</span>
                       </div>
                       <p className="text-[13px] text-g-textSecondary mt-2.5 leading-relaxed">
-                        Instant 1-click replay of real machining shift logs containing spindle thermal drift (ALM-E204 on CNC-101), torch nozzle reaming cycle (ALM-W512 on WLD-303), and authentic cycle variance distributions.
+                        Authentic 8-hour operational shift logs across CNC-101, INJ-202, and WLD-303 with realistic thermal ramp curves, planned tool insert rotation, swarf evacuation, and minor stoppages.
                       </p>
                     </div>
                     <MotionButton
                       primary
-                      onClick={handleLoadSampleCsv}
+                      onClick={() => handleLoadSampleCsv('master')}
                       disabled={csvIsLoading}
                       className="w-full py-2.5 rounded-lg bg-g-blue hover:bg-g-blueHover text-white font-semibold text-[13px] font-sans flex items-center justify-center gap-2 transition-all shadow-sm"
                     >
                       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                       </svg>
-                      <span>{csvIsLoading ? 'Ingesting Real Shift Dataset...' : 'Replay Machining Shift Dataset (Shift 1 Log)'}</span>
+                      <span>{csvIsLoading ? 'Ingesting Dataset...' : 'Replay Master Shift (147 Records)'}</span>
+                    </MotionButton>
+                  </SpotlightCard>
+                  </RevealItem>
+
+                  {/* 1-Click Load Aerospace 5-Axis Dataset */}
+                  <RevealItem variant="grid" className="flex">
+                  <SpotlightCard surface={false} notch={false} className="w-full bg-g-surfaceElevated border border-g-border rounded-xl p-5 flex flex-col justify-between gap-4">
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-g-text text-[13px] uppercase font-mono tracking-wider">
+                          Aerospace 5-Axis Inconel Machining
+                        </span>
+                        <span className="text-xs font-mono text-cyan-400">241 Records • CNC-101</span>
+                      </div>
+                      <p className="text-[13px] text-g-textSecondary mt-2.5 leading-relaxed">
+                        High-resolution titanium/inconel turbine blisk milling shift capturing progressive tool wear in microns, spindle torque load, and 3-axis vibration RMS.
+                      </p>
+                    </div>
+                    <MotionButton
+                      primary
+                      onClick={() => handleLoadSampleCsv('aerospace')}
+                      disabled={csvIsLoading}
+                      className="w-full py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-[13px] font-sans flex items-center justify-center gap-2 transition-all shadow-sm"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                      </svg>
+                      <span>{csvIsLoading ? 'Ingesting Dataset...' : 'Replay Aerospace Shift (241 Records)'}</span>
                     </MotionButton>
                   </SpotlightCard>
                   </RevealItem>
@@ -6695,33 +6913,69 @@ export default function DashboardWorkspace({
                 />
               </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-g-border">
-                <button
-                  onClick={async () => {
-                    try {
-                      let res = await fetch('/api/data-source/sample-csv');
-                      if (!res.ok) res = await fetch('http://localhost:8000/api/data-source/sample-csv');
-                      const json = await res.json();
-                      if (json.csv_data) setCustomCsvInput(json.csv_data);
-                    } catch (e) {
-                      console.error(e);
-                    }
-                  }}
-                  className="text-g-blue hover:text-g-blueHover text-xs font-mono cursor-pointer"
-                >
-                  Pre-fill with Shift 1 Sample
-                </button>
-                <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-g-border">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] text-g-textMuted font-sans">Pre-fill Real Dataset:</span>
                   <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        let res = await fetch('/api/data-source/sample-csv?dataset=master');
+                        if (!res.ok) res = await fetch('http://localhost:8000/api/data-source/sample-csv?dataset=master');
+                        let text = '';
+                        if (res.ok) {
+                          const json = await res.json();
+                          text = json.csv_data;
+                        } else {
+                          const staticRes = await fetch('/datasets/real_machining_shift_sample.csv');
+                          if (staticRes.ok) text = await staticRes.text();
+                        }
+                        if (text) setCustomCsvInput(text);
+                      } catch (e) {
+                        console.error(e);
+                      }
+                    }}
+                    className="px-2.5 py-1 rounded bg-g-surfaceElevated hover:bg-g-surfaceSubtle border border-g-border text-g-blue text-[11px] font-mono cursor-pointer transition-colors"
+                  >
+                    Master Shift (147 Records)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        let res = await fetch('/api/data-source/sample-csv?dataset=aerospace');
+                        if (!res.ok) res = await fetch('http://localhost:8000/api/data-source/sample-csv?dataset=aerospace');
+                        let text = '';
+                        if (res.ok) {
+                          const json = await res.json();
+                          text = json.csv_data;
+                        } else {
+                          const staticRes = await fetch('/datasets/aerospace_5axis_cnc_shift.csv');
+                          if (staticRes.ok) text = await staticRes.text();
+                        }
+                        if (text) setCustomCsvInput(text);
+                      } catch (e) {
+                        console.error(e);
+                      }
+                    }}
+                    className="px-2.5 py-1 rounded bg-g-surfaceElevated hover:bg-g-surfaceSubtle border border-g-border text-cyan-400 text-[11px] font-mono cursor-pointer transition-colors"
+                  >
+                    Aerospace Impeller (241 Records)
+                  </button>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
                     onClick={() => setShowCsvModal(false)}
-                    className="px-3 py-1.5 rounded bg-g-surfaceElevated hover:bg-g-surfaceSubtle border border-g-border text-g-text font-medium cursor-pointer"
+                    className="px-3 py-1.5 rounded bg-g-surfaceElevated hover:bg-g-surfaceSubtle border border-g-border text-g-text font-medium cursor-pointer text-xs"
                   >
                     Cancel
                   </button>
                   <button
+                    type="button"
                     onClick={() => handleImportCustomCsv(customCsvInput)}
                     disabled={csvIsLoading || !customCsvInput.trim()}
-                    className="px-4 py-1.5 rounded bg-g-blue hover:bg-g-blueHover disabled:opacity-50 text-white font-medium cursor-pointer"
+                    className="px-4 py-1.5 rounded bg-g-blue hover:bg-g-blueHover disabled:opacity-50 text-white font-medium cursor-pointer text-xs shadow-sm"
                   >
                     {csvIsLoading ? 'Parsing...' : 'Ingest & Recalculate OEE'}
                   </button>

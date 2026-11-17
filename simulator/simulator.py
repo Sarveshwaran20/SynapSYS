@@ -268,7 +268,120 @@ def format_status(status: str) -> str:
         return f"{COLOR_YELLOW}{COLOR_BOLD}■ IDLE   {COLOR_RESET}"
 
 
+def replay_real_world_csv(csv_path: str, cadence_sec: float = 1.5):
+    """
+    Replays an authentic real-world manufacturing shift CSV file row-by-row into FastAPI.
+    Dynamically maps timestamps to current time for live streaming.
+    """
+    import csv
+    if not os.path.exists(csv_path):
+        print(f"{COLOR_RED}Error: Dataset not found at {csv_path}{COLOR_RESET}")
+        return
+
+    with open(csv_path, "r", encoding="utf-8") as f:
+        reader = list(csv.DictReader(f))
+
+    print(f"\n{COLOR_CYAN}{COLOR_BOLD}{'='*75}{COLOR_RESET}")
+    print(f"{COLOR_CYAN}{COLOR_BOLD} SynapSYS Real-World Shift Telemetry Replay Engine{COLOR_RESET}")
+    print(f" Source Dataset: {COLOR_BOLD}{os.path.basename(csv_path)}{COLOR_RESET} ({len(reader)} records)")
+    print(f" Ingestion Target: {COLOR_BOLD}{BACKEND_URL}{COLOR_RESET}")
+    print(f" Streaming Cadence: {cadence_sec}s per telemetry frame")
+    print(f"{COLOR_CYAN}{COLOR_BOLD}{'='*75}{COLOR_RESET}\n")
+
+    frame_idx = 0
+    try:
+        while True:
+            for row in reader:
+                frame_idx += 1
+                now_str = datetime.now().strftime("%H:%M:%S")
+                m_id = row["machine_id"].strip()
+                status = row.get("status", "Running").strip()
+                output_c = int(row.get("output_count", 0))
+                target_o = int(row.get("target_output", 250))
+                good_c = int(row.get("good_count", output_c))
+                scrap_c = int(row.get("scrap_count", 0))
+                cycle_t = float(row.get("cycle_time_sec", 12.0))
+                ideal_t = float(row.get("ideal_cycle_time_sec", 12.0))
+                uptime_s = float(row.get("uptime_sec", output_c * ideal_t))
+                downtime_s = float(row.get("downtime_sec", 0.0))
+                active_alm = row.get("active_alarm") or None
+                alm_code = row.get("alarm_code") or None
+
+                payload = {
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "machine_id": m_id,
+                    "machine_name": row.get("machine_name", m_id),
+                    "location": "Bay 02 • Machining Cell A" if "CNC" in m_id else ("Bay 04 • Polymers Line" if "INJ" in m_id else "Bay 01 • Fabrication"),
+                    "operator": "K. Miller [Shift 1]" if "CNC" in m_id else ("T. Vance [Shift 1]" if "INJ" in m_id else "A. Chen [Shift 1]"),
+                    "status": status,
+                    "output_count": output_c,
+                    "target_output": target_o,
+                    "good_count": good_c,
+                    "scrap_count": scrap_c,
+                    "cycle_time_sec": cycle_t,
+                    "ideal_cycle_time_sec": ideal_t,
+                    "uptime_seconds": uptime_s,
+                    "downtime_seconds": downtime_s,
+                    "active_alarm": active_alm,
+                    "alarm_severity": "Critical" if status == "Down" else ("Warning" if active_alm else "None"),
+                    "alarm_code": alm_code,
+                    "sensors": {
+                        "temperature_c": float(row.get("temp_c", 52.0)),
+                        "vibration_mm_s": float(row.get("vibration_rms", 1.5)),
+                        "power_kw": float(row.get("power_kw", 22.0)),
+                        "pressure_bar": float(row.get("pressure_bar", 6.2)) if row.get("pressure_bar") else 6.2,
+                    },
+                }
+
+                status_colored = format_status(status)
+                sensors = payload["sensors"]
+                sensor_str = f" | {sensors['temperature_c']}°C | {sensors['power_kw']}kW | {sensors['vibration_mm_s']}mm/s"
+                alarm_str = f" | {COLOR_RED}FAULT: {active_alm} ({alm_code}){COLOR_RESET}" if active_alm else ""
+
+                try:
+                    http_code = post_telemetry(BACKEND_URL, payload, timeout=2.5)
+                    code_color = COLOR_GREEN if http_code == 201 else COLOR_YELLOW
+                    print(
+                        f"[{now_str}] Frame #{frame_idx:>4} [{code_color}{http_code}{COLOR_RESET}] {COLOR_BOLD}{m_id:<8}{COLOR_RESET} "
+                        f"{status_colored} | Output: {output_c:>3}/{target_o} "
+                        f"| Cycle: {cycle_t:>4.1f}s{sensor_str}{alarm_str}"
+                    )
+                except NetworkError as exc:
+                    print(
+                        f"[{now_str}] Frame #{frame_idx:>4} [{COLOR_RED}FAIL{COLOR_RESET}] {COLOR_BOLD}{m_id:<8}{COLOR_RESET} "
+                        f"Backend unreachable at {BACKEND_URL} ({type(exc).__name__})"
+                    )
+
+                time.sleep(cadence_sec)
+
+    except KeyboardInterrupt:
+        print(f"\n{COLOR_YELLOW}[!] Shift replay stopped gracefully.{COLOR_RESET}\n")
+        sys.exit(0)
+
+
 def main():
+    # Check if replay mode requested via command line or env
+    is_replay = "--replay" in sys.argv or os.environ.get("REPLAY_CSV", "").lower() in ("1", "true")
+    csv_file = None
+    if is_replay:
+        for idx, arg in enumerate(sys.argv):
+            if arg == "--replay" and idx + 1 < len(sys.argv) and not sys.argv[idx + 1].startswith("--"):
+                csv_file = sys.argv[idx + 1]
+                break
+        if not csv_file:
+            # Default to authentic shift sample
+            cand_paths = [
+                os.path.join(os.path.dirname(__file__), "..", "backend", "data", "real_machining_shift_sample.csv"),
+                os.path.join(os.path.dirname(__file__), "data", "real_machining_shift_sample.csv"),
+            ]
+            for p in cand_paths:
+                if os.path.exists(p):
+                    csv_file = p
+                    break
+
+        if csv_file and os.path.exists(csv_file):
+            replay_real_world_csv(csv_file)
+            return
     print(f"\n{COLOR_CYAN}{COLOR_BOLD}{'='*75}{COLOR_RESET}")
     print(f"{COLOR_CYAN}{COLOR_BOLD} SynapSYS Enterprise IIoT Simulator (3 Discrete Production Assets){COLOR_RESET}")
     print(f" Ingestion Target: {COLOR_BOLD}{BACKEND_URL}{COLOR_RESET}")

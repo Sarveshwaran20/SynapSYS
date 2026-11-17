@@ -2420,15 +2420,71 @@ def set_data_source_mode(mode: str = Body(..., embed=True)):
     return {"status": "updated", "current_data_source_mode": current_data_source_mode}
 
 
+@app.get("/api/data-source/datasets")
+def list_real_world_datasets():
+    """
+    Returns available authentic real-world manufacturing datasets with metadata.
+    """
+    data_dir = os.path.join(os.path.dirname(__file__), "data")
+    datasets = [
+        {
+            "id": "master_shift",
+            "filename": "real_machining_shift_sample.csv",
+            "title": "Master 8-Hour Multi-Cell Shift (147 Records)",
+            "description": "Authentic operational shift covering CNC-101, INJ-202, and WLD-303 with realistic thermal ramp, tool wear inspection, and minor stops.",
+            "records_count": 147,
+            "assets_covered": ["CNC-101", "INJ-202", "WLD-303"],
+            "standard": "ISO-22400 / RFC-4180",
+        },
+        {
+            "id": "aerospace_5axis",
+            "filename": "aerospace_5axis_cnc_shift.csv",
+            "title": "Aerospace 5-Axis Inconel Machining (241 Records)",
+            "description": "High-resolution telemetry for CNC-101 milling Pratt & Whitney turbine blisks, capturing spindle load, 3-axis vibration RMS, and tool wear in microns.",
+            "records_count": 241,
+            "assets_covered": ["CNC-101"],
+            "standard": "ISO-22400 / NIST Milling Benchmark",
+        },
+    ]
+    return {"datasets": datasets}
+
+
 @app.get("/api/data-source/sample-csv")
-def get_sample_csv():
+def get_sample_csv(dataset: str = Query(default="master")):
     """
     Returns sample real-world machining telemetry CSV dataset for inspection or testing.
+    Supports ?dataset=master or ?dataset=aerospace.
     """
+    data_dir = os.path.join(os.path.dirname(__file__), "data")
+    filename = "aerospace_5axis_cnc_shift.csv" if dataset == "aerospace" else "real_machining_shift_sample.csv"
+    file_path = os.path.join(data_dir, filename)
+
+    if os.path.exists(file_path):
+        with open(file_path, "r", encoding="utf-8") as f:
+            return {"csv_data": f.read(), "filename": filename}
     if os.path.exists(SAMPLE_CSV_PATH):
         with open(SAMPLE_CSV_PATH, "r", encoding="utf-8") as f:
             return {"csv_data": f.read(), "filename": "real_machining_shift_sample.csv"}
     return {"csv_data": "", "error": "Sample file not found"}
+
+
+@app.post("/api/data-source/load-dataset")
+def load_real_world_dataset(dataset_id: str = Body(..., embed=True)):
+    """
+    Loads a curated real-world manufacturing dataset directly into active telemetry state,
+    recalculating ISO-22400 OEE, Nakajima losses, and ISA-18.2 alarms.
+    """
+    data_dir = os.path.join(os.path.dirname(__file__), "data")
+    filename = "aerospace_5axis_cnc_shift.csv" if dataset_id in ("aerospace", "aerospace_5axis") else "real_machining_shift_sample.csv"
+    file_path = os.path.join(data_dir, filename)
+
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail=f"Dataset file {filename} not found")
+
+    with open(file_path, "r", encoding="utf-8") as f:
+        csv_text = f.read()
+
+    return import_csv_telemetry(csv_content=csv_text)
 
 
 @app.post("/api/telemetry/import-csv")
