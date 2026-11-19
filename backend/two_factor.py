@@ -10,9 +10,11 @@ from email.mime.text import MIMEText
 import logging
 import os
 import random
+import secrets
+import hmac
 import smtplib
 import time
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Any
 
 try:
     from dotenv import load_dotenv
@@ -27,13 +29,13 @@ logger = logging.getLogger("synapsys.two_factor")
 # Primary security recipient (customized per user preference)
 DESIGNATED_SECURITY_EMAIL = os.getenv("SECURITY_ALERT_EMAIL", "sarveshwaran.k2008@gmail.com")
 
-# Temporary store: email -> (otp_code, expires_at_timestamp, user_data_dict)
-_PENDING_REGISTRATIONS: Dict[str, Tuple[str, float, dict]] = {}
+# Temporary store: email -> dict with otp, expires_at, candidate_data, attempts_remaining
+_PENDING_REGISTRATIONS: Dict[str, dict] = {}
 
 
 def generate_otp() -> str:
-    """Generates a secure 6-digit verification code."""
-    return f"{random.randint(100000, 999999)}"
+    """Generates a cryptographically secure 6-digit verification code using CSPRNG."""
+    return f"{secrets.randbelow(900000) + 100000}"
 
 
 def send_security_alert_email(
@@ -184,7 +186,12 @@ def initiate_2fa_signup(candidate_data: dict) -> Tuple[str, str, dict]:
     otp = generate_otp()
     expires_at = time.time() + 600.0  # 10 minutes
 
-    _PENDING_REGISTRATIONS[email] = (otp, expires_at, candidate_data)
+    _PENDING_REGISTRATIONS[email] = {
+        "otp": otp,
+        "expires_at": expires_at,
+        "candidate_data": candidate_data,
+        "attempts_remaining": 5,
+    }
 
     delivery_info = send_security_alert_email(
         candidate_name=candidate_data.get("full_name") or "Authorized User",
@@ -198,9 +205,8 @@ def initiate_2fa_signup(candidate_data: dict) -> Tuple[str, str, dict]:
 
 def verify_2fa_code(email: str, provided_otp: str) -> Optional[dict]:
     """
-    Validates provided OTP for the email.
-    If valid and unexpired, returns candidate_data and clears the pending registration.
-    Also accepts standard sandbox passcode 123456 during development.
+    Validates provided OTP for the email using constant-time comparison.
+    Limits to 5 attempts per challenge to prevent brute-force attacks.
     """
     clean_email = email.strip().lower()
     clean_otp = provided_otp.strip()
@@ -209,15 +215,21 @@ def verify_2fa_code(email: str, provided_otp: str) -> Optional[dict]:
     if not entry:
         return None
 
-    expected_otp, expires_at, candidate_data = entry
-
-    if time.time() > expires_at:
+    if time.time() > entry["expires_at"]:
         _PENDING_REGISTRATIONS.pop(clean_email, None)
         return None
 
-    if clean_otp == expected_otp or clean_otp == "123456":
+    entry["attempts_remaining"] -= 1
+    if entry["attempts_remaining"] < 0:
         _PENDING_REGISTRATIONS.pop(clean_email, None)
-        return candidate_data
+        return None
+
+    if hmac.compare_digest(clean_otp, entry["otp"]):
+        _PENDING_REGISTRATIONS.pop(clean_email, None)
+        return entry["candidate_data"]
+
+    if entry["attempts_remaining"] <= 0:
+        _PENDING_REGISTRATIONS.pop(clean_email, None)
 
     return None
 
@@ -225,7 +237,7 @@ def verify_2fa_code(email: str, provided_otp: str) -> Optional[dict]:
 # ---------------------------------------------------------------------------
 # Procurement Purchase Order 2FA Authorization Engine
 # ---------------------------------------------------------------------------
-_PENDING_PO_AUTHORIZATIONS: Dict[str, Tuple[str, float, dict]] = {}
+_PENDING_PO_AUTHORIZATIONS: Dict[str, dict] = {}
 
 
 def send_po_security_alert_email(
@@ -408,7 +420,12 @@ def initiate_po_authorization_2fa(po_draft: dict) -> Tuple[str, str, dict]:
     otp = generate_otp()
     expires_at = time.time() + 600.0  # 10 minutes
 
-    _PENDING_PO_AUTHORIZATIONS[auth_token] = (otp, expires_at, po_draft)
+    _PENDING_PO_AUTHORIZATIONS[auth_token] = {
+        "otp": otp,
+        "expires_at": expires_at,
+        "po_draft": po_draft,
+        "attempts_remaining": 5,
+    }
 
     delivery_info = send_po_security_alert_email(
         po_draft=po_draft,
@@ -421,8 +438,7 @@ def initiate_po_authorization_2fa(po_draft: dict) -> Tuple[str, str, dict]:
 def verify_po_authorization_2fa(auth_token: str, provided_otp: str) -> Optional[dict]:
     """
     Validates the 2FA code for a pending purchase order authorization.
-    Returns the po_draft if valid, or None if invalid/expired.
-    Also accepts sandbox passcode 123456.
+    Returns the po_draft if valid, or None if invalid/expired/exhausted.
     """
     clean_token = auth_token.strip()
     clean_otp = provided_otp.strip()
@@ -431,14 +447,20 @@ def verify_po_authorization_2fa(auth_token: str, provided_otp: str) -> Optional[
     if not entry:
         return None
 
-    expected_otp, expires_at, po_draft = entry
-
-    if time.time() > expires_at:
+    if time.time() > entry["expires_at"]:
         _PENDING_PO_AUTHORIZATIONS.pop(clean_token, None)
         return None
 
-    if clean_otp == expected_otp or clean_otp == "123456":
+    entry["attempts_remaining"] -= 1
+    if entry["attempts_remaining"] < 0:
         _PENDING_PO_AUTHORIZATIONS.pop(clean_token, None)
-        return po_draft
+        return None
+
+    if hmac.compare_digest(clean_otp, entry["otp"]):
+        _PENDING_PO_AUTHORIZATIONS.pop(clean_token, None)
+        return entry["po_draft"]
+
+    if entry["attempts_remaining"] <= 0:
+        _PENDING_PO_AUTHORIZATIONS.pop(clean_token, None)
 
     return None

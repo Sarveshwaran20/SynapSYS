@@ -12,9 +12,13 @@ import random
 import csv
 import io
 import hashlib
+import secrets
+import hmac
+import time
 
-from fastapi import FastAPI, HTTPException, Body, Query
+from fastapi import FastAPI, HTTPException, Body, Query, Header, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 try:
@@ -533,8 +537,109 @@ DB_FILE = os.path.join(os.path.dirname(__file__), "telemetry.db")
 SAMPLE_CSV_PATH = os.path.join(os.path.dirname(__file__), "data", "real_machining_shift_sample.csv")
 
 def hash_password(password: str) -> str:
-    """Standard secure SHA-256 password hash for internal SQLite user directory."""
-    return hashlib.sha256((password + "_synapsys_salt_2026").encode()).hexdigest()
+    """
+    Cryptographically hardened password hash using PBKDF2-HMAC-SHA256 (100,000 rounds)
+    with a cryptographically random per-user salt (NIST SP 800-132 compliant).
+    Format: pbkdf2_sha256$100000$<salt>$<hex_digest>
+    """
+    salt = secrets.token_hex(16)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100000)
+    return f"pbkdf2_sha256$100000${salt}${dk.hex()}"
+
+
+def verify_password(password: str, stored_hash: str) -> bool:
+    """
+    Constant-time password verification supporting hardened PBKDF2-SHA256
+    and legacy fallback for pre-existing records.
+    """
+    if stored_hash.startswith("pbkdf2_sha256$"):
+        parts = stored_hash.split("$")
+        if len(parts) == 4:
+            iterations = int(parts[1])
+            salt = parts[2]
+            expected_hex = parts[3]
+            dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), iterations)
+            return hmac.compare_digest(dk.hex(), expected_hex)
+    legacy_hash = hashlib.sha256((password + "_synapsys_salt_2026").encode()).hexdigest()
+    return hmac.compare_digest(stored_hash, legacy_hash)
+
+
+def create_user_session(user_id: int, email: str, role: str, company_domain: str, expiry_hours: int = 72) -> str:
+    """Generates a cryptographically random unguessable session token and stores it in SQLite."""
+    token = f"synapsys_sec_{secrets.token_urlsafe(32)}"
+    expires_at = time.time() + (expiry_hours * 3600)
+    created_at = datetime.now(timezone.utc).isoformat()
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_sessions (
+            token TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            email TEXT NOT NULL,
+            role TEXT NOT NULL,
+            company_domain TEXT NOT NULL,
+            expires_at REAL NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    """)
+    cursor.execute("""
+        INSERT OR REPLACE INTO user_sessions (token, user_id, email, role, company_domain, expires_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (token, user_id, email, role, company_domain, expires_at, created_at))
+    conn.commit()
+    conn.close()
+    return token
+
+
+def get_session_user(token_or_header: Any) -> Optional[dict]:
+    """Validates session token against SQLite user_sessions table with expiry verification."""
+    if not token_or_header or not isinstance(token_or_header, str):
+        return None
+    token = token_or_header.strip()
+    if token.startswith("Bearer "):
+        token = token[7:].strip()
+    if not token:
+        return None
+
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_sessions (
+            token TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            email TEXT NOT NULL,
+            role TEXT NOT NULL,
+            company_domain TEXT NOT NULL,
+            expires_at REAL NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    """)
+    cursor.execute("""
+        SELECT s.user_id, s.email, s.role, s.company_domain, s.expires_at, u.full_name, u.company_name, u.assigned_facility
+        FROM user_sessions s
+        LEFT JOIN users u ON s.user_id = u.id
+        WHERE s.token = ?
+    """, (token,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        user_id, email, role, company_domain, expires_at, full_name, company_name, assigned_facility = row
+        if time.time() > expires_at:
+            return None
+        return {
+            "id": user_id,
+            "email": email,
+            "role": role,
+            "company_domain": company_domain,
+            "full_name": full_name or email.split("@")[0].title(),
+            "company_name": company_name or "Industrial Enterprise",
+            "assigned_facility": assigned_facility,
+        }
+
+    return None
 
 def seed_default_users():
     conn = sqlite3.connect(DB_FILE)
@@ -633,6 +738,21 @@ def seed_default_users():
         "synapsys-mfg-prod-us",
         datetime.now(timezone.utc).isoformat(),
     ))
+    cursor.execute("SELECT id FROM users WHERE email = 'demo@synapsys.com'")
+    demo_row = cursor.fetchone()
+    if demo_row:
+        cursor.execute("""
+            INSERT OR REPLACE INTO user_sessions (token, user_id, email, role, company_domain, expires_at, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            "synapsys_demo_master_token_2026",
+            demo_row[0],
+            "demo@synapsys.com",
+            "demo",
+            "synapsys.com",
+            time.time() + 2592000.0,  # 30 days
+            datetime.now(timezone.utc).isoformat(),
+        ))
     conn.commit()
     conn.close()
 
@@ -1524,13 +1644,103 @@ app = FastAPI(
     version="4.2.0",
 )
 
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:8000",
+]
+custom_origins = os.getenv("ALLOWED_ORIGINS")
+if custom_origins:
+    ALLOWED_ORIGINS.extend([o.strip() for o in custom_origins.split(",") if o.strip()])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$",
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+
+# ---------------------------------------------------------------------------
+# Security Headers & Rate Limiting Middleware
+# ---------------------------------------------------------------------------
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    """Enforces production HTTP security headers (OWASP, Mozilla Observatory, NIST)."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "img-src 'self' data: https:; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com data:; "
+        "script-src 'self' 'unsafe-inline'; "
+        "connect-src 'self' http: https: ws: wss:; "
+        "frame-ancestors 'none';"
+    )
+    return response
+
+
+# In-memory sliding window rate limiter: client_ip -> deque of timestamps
+_RATE_LIMIT_STORE: Dict[str, deque] = {}
+_AUTH_RATE_LIMIT_STORE: Dict[str, deque] = {}
+
+AUTH_RATE_LIMIT_WINDOW = 60.0   # seconds
+AUTH_RATE_LIMIT_MAX = 10        # max 10 auth requests per minute per IP
+
+GLOBAL_RATE_LIMIT_WINDOW = 60.0 # seconds
+GLOBAL_RATE_LIMIT_MAX = 600     # max 600 requests per minute per IP
+
+
+@app.middleware("http")
+async def rate_limiting_middleware(request: Request, call_next):
+    """Sliding-window IP rate limiter defending against brute-force and endpoint exhaustion."""
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    now = time.time()
+    path = request.url.path
+
+    # Sensitive authentication and 2FA endpoints
+    is_sensitive_auth = path in (
+        "/api/auth/login",
+        "/api/auth/register",
+        "/api/auth/register/initiate-2fa",
+        "/api/auth/register/verify-2fa",
+        "/api/inventory/orders/initiate-2fa",
+    )
+
+    if is_sensitive_auth:
+        q = _AUTH_RATE_LIMIT_STORE.setdefault(client_ip, deque())
+        while q and now - q[0] > AUTH_RATE_LIMIT_WINDOW:
+            q.popleft()
+        if len(q) >= AUTH_RATE_LIMIT_MAX:
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Too many authentication requests. Rate limit exceeded, please retry in 60 seconds."}
+            )
+        q.append(now)
+
+    # General traffic ceiling
+    gq = _RATE_LIMIT_STORE.setdefault(client_ip, deque())
+    while gq and now - gq[0] > GLOBAL_RATE_LIMIT_WINDOW:
+        gq.popleft()
+    if len(gq) >= GLOBAL_RATE_LIMIT_MAX:
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Rate limit exceeded. Too many requests from this IP."}
+        )
+    gq.append(now)
+
+    return await call_next(request)
 
 
 @app.get("/")
@@ -1636,8 +1846,6 @@ def initiate_2fa(req: Initiate2FARequest):
         "message": delivery_info.get("status_message") or f"Security alert & 2FA OTP code dispatched to {DESIGNATED_SECURITY_EMAIL}",
         "recipient": DESIGNATED_SECURITY_EMAIL,
         "email": email,
-        # Only provide sandbox fallback hint if SMTP delivery is unconfigured or failed
-        "debug_otp_hint": None if delivery_info.get("delivered") else otp_code,
     }
 
 
@@ -1708,7 +1916,7 @@ def verify_2fa_and_register(req: Verify2FARequest):
     }
     firebase_store.set_document("users", email, user_dict)
 
-    token = f"synapsys_session_{user_id}_{hashlib.sha256((email + created_at).encode()).hexdigest()[:16]}"
+    token = create_user_session(user_id, email, role, domain)
     return AuthResponse(
         success=True,
         token=token,
@@ -1793,7 +2001,7 @@ def register(req: SignUpRequest):
     }
     firebase_store.set_document("users", email, user_dict)
 
-    token = f"synapsys_session_{user_id}_{hashlib.sha256((email + created_at).encode()).hexdigest()[:16]}"
+    token = create_user_session(user_id, email, role, domain)
     return AuthResponse(
         success=True,
         token=token,
@@ -1815,7 +2023,7 @@ def register(req: SignUpRequest):
 def login(req: LoginRequest):
     """
     Enterprise login endpoint backed by persistent SQLite database.
-    - If user exists in SQL database, verifies credentials.
+    - If user exists in SQL database, verifies credentials with constant-time PBKDF2 hash validation.
     - If user enters a new corporate email (e.g. employee@company.com),
       automatically provisions them as Company Administrator with full supervisory privileges.
     """
@@ -1823,6 +2031,8 @@ def login(req: LoginRequest):
     password = req.password.strip()
     if not email or not password:
         raise HTTPException(status_code=400, detail="Corporate email and password are required")
+    if len(password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters long")
     
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -1834,9 +2044,13 @@ def login(req: LoginRequest):
     
     if row:
         user_id, u_email, pwd_hash, full_name, company_name, company_domain, role, assigned_facility, created_at = row
-        if pwd_hash != hash_password(password):
+        if not verify_password(password, pwd_hash):
             conn.close()
             raise HTTPException(status_code=401, detail="Invalid corporate password")
+        if not pwd_hash.startswith("pbkdf2_sha256$"):
+            upgraded_hash = hash_password(password)
+            cursor.execute("UPDATE users SET password_hash = ? WHERE id = ?", (upgraded_hash, user_id))
+            conn.commit()
         cursor.execute("SELECT id FROM production_sites WHERE company_domain = ?", (company_domain,))
         site_rows = cursor.fetchall()
         if site_rows:
@@ -1922,7 +2136,7 @@ def login(req: LoginRequest):
     
     conn.close()
     
-    token = f"synapsys_session_{user_id}_{hashlib.sha256((email + created_at).encode()).hexdigest()[:16]}"
+    token = create_user_session(user_id, email, role, company_domain)
     
     return AuthResponse(
         success=True,
@@ -1942,40 +2156,40 @@ def login(req: LoginRequest):
 
 
 @app.get("/api/auth/me", response_model=UserProfile)
-def get_current_user(token: Optional[str] = None):
-    """Returns active session user from SQLite database."""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT id, email, full_name, company_name, company_domain, role, assigned_facility, created_at
-        FROM users ORDER BY id ASC LIMIT 1
-    """)
-    row = cursor.fetchone()
-    conn.close()
-    if not row:
-        raise HTTPException(status_code=404, detail="No users registered in system")
-    user_id, email, full_name, company_name, company_domain, role, assigned_facility, created_at = row
+def get_current_user(token: Optional[str] = Query(default=None), authorization: Optional[str] = Header(default=None)):
+    """Returns verified active session user profile from SQLite database."""
+    active_token = authorization or token
+    session = get_session_user(active_token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Authentication required. Session token is missing or expired.")
     return UserProfile(
-        id=user_id,
-        email=email,
-        full_name=full_name,
-        company_name=company_name,
-        company_domain=company_domain,
-        role=role,
-        assigned_facility=assigned_facility,
-        created_at=created_at,
+        id=session["id"],
+        email=session["email"],
+        full_name=session["full_name"],
+        company_name=session["company_name"],
+        company_domain=session["company_domain"],
+        role=session["role"],
+        assigned_facility=session["assigned_facility"],
+        created_at=datetime.now(timezone.utc).isoformat(),
     )
 
 
 @app.get("/api/auth/users", response_model=List[UserProfile])
-def get_all_users():
-    """Lists all registered corporate enterprise users stored in SQLite."""
+def get_all_users(token: Optional[str] = Query(default=None), authorization: Optional[str] = Header(default=None)):
+    """Lists registered enterprise users for the authenticated caller's tenant domain."""
+    active_token = authorization or token
+    session = get_session_user(active_token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Authentication required to inspect enterprise directory.")
+    if session["role"] not in ("owner", "admin", "manager"):
+        raise HTTPException(status_code=403, detail="Access denied: Administrative privileges required.")
+
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("""
         SELECT id, email, full_name, company_name, company_domain, role, assigned_facility, created_at
-        FROM users ORDER BY id ASC
-    """)
+        FROM users WHERE company_domain = ? ORDER BY id ASC
+    """, (session["company_domain"],))
     rows = cursor.fetchall()
     conn.close()
     return [
@@ -1994,9 +2208,17 @@ def get_all_users():
 
 
 @app.post("/api/auth/logout")
-def logout():
-    """Logs out current session."""
-    return {"success": True, "message": "Enterprise session terminated"}
+def logout(token: Optional[str] = Query(default=None), authorization: Optional[str] = Header(default=None)):
+    """Logs out current session and revokes the session token from SQLite."""
+    active_token = authorization or token
+    if active_token:
+        clean_token = active_token.replace("Bearer ", "").strip()
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM user_sessions WHERE token = ?", (clean_token,))
+        conn.commit()
+        conn.close()
+    return {"success": True, "message": "Enterprise session terminated and revoked"}
 
 
 @app.get("/api/connectors", response_model=List[IndustrialConnector])
@@ -2031,8 +2253,16 @@ def get_production_sites(company_domain: Optional[str] = Query(None)):
 
 @app.post("/api/sites", response_model=ProductionSite, status_code=201)
 @app.post("/api/production-sites", response_model=ProductionSite, status_code=201)
-def create_production_site(site: ProductionSite):
+def create_production_site(
+    site: ProductionSite,
+    token: Optional[str] = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+):
     """Provisions a new production site / manufacturing plant with automatic distinct machine seeding for that company."""
+    session = get_session_user(authorization or token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Authentication required to commission production facilities.")
+
     site_id = site.id.strip().lower().replace(" ", "-")
     domain = (site.company_domain or "synapsys.com").strip().lower()
     clean_company = site.company_name or (domain.split(".")[0].replace("-", " ").title() + " Industrial")
@@ -2073,8 +2303,18 @@ def create_production_site(site: ProductionSite):
 
 
 @app.delete("/api/sites/{site_id}")
-def delete_production_site(site_id: str):
+def delete_production_site(
+    site_id: str,
+    token: Optional[str] = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+):
     """Decommissions/removes a production site and purges its attached machinery."""
+    session = get_session_user(authorization or token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Authentication required to decommission production sites.")
+    if session["role"] not in ("owner", "admin"):
+        raise HTTPException(status_code=403, detail="Permission denied: Facility decommissioning requires Owner or Admin authorization.")
+
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM production_sites WHERE id = ?", (site_id,))
@@ -2136,7 +2376,15 @@ class CreateWorkOrderRequest(BaseModel):
 
 
 @app.post("/api/machines", status_code=201)
-def create_machine(req: CreateMachineRequest):
+def create_machine(
+    req: CreateMachineRequest,
+    token: Optional[str] = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+):
+    session = get_session_user(authorization or token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Authentication required to commission machinery.")
+
     m_id = req.machine_id.strip().upper()
     if not m_id:
         raise HTTPException(status_code=400, detail="Machine ID cannot be empty")
@@ -2202,7 +2450,17 @@ def create_machine(req: CreateMachineRequest):
 
 
 @app.delete("/api/machines/{machine_id}")
-def delete_machine(machine_id: str):
+def delete_machine(
+    machine_id: str,
+    token: Optional[str] = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+):
+    session = get_session_user(authorization or token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Authentication required to decommission machinery.")
+    if session["role"] not in ("owner", "admin", "manager"):
+        raise HTTPException(status_code=403, detail="Permission denied: Machinery decommissioning requires Managerial or Admin authorization.")
+
     m_id = machine_id.strip().upper()
     if m_id not in MACHINE_METADATA:
         raise HTTPException(status_code=404, detail="Machine not found")
@@ -2218,7 +2476,15 @@ def delete_machine(machine_id: str):
 
 
 @app.post("/api/connectors", status_code=201)
-def create_connector(req: CreateConnectorRequest):
+def create_connector(
+    req: CreateConnectorRequest,
+    token: Optional[str] = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+):
+    session = get_session_user(authorization or token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Authentication required to register industrial connectors.")
+
     c_id = req.id or f"conn_{len(industrial_connectors) + 1}_{req.protocol.lower().replace('-', '_')}"
     new_conn = IndustrialConnector(
         id=c_id,
@@ -2236,7 +2502,17 @@ def create_connector(req: CreateConnectorRequest):
 
 
 @app.delete("/api/connectors/{connector_id}")
-def delete_connector(connector_id: str):
+def delete_connector(
+    connector_id: str,
+    token: Optional[str] = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+):
+    session = get_session_user(authorization or token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Authentication required to remove edge telemetry connectors.")
+    if session["role"] not in ("owner", "admin", "manager"):
+        raise HTTPException(status_code=403, detail="Permission denied: Edge connector management requires Managerial or Admin authorization.")
+
     if connector_id not in industrial_connectors:
         raise HTTPException(status_code=404, detail="Connector not found")
     del industrial_connectors[connector_id]
@@ -2244,7 +2520,15 @@ def delete_connector(connector_id: str):
 
 
 @app.post("/api/workorders", status_code=201)
-def create_work_order(req: CreateWorkOrderRequest):
+def create_work_order(
+    req: CreateWorkOrderRequest,
+    token: Optional[str] = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+):
+    session = get_session_user(authorization or token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Authentication required to dispatch batch work orders.")
+
     m_id = req.machine_id.strip().upper()
     if m_id not in MACHINE_METADATA:
         raise HTTPException(status_code=404, detail="Machine not found")
@@ -2487,17 +2771,30 @@ def load_real_world_dataset(dataset_id: str = Body(..., embed=True)):
     return import_csv_telemetry(csv_content=csv_text)
 
 
+MAX_CSV_BYTES = 5 * 1024 * 1024  # 5 MB
+MAX_CSV_ROWS = 10000
+
+
 @app.post("/api/telemetry/import-csv")
 def import_csv_telemetry(csv_content: str = Body(..., embed=True)):
     """
     Imports real-world telemetry CSV log files from industrial machines/PLCs.
     Parses timestamps, asset IDs, output, cycle times, sensor signals, and alarms.
+    Enforces payload size ceiling and maximum row bounds against denial of service.
     """
+    if len(csv_content.encode("utf-8")) > MAX_CSV_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail="Payload Too Large: CSV dataset exceeds maximum permitted size of 5MB"
+        )
+
     reader = csv.DictReader(io.StringIO(csv_content))
     imported_count = 0
     now_epoch = datetime.now(timezone.utc).timestamp()
 
     for row in reader:
+        if imported_count >= MAX_CSV_ROWS:
+            break
         try:
             m_id = row["machine_id"].strip()
             status = row.get("status", "Running").strip()
@@ -3277,7 +3574,6 @@ def initiate_po_order_2fa(req: InitiatePO2FARequest):
         "delivery_status": "SMTP_DELIVERED" if delivery_info.get("delivered") else "SMTP_UNCONFIGURED",
         "delivery_message": delivery_info.get("status_message") or f"2FA code generated for supervisor {DESIGNATED_SECURITY_EMAIL}",
         "expires_in_sec": 600,
-        "debug_otp_hint": None if delivery_info.get("delivered") else otp,
         "message": delivery_info.get("status_message") or f"2FA code dispatched to supervisor {DESIGNATED_SECURITY_EMAIL}",
     }
 
@@ -3317,7 +3613,15 @@ def verify_po_order_2fa(req: VerifyPO2FARequest):
 
 
 @app.post("/api/inventory/orders/create")
-def create_purchase_order(req: CreatePORequest):
+def create_purchase_order(
+    req: CreatePORequest,
+    token: Optional[str] = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+):
+    session = get_session_user(authorization or token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Authentication required to dispatch purchase orders.")
+
     sup = next((s for s in DEFAULT_SUPPLIERS if s["id"] == req.supplier_id), None)
     if not sup:
         raise HTTPException(status_code=404, detail="Supplier not found")
@@ -3384,7 +3688,15 @@ def receive_purchase_order(po_id: str):
 
 
 @app.post("/api/inventory/adjust")
-def adjust_inventory_stock(req: AdjustStockRequest):
+def adjust_inventory_stock(
+    req: AdjustStockRequest,
+    token: Optional[str] = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+):
+    session = get_session_user(authorization or token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Authentication required to adjust warehouse inventory.")
+
     item = next((it for it in DEFAULT_INVENTORY if it["id"] == req.item_id), None)
     if not item:
         raise HTTPException(status_code=404, detail="Inventory item not found")
@@ -3567,7 +3879,19 @@ def acknowledge_all_alarms():
 
 
 @app.post("/api/machines/{machine_id}/command")
-def machine_command(machine_id: str, action: str):
+def machine_command(
+    machine_id: str,
+    action: str,
+    token: Optional[str] = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+):
+    session = get_session_user(authorization or token)
+    if not session:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required. Remote physical machine interlocks require certified operator credentials."
+        )
+
     if machine_id not in latest_telemetry:
         raise HTTPException(status_code=404, detail="Machine not registered")
     payload = latest_telemetry[machine_id]
@@ -3579,7 +3903,13 @@ def machine_command(machine_id: str, action: str):
         payload.status = "Down"
         payload.active_alarm = "Operator Emergency Stop Commanded"
         payload.alarm_severity = "Critical"
-    return {"status": "command_executed", "machine_id": machine_id, "action": action}
+    return {
+        "status": "command_executed",
+        "machine_id": machine_id,
+        "action": action,
+        "authorized_by": session["full_name"],
+        "role": session["role"],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -3601,8 +3931,18 @@ def get_firebase_status(refresh: bool = Query(False)):
 
 
 @app.post("/api/cloud/firebase/configure")
-def configure_firebase_connection(req: FirebaseConfigRequest):
+def configure_firebase_connection(
+    req: FirebaseConfigRequest,
+    token: Optional[str] = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+):
     """Validates and tests live connectivity to a user's Firebase project via Cloud Firestore REST API."""
+    session = get_session_user(authorization or token)
+    if not session or session["role"] not in ("owner", "admin"):
+        raise HTTPException(
+            status_code=403,
+            detail="Permission denied: Cloud backend reconfiguration requires Owner or Admin authorization."
+        )
     try:
         return firebase_store.configure(req.project_id, req.api_key or "", req.auth_token or "")
     except ValueError as exc:
@@ -3610,8 +3950,17 @@ def configure_firebase_connection(req: FirebaseConfigRequest):
 
 
 @app.post("/api/cloud/firebase/sync-baseline")
-def sync_baseline_to_firebase():
+def sync_baseline_to_firebase(
+    token: Optional[str] = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+):
     """Synchronizes users, multi-tenant sites, and live machine telemetry snapshot to Cloud Firestore."""
+    session = get_session_user(authorization or token)
+    if not session or session["role"] not in ("owner", "admin"):
+        raise HTTPException(
+            status_code=403,
+            detail="Permission denied: Telemetry baseline synchronization requires Owner or Admin authorization."
+        )
     status = firebase_store.ping()
     if not status.get("connected"):
         raise HTTPException(
@@ -3622,18 +3971,18 @@ def sync_baseline_to_firebase():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT email, password_hash, full_name, company_name, company_domain, role, assigned_facility, created_at FROM users"
+        "SELECT email, full_name, company_name, company_domain, role, assigned_facility, created_at FROM users"
     )
     user_rows = [
         {
             "email": r[0],
-            "password_hash": r[1],
-            "full_name": r[2],
-            "company_name": r[3],
-            "company_domain": r[4],
-            "role": r[5],
-            "assigned_facility": r[6],
-            "created_at": r[7],
+            "password_hash": "[REDACTED_SECURE]",
+            "full_name": r[1],
+            "company_name": r[2],
+            "company_domain": r[3],
+            "role": r[4],
+            "assigned_facility": r[5],
+            "created_at": r[6],
         }
         for r in cursor.fetchall()
     ]

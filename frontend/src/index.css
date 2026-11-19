@@ -872,3 +872,12 @@
 .animate-reticle-rotate {
   animation: synapsysReticleRotate 8s linear infinite;
 }
+
+/* Global scrollbar suppression utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

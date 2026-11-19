@@ -101,9 +101,13 @@ export const PlantSetupOnboarding: React.FC<PlantSetupOnboardingProps> = ({
         created_at: new Date().toISOString(),
       };
 
+      const token = typeof window !== 'undefined' ? localStorage.getItem('synapsys_auth_token') : null;
       const res = await fetch('/api/sites', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify(payload),
       });
 

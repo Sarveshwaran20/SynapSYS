@@ -2,7 +2,6 @@ import { Suspense, lazy, useState, useEffect, useCallback, useMemo, useId, useRe
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { GeoLocationData } from './GeoMapAssist';
 import { SynapsysLogo } from './SynapsysLogo';
-import { RomanMedallion } from './MotionComponents';
 import { useDynamicFavicon } from './lib/favicon';
 import {
   DEFAULT_FIREBASE_STATUS,
@@ -48,7 +47,6 @@ import {
 } from './types';
 import { getCurrencyForSite, SiteCurrency } from './lib/currency';
 import { MANUFACTURING_HUBS } from './lib/manufacturingHubs';
-import { SingularityBackdrop } from './components/dashboard/SingularityBackdrop';
 
 const LazyGeoMapAssist = lazy(() => import('./GeoMapAssist'));
 const LazyDigitalTwinFloor = lazy(() =>
@@ -1835,6 +1833,60 @@ const SHIFT_CONFIGS = {
   },
 };
 
+type ShiftKey = keyof typeof SHIFT_CONFIGS;
+
+interface PlantRosterOperator {
+  name: string;
+  role: string;
+  badgeId: string;
+  level: string;
+  cert: string;
+  location: string;
+}
+
+const CERTIFIED_PLANT_ROSTER: PlantRosterOperator[] = [
+  {
+    name: 'E. Rostova',
+    role: 'Lead Mechatronics & CNC Specialist',
+    badgeId: 'OPR-8841-A',
+    level: 'Level 4 Master Operator',
+    cert: 'Siemens Sinumerik 840D / Fanuc 31i-B5',
+    location: 'Detroit Plant 04 • Bay 1',
+  },
+  {
+    name: 'K. Miller',
+    role: 'Senior Metrologist & Quality Lead',
+    badgeId: 'OPR-4412-B',
+    level: 'ISO-9001 Lead Auditor',
+    cert: 'Zeiss CMM Metrology / SPC Level 3',
+    location: 'Detroit Plant 04 • QC Lab',
+  },
+  {
+    name: 'K. Takahashi',
+    role: 'Automation & Fieldbus Engineer',
+    badgeId: 'OPR-9023-C',
+    level: 'ISA-88 Batch / ISA-95 Specialist',
+    cert: 'Allen-Bradley ControlLogix 5580',
+    location: 'Detroit Plant 04 • Control Room',
+  },
+  {
+    name: 'S. Jenkins',
+    role: 'Process Safety & EHS Officer',
+    badgeId: 'OPR-3310-S',
+    level: 'OSHA-30 / NFPA-70E Certified',
+    cert: 'Safety PLC Interlocks (SIL-3 / Cat 4)',
+    location: 'Detroit Plant 04 • Safety Station',
+  },
+  {
+    name: 'M. Vance',
+    role: 'Operations Plant Director',
+    badgeId: 'OPR-1001-EXEC',
+    level: 'Six Sigma Master Black Belt',
+    cert: 'Lean Production & Takt Governance',
+    location: 'Plant Operations Center',
+  },
+];
+
 export interface DashboardWorkspaceProps {
   currentUser: UserProfile;
   isDarkMode: boolean;
@@ -1915,7 +1967,7 @@ export default function DashboardWorkspace({
     return '';
   });
   const [firebaseStatus, setFirebaseStatus] = useState<FirebaseConnectionStatus>(DEFAULT_FIREBASE_STATUS);
-  const [activeShift, setActiveShift] = useState<'shift1' | 'shift2' | 'shift3'>('shift1');
+  const [activeShift, setActiveShift] = useState<ShiftKey>('shift1');
   const [showEventPopover, setShowEventPopover] = useState<boolean>(false);
   const [eventLog, setEventLog] = useState<
     Array<{ id: string; label: string; category: string; tone: 'blue' | 'emerald' | 'amber' | 'rose'; time: string }>
@@ -1934,19 +1986,69 @@ export default function DashboardWorkspace({
     },
     []
   );
+
+  const [shiftSupervisors, setShiftSupervisors] = useState<Record<ShiftKey, string>>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('synapsys_shift_supervisors');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed === 'object') return parsed;
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return {
+      shift1: SHIFT_CONFIGS.shift1.supervisor,
+      shift2: SHIFT_CONFIGS.shift2.supervisor,
+      shift3: SHIFT_CONFIGS.shift3.supervisor,
+    };
+  });
+  const [showSupervisorModal, setShowSupervisorModal] = useState<boolean>(false);
+  const [customSupervisorName, setCustomSupervisorName] = useState<string>('');
+  const [customBadgeId, setCustomBadgeId] = useState<string>('');
+  const [badgeScanStatus, setBadgeScanStatus] = useState<'idle' | 'scanning' | 'success'>('idle');
+
+  const currentSupervisor = shiftSupervisors[activeShift] || SHIFT_CONFIGS[activeShift].supervisor;
+
+  const handleAssignSupervisor = useCallback(
+    (name: string, badge?: string) => {
+      if (!name.trim()) return;
+      const cleanName = name.trim();
+      setShiftSupervisors((prev) => {
+        const next = { ...prev, [activeShift]: cleanName };
+        try {
+          localStorage.setItem('synapsys_shift_supervisors', JSON.stringify(next));
+        } catch {
+          // ignore
+        }
+        return next;
+      });
+      pushEvent(
+        `Shift ${SHIFT_CONFIGS[activeShift].name} supervisor assigned to ${cleanName}${badge ? ` (Badge: ${badge})` : ''}`,
+        'Shift',
+        'blue'
+      );
+    },
+    [activeShift, pushEvent]
+  );
+
+  const getAuthHeaders = useCallback((): Record<string, string> => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('synapsys_auth_token') || '' : '';
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+  }, []);
+
   const [showHotkeysModal, setShowHotkeysModal] = useState<boolean>(false);
   const [latencyMs, setLatencyMs] = useState<number>(10);
   const [showHarness, setShowHarness] = useState<boolean>(false);
   const [simulatedAlarms, setSimulatedAlarms] = useState<AlarmEvent[]>([]);
   const [showCopilot, setShowCopilot] = useState<boolean>(false);
   const [copilotInput, setCopilotInput] = useState<string>('');
-  const [showVortexBg, setShowVortexBg] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('synapsys_vortex_bg');
-      return saved !== null ? saved === 'true' : true;
-    }
-    return true;
-  });
   const [copilotLoading, setCopilotLoading] = useState<boolean>(false);
   const [csvIsLoading, setCsvIsLoading] = useState<boolean>(false);
   const [csvFeedback, setCsvFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -2782,9 +2884,9 @@ export default function DashboardWorkspace({
 
   const handleMachineCommand = async (machineId: string, action: string) => {
     try {
-      await fetch(`/api/machines/${machineId}/command?action=${action}`, { method: 'POST' });
+      await fetch(`/api/machines/${machineId}/command?action=${action}`, { method: 'POST', headers: getAuthHeaders() });
     } catch {
-      await fetch(`http://localhost:8000/api/machines/${machineId}/command?action=${action}`, { method: 'POST' });
+      await fetch(`http://localhost:8000/api/machines/${machineId}/command?action=${action}`, { method: 'POST', headers: getAuthHeaders() });
     }
     fetchDashboardData();
   };
@@ -2792,9 +2894,9 @@ export default function DashboardWorkspace({
   const handleToggleConnector = async (connectorId: string) => {
     setPendingConnectors((prev) => ({ ...prev, [connectorId]: true }));
     try {
-      let res = await fetch(`/api/connectors/${connectorId}/toggle`, { method: 'POST' });
+      let res = await fetch(`/api/connectors/${connectorId}/toggle`, { method: 'POST', headers: getAuthHeaders() });
       if (!res.ok) {
-        res = await fetch(`http://localhost:8000/api/connectors/${connectorId}/toggle`, { method: 'POST' });
+        res = await fetch(`http://localhost:8000/api/connectors/${connectorId}/toggle`, { method: 'POST', headers: getAuthHeaders() });
       }
       await fetchDashboardData();
     } catch (err) {
@@ -3181,13 +3283,13 @@ export default function DashboardWorkspace({
       try {
         res = await fetch('/api/machines', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload),
         });
       } catch {
         res = await fetch('http://localhost:8000/api/machines', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(payload),
         });
       }
@@ -3285,9 +3387,9 @@ export default function DashboardWorkspace({
   const handleDeleteMachine = async (machineId: string) => {
     if (!window.confirm(`Are you sure you want to decommission and remove ${machineId} from the active plant fleet?`)) return;
     try {
-      let res = await fetch(`/api/machines/${machineId}`, { method: 'DELETE' });
+      let res = await fetch(`/api/machines/${machineId}`, { method: 'DELETE', headers: getAuthHeaders() });
       if (!res.ok) {
-        res = await fetch(`http://localhost:8000/api/machines/${machineId}`, { method: 'DELETE' });
+        res = await fetch(`http://localhost:8000/api/machines/${machineId}`, { method: 'DELETE', headers: getAuthHeaders() });
       }
       setSelectedMachine(null);
       setCsvFeedback({
@@ -3305,13 +3407,13 @@ export default function DashboardWorkspace({
     try {
       let res = await fetch('/api/connectors', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(newConnectorForm),
       });
       if (!res.ok) {
         res = await fetch('http://localhost:8000/api/connectors', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(newConnectorForm),
         });
       }
@@ -3328,9 +3430,9 @@ export default function DashboardWorkspace({
 
   const handleDeleteConnector = async (connectorId: string) => {
     try {
-      let res = await fetch(`/api/connectors/${connectorId}`, { method: 'DELETE' });
+      let res = await fetch(`/api/connectors/${connectorId}`, { method: 'DELETE', headers: getAuthHeaders() });
       if (!res.ok) {
-        res = await fetch(`http://localhost:8000/api/connectors/${connectorId}`, { method: 'DELETE' });
+        res = await fetch(`http://localhost:8000/api/connectors/${connectorId}`, { method: 'DELETE', headers: getAuthHeaders() });
       }
       fetchDashboardData();
     } catch (err) {
@@ -3343,13 +3445,13 @@ export default function DashboardWorkspace({
     try {
       let res = await fetch('/api/workorders', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(newWorkOrderForm),
       });
       if (!res.ok) {
         res = await fetch('http://localhost:8000/api/workorders', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(newWorkOrderForm),
         });
       }
@@ -3547,7 +3649,7 @@ export default function DashboardWorkspace({
     try {
       await fetch('/api/sites', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(newSite),
       });
     } catch (err) {
@@ -3576,7 +3678,7 @@ export default function DashboardWorkspace({
       return;
     }
     try {
-      await fetch(`/api/sites/${siteId}`, { method: 'DELETE' });
+      await fetch(`/api/sites/${siteId}`, { method: 'DELETE', headers: getAuthHeaders() });
     } catch {
       // ignore
     }
@@ -3927,6 +4029,16 @@ export default function DashboardWorkspace({
         onSelect: () => setShowShiftReportModal(true),
       },
       {
+        id: 'act-shift-supervisor',
+        category: 'Action',
+        title: 'Assign Shift Supervisor & Badge-In',
+        subtitle: 'Transfer shift custody, select certified roster lead, or tap RFID',
+        badge: 'Rota',
+        badgeTone: 'blue',
+        keywords: 'shift supervisor operator roster badge rfid handover rota lead',
+        onSelect: () => setShowSupervisorModal(true),
+      },
+      {
         id: 'act-add-asset',
         category: 'Action',
         title: 'Commission Physical Asset',
@@ -4255,12 +4367,9 @@ export default function DashboardWorkspace({
     >
       <ScrollProgressBar showBackToTop={true} />
 
-      {/* Subtle Engineering Blueprint Backdrop & Ambient Gravitational Singularity Vortex */}
+      {/* Clean Industrial SCADA Canvas */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
-        <SingularityBackdrop isDarkMode={isDarkMode} enabled={showVortexBg} />
-        <div className="absolute inset-0 hero-blueprint-grid opacity-20" />
-        <div className="absolute -top-40 -right-40 w-[540px] h-[540px] rounded-full hero-ambient-glow-blue opacity-25" />
-        <div className="absolute -bottom-48 -left-48 w-[520px] h-[520px] rounded-full hero-ambient-glow-purple opacity-20" />
+        <div className="absolute inset-0 hero-blueprint-grid opacity-15" />
       </div>
 
       {/* SynapSYS SaaS Navigation Header */}
@@ -4268,17 +4377,17 @@ export default function DashboardWorkspace({
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: dur.base, ease }}
-        className={`relative bg-g-surface/92 border-b px-5 sm:px-7 py-3.5 flex items-center justify-between gap-4 z-30 sticky top-0 w-full max-w-full header-scroll-transition ${
+        className={`relative bg-g-surface/92 border-b px-3 sm:px-6 lg:px-7 py-2.5 sm:py-3.5 flex items-center justify-between gap-2 sm:gap-4 z-30 sticky top-0 w-full max-w-full header-scroll-transition ${
           isHeaderScrolled
             ? 'backdrop-blur-md border-g-border shadow-xs'
             : 'border-g-border/50 backdrop-blur-sm'
         }`}
       >
-        <div className="flex items-center gap-3.5 shrink-0 min-w-0">
+        <div className="flex items-center gap-2 sm:gap-3.5 shrink-0 min-w-0">
           {/* Navigation Drawer Toggle */}
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-2 rounded-lg hover:bg-g-surfaceElevated text-g-textSecondary hover:text-g-text transition-colors cursor-pointer shrink-0 border border-transparent hover:border-g-border"
+            className="p-1.5 sm:p-2 rounded-lg hover:bg-g-surfaceElevated text-g-textSecondary hover:text-g-text transition-colors cursor-pointer shrink-0 border border-transparent hover:border-g-border"
             title="Open side navigation"
             aria-label="Toggle Side Navigation Drawer"
           >
@@ -4288,7 +4397,7 @@ export default function DashboardWorkspace({
           </button>
 
           {/* Logo & Facility Context */}
-          <div className="flex items-center gap-3.5 min-w-0 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3.5 min-w-0 shrink-0">
             <div className="group cursor-default flex items-center gap-2">
               <SynapsysLogo variant="horizontal" size="md" isDarkMode={isDarkMode} />
               {currentUser?.company_name && (
@@ -4302,17 +4411,17 @@ export default function DashboardWorkspace({
             </div>
             <button
               onClick={() => setShowProjectModal(true)}
-              className="flex items-center gap-2 text-[13px] text-g-text bg-g-surfaceElevated hover:bg-g-surfaceSubtle px-3.5 py-2 rounded-lg border border-g-border transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-[13px] text-g-text bg-g-surfaceElevated hover:bg-g-surfaceSubtle px-2 sm:px-3.5 py-1.5 sm:py-2 rounded-lg border border-g-border transition-colors cursor-pointer"
               title="Switch facility context"
             >
               <StatusDot status="running" />
-              <span className="font-medium truncate max-w-[140px] sm:max-w-[210px]">
+              <span className="font-medium truncate max-w-[90px] xs:max-w-[140px] sm:max-w-[210px]">
                 {activeSite?.name.replace(/\s*\(Production Live\)/i, '') || currentProject}
               </span>
-              <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-g-surface border border-g-border text-cyan-400 font-bold shrink-0">
+              <span className="text-[10px] sm:text-[11px] font-mono px-1 sm:px-1.5 py-0.5 rounded bg-g-surface border border-g-border text-cyan-400 font-bold shrink-0 hidden xs:inline-block">
                 {siteCurrency.symbol} {siteCurrency.code}
               </span>
-              <svg className="w-4 h-4 text-g-textSecondary ml-0.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-g-textSecondary ml-0.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
               </svg>
             </button>
@@ -4376,7 +4485,7 @@ export default function DashboardWorkspace({
         </div>
 
         {/* Right Action Bar */}
-        <div className="flex items-center gap-2.5 text-[13px] shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 text-xs sm:text-[13px] shrink-0">
           {/* Mobile Search Toggle */}
           <button
             type="button"
@@ -4388,7 +4497,7 @@ export default function DashboardWorkspace({
                 setTimeout(() => mobileSearchInputRef.current?.focus(), 30);
               }
             }}
-            className="md:hidden p-2 rounded-lg hover:bg-g-surfaceElevated text-g-textSecondary hover:text-g-text transition-colors cursor-pointer"
+            className="md:hidden p-1.5 sm:p-2 rounded-lg hover:bg-g-surfaceElevated text-g-textSecondary hover:text-g-text transition-colors cursor-pointer"
             aria-label="Toggle search"
             title="Search dashboard"
           >
@@ -4399,7 +4508,7 @@ export default function DashboardWorkspace({
           {/* Live Status Indicator & Refresh */}
           <button
             onClick={() => setAutoRefresh(!autoRefresh)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-g-surfaceElevated text-[13px] transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg hover:bg-g-surfaceElevated text-xs sm:text-[13px] transition-colors cursor-pointer"
             title={autoRefresh ? 'Live telemetry streaming. Click to pause.' : 'Telemetry paused. Click to resume.'}
           >
             <StatusDot status={isConnected ? (autoRefresh ? 'live' : 'standby') : 'down'} size="md" />
@@ -4410,7 +4519,7 @@ export default function DashboardWorkspace({
 
           <button
             onClick={handleManualRefresh}
-            className={`p-2 rounded-lg hover:bg-g-surfaceElevated text-g-textSecondary hover:text-g-text transition-colors cursor-pointer ${
+            className={`p-1.5 sm:p-2 rounded-lg hover:bg-g-surfaceElevated text-g-textSecondary hover:text-g-text transition-colors cursor-pointer ${
               isRefreshing ? 'animate-spin text-g-blue' : ''
             }`}
             title="Force instant telemetry resync"
@@ -4423,7 +4532,7 @@ export default function DashboardWorkspace({
           {/* Dark / Light Theme Toggle */}
           <button
             onClick={() => onToggleTheme()}
-            className="p-2 rounded-lg hover:bg-g-surfaceElevated text-g-textSecondary hover:text-g-text transition-colors cursor-pointer"
+            className="p-1.5 sm:p-2 rounded-lg hover:bg-g-surfaceElevated text-g-textSecondary hover:text-g-text transition-colors cursor-pointer"
             title={isDarkMode ? 'Switch to light theme' : 'Switch to dark theme'}
             aria-label="Toggle Dark and Light Mode"
           >
@@ -4439,39 +4548,12 @@ export default function DashboardWorkspace({
             )}
           </button>
 
-          {/* Ambient SCADA Backdrop Toggle */}
-          <button
-            type="button"
-            onClick={() => {
-              setShowVortexBg((prev) => {
-                const next = !prev;
-                if (typeof window !== 'undefined') {
-                  localStorage.setItem('synapsys_vortex_bg', String(next));
-                }
-                return next;
-              });
-            }}
-            className={`p-2 rounded-lg transition-all cursor-pointer border ${
-              showVortexBg
-                ? 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30 hover:bg-cyan-500/25 shadow-xs'
-                : 'text-g-textSecondary hover:text-g-text hover:bg-g-surfaceElevated border-transparent'
-            }`}
-            title={showVortexBg ? 'Circuit Highway FX: Active (click to pause/hide)' : 'Circuit Highway FX: Off (click to activate)'}
-            aria-label="Toggle Circuit Highway Background"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="5" y="5" width="14" height="14" rx="2" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 9h6v6H9z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 1v4M15 1v4M9 19v4M15 19v4M1 9h4M1 15h4M19 9h4M19 15h4" />
-            </svg>
-          </button>
-
 
           {/* More Dropdown */}
           <div className="relative">
             <button
               onClick={() => setShowMoreMenu(!showMoreMenu)}
-              className={`px-3.5 py-2 rounded-lg text-[13px] font-medium border flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs sm:text-[13px] font-medium border flex items-center gap-1 sm:gap-1.5 transition-colors cursor-pointer ${
                 showMoreMenu ? 'bg-g-surfaceElevated text-g-text border-g-border' : 'bg-transparent text-g-textSecondary hover:text-g-text border-g-border hover:bg-g-surfaceElevated'
               }`}
             >
@@ -4519,33 +4601,6 @@ export default function DashboardWorkspace({
                       {data.active_alarms.length}
                     </span>
                   )}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowVortexBg((prev) => {
-                      const next = !prev;
-                      if (typeof window !== 'undefined') {
-                        localStorage.setItem('synapsys_vortex_bg', String(next));
-                      }
-                      return next;
-                    });
-                    setShowMoreMenu(false);
-                  }}
-                  className="w-full text-left px-3.5 py-2.5 hover:bg-g-surfaceElevated text-g-text flex items-center justify-between cursor-pointer"
-                >
-                  <span className="flex items-center gap-2.5">
-                    <svg className="w-4 h-4 text-cyan-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect x="5" y="5" width="14" height="14" rx="2" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 9h6v6H9z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 1v4M15 1v4M9 19v4M15 19v4M1 9h4M1 15h4M19 9h4M19 15h4" />
-                    </svg>
-                    <span>Ambient SCADA Backdrop FX</span>
-                  </span>
-                  <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${showVortexBg ? 'bg-cyan-500/20 text-cyan-300' : 'bg-g-surfaceSubtle text-g-textMuted'}`}>
-                    {showVortexBg ? 'ON' : 'OFF'}
-                  </span>
                 </button>
 
                 <div className="border-t border-g-border my-1" />
@@ -4736,97 +4791,8 @@ export default function DashboardWorkspace({
           )}
         </MotionToast>
 
-        {/* Primary Operational Section Tabs */}
-        <Reveal as="div" immediate delay={0.04}>
-          <SlidingTabGroup id="main-nav-tabs">
-            <nav className="bg-g-surface border-b border-g-border px-5 sm:px-7 lg:px-8 flex items-center gap-5 sm:gap-8 text-sm overflow-x-auto no-scrollbar whitespace-nowrap">
-              {[
-                { id: 'overview', numeral: '01', label: 'Fleet Overview', subtitle: 'Live Monitoring' },
-                { id: 'connectors', numeral: '02', label: 'Field Connectors', subtitle: 'Edge & Ingestion' },
-                { id: 'twin', numeral: '03', label: 'Digital Twin', subtitle: 'Floor Layout' },
-                { id: 'losses', numeral: '04', label: 'Loss Analysis', subtitle: 'Six Big Losses' },
-                { id: 'workorders', numeral: '05', label: 'Work Orders', subtitle: 'Batch Tracking' },
-                {
-                  id: 'alarms',
-                  numeral: '06',
-                  label: 'Alarms & Incidents',
-                  subtitle: 'ISA-18.2 Triage',
-                  badge: data.active_alarms.filter((a) => !a.acknowledged).length > 0
-                    ? data.active_alarms.filter((a) => !a.acknowledged).length
-                    : null,
-                },
-                {
-                  id: 'inventory',
-                  numeral: '07',
-                  label: 'Inventory & MRO',
-                  subtitle: 'Tooling & Procurement',
-                },
-                {
-                  id: 'acoustic_ai',
-                  numeral: '08',
-                  label: 'Acoustic AI Twin',
-                  subtitle: 'Ultrasonic Stethoscope',
-                  badge: 'NEW',
-                },
-                {
-                  id: 'sandbox',
-                  numeral: '09',
-                  label: 'Process Sandbox',
-                  subtitle: 'What-If Twin & Weibull',
-                  badge: 'PRESCRIPTIVE',
-                },
-              ].map((tab) => {
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id as any)}
-                    className={`relative py-4 text-sm transition-all flex items-center gap-3 border-b-2 -mb-[1px] cursor-pointer group ${
-                      isActive
-                        ? 'border-transparent text-marble font-semibold'
-                        : 'border-transparent text-silver hover:text-marble font-normal'
-                    }`}
-                  >
-                    <RomanMedallion numeral={tab.numeral} active={isActive} size="md" />
-                    <div className="flex flex-col text-left">
-                      <span className="font-cinzel text-[13px] tracking-[0.06em] leading-none">{tab.label}</span>
-                      <span className="text-[12px] text-pewter font-sans leading-tight mt-1">{tab.subtitle}</span>
-                    </div>
-                    <AnimatePresence mode="popLayout">
-                      {tab.badge != null && (
-                        <motion.span
-                          key="alarm-badge"
-                          initial={shouldReduce ? false : { opacity: 0, scale: 0.7 }}
-                          animate={
-                            !shouldReduce && isDocVisible
-                              ? { opacity: 1, scale: [1, 1.07] }
-                              : { opacity: 1, scale: 1 }
-                          }
-                          exit={{ opacity: 0, scale: 0.7 }}
-                          transition={
-                            !shouldReduce && isDocVisible
-                              ? {
-                                  scale: { duration: 1.2, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut' },
-                                  opacity: { duration: dur.fast },
-                                }
-                              : { duration: dur.fast }
-                          }
-                          className="ml-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30"
-                        >
-                          {tab.badge}
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
-                    {isActive && <SlidingTabIndicator layoutId="main-nav-underline" variant="underline" />}
-                  </button>
-                );
-              })}
-            </nav>
-          </SlidingTabGroup>
-        </Reveal>
-
-        {/* Main Container */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-24 sm:pb-10 flex flex-col gap-6 sm:gap-8 max-w-[1720px] w-full mx-auto relative z-10">
+        {/* Main Container (Padded bottom for Floating SCADA Dock) */}
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-32 sm:pb-36 flex flex-col gap-6 sm:gap-8 max-w-[1720px] w-full mx-auto relative z-10">
           {/* Executive KPI Strip with Midnight Marble Spotlight Cards */}
           <RevealGroup
             as="section"
@@ -4839,14 +4805,14 @@ export default function DashboardWorkspace({
             <RevealItem variant="grid" className="flex">
               <SpotlightCard
                 onClick={() => setSelectedKpiModal('oee')}
-                className="w-full p-6 sm:p-7 flex flex-col justify-between cursor-pointer group"
+                className="w-full p-5 sm:p-6 flex flex-col justify-between cursor-pointer group bg-g-surface border border-g-border rounded-xl"
               >
-                <div className="flex items-center justify-between text-[13px] text-silver gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <RomanMedallion numeral="01" size="md" active />
-                    <span className="font-cinzel tracking-wider font-semibold truncate">OVERALL PLANT OEE</span>
+                <div className="flex items-center justify-between text-[13px] text-g-textSecondary gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-g-surfaceElevated border border-g-border text-g-textSecondary font-semibold">01</span>
+                    <span className="font-sans font-semibold tracking-wide text-g-text truncate">OVERALL PLANT OEE</span>
                   </div>
-                  <span className="text-xs font-mono text-pewter px-2 py-0.5 rounded bg-g-surfaceElevated border border-g-border shrink-0">Target: 85.0%</span>
+                  <span className="text-xs font-mono text-g-textMuted px-2 py-0.5 rounded bg-g-surfaceElevated border border-g-border shrink-0">Target: 85.0%</span>
                 </div>
                 <div className="my-4 flex items-center justify-between gap-3">
                   <div className="flex flex-col gap-2">
@@ -4854,14 +4820,14 @@ export default function DashboardWorkspace({
                       value={data.summary.overall_plant_oee}
                       decimals={1}
                       suffix="%"
-                      className={`font-cinzel text-4xl xl:text-[42px] font-bold tracking-tight leading-none ${
-                        data.summary.overall_plant_oee >= 85 ? 'text-laurel' : 'text-marble'
+                      className={`font-sans text-4xl xl:text-[42px] font-bold tracking-tight leading-none ${
+                        data.summary.overall_plant_oee >= 85 ? 'text-emerald-400' : 'text-g-text'
                       }`}
                     />
                     <span className={`inline-block w-fit text-xs font-medium px-2.5 py-0.5 rounded-md ${
                       data.summary.overall_plant_oee >= 85
-                        ? 'bg-laurel/15 text-laurel border border-laurel/30'
-                        : 'bg-coral/15 text-coral border border-coral/30'
+                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
                     }`}>
                       {data.summary.overall_plant_oee >= 85 ? 'World Class' : 'Acceptable'}
                     </span>
@@ -4873,12 +4839,12 @@ export default function DashboardWorkspace({
                     colorVar={data.summary.overall_plant_oee >= 85 ? 'var(--laurel)' : 'var(--coral)'}
                   />
                 </div>
-                <div className="text-[13px] text-silver pt-3.5 border-t border-line flex items-center justify-between font-mono">
-                  <span>Avail <strong className="text-marble font-semibold"><AnimatedNumber value={data.summary.overall_availability} decimals={1} suffix="%" /></strong></span>
-                  <span className="text-line">|</span>
-                  <span>Perf <strong className="text-marble font-semibold"><AnimatedNumber value={data.summary.overall_performance} decimals={1} suffix="%" /></strong></span>
-                  <span className="text-line">|</span>
-                  <span>Qual <strong className="text-marble font-semibold"><AnimatedNumber value={data.summary.overall_quality} decimals={1} suffix="%" /></strong></span>
+                <div className="text-[13px] text-g-textSecondary pt-3.5 border-t border-g-border flex items-center justify-between font-mono">
+                  <span>Avail <strong className="text-g-text font-semibold"><AnimatedNumber value={data.summary.overall_availability} decimals={1} suffix="%" /></strong></span>
+                  <span className="text-g-textMuted">|</span>
+                  <span>Perf <strong className="text-g-text font-semibold"><AnimatedNumber value={data.summary.overall_performance} decimals={1} suffix="%" /></strong></span>
+                  <span className="text-g-textMuted">|</span>
+                  <span>Qual <strong className="text-g-text font-semibold"><AnimatedNumber value={data.summary.overall_quality} decimals={1} suffix="%" /></strong></span>
                 </div>
               </SpotlightCard>
             </RevealItem>
@@ -4887,14 +4853,14 @@ export default function DashboardWorkspace({
             <RevealItem variant="grid" className="flex">
               <SpotlightCard
                 onClick={() => setSelectedKpiModal('production')}
-                className="w-full p-6 sm:p-7 flex flex-col justify-between cursor-pointer group"
+                className="w-full p-5 sm:p-6 flex flex-col justify-between cursor-pointer group bg-g-surface border border-g-border rounded-xl"
               >
-                <div className="flex items-center justify-between text-[13px] text-silver gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <RomanMedallion numeral="02" size="md" active />
-                    <span className="font-cinzel tracking-wider font-semibold truncate">PRODUCTION OUTPUT</span>
+                <div className="flex items-center justify-between text-[13px] text-g-textSecondary gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-g-surfaceElevated border border-g-border text-g-textSecondary font-semibold">02</span>
+                    <span className="font-sans font-semibold tracking-wide text-g-text truncate">PRODUCTION OUTPUT</span>
                   </div>
-                  <span className="text-xs font-mono text-pewter px-2 py-0.5 rounded bg-g-surfaceElevated border border-g-border shrink-0">Target: <AnimatedNumber value={data.summary.total_target} decimals={0} /></span>
+                  <span className="text-xs font-mono text-g-textMuted px-2 py-0.5 rounded bg-g-surfaceElevated border border-g-border shrink-0">Target: <AnimatedNumber value={data.summary.total_target} decimals={0} /></span>
                 </div>
                 <div className="my-4 flex items-center justify-between gap-3">
                   <div className="flex flex-col gap-1">
@@ -4902,11 +4868,11 @@ export default function DashboardWorkspace({
                       <AnimatedNumber
                         value={data.summary.total_output}
                         decimals={0}
-                        className="font-cinzel text-4xl xl:text-[42px] font-bold text-marble tracking-tight leading-none"
+                        className="font-sans text-4xl xl:text-[42px] font-bold text-g-text tracking-tight leading-none"
                       />
-                      <span className="text-sm text-silver font-sans">units</span>
+                      <span className="text-sm text-g-textSecondary font-sans">units</span>
                     </div>
-                    <span className="text-xs font-mono text-silver">
+                    <span className="text-xs font-mono text-g-textSecondary">
                       <AnimatedNumber value={(data.summary.total_output / (data.summary.total_target || 1)) * 100} decimals={0} suffix="%" /> Shift Cadence
                     </span>
                   </div>
@@ -4918,10 +4884,10 @@ export default function DashboardWorkspace({
                     showLabel
                   />
                 </div>
-                <div className="text-[13px] text-silver pt-3.5 border-t border-line flex items-center justify-between font-mono">
-                  <span className="text-laurel">Conforming: <strong className="font-semibold"><AnimatedNumber value={data.summary.total_good} decimals={0} /></strong></span>
-                  <span className="text-line">|</span>
-                  <span className="text-crimson">Rejects: <strong className="font-semibold"><AnimatedNumber value={data.summary.total_scrap} decimals={0} /></strong></span>
+                <div className="text-[13px] text-g-textSecondary pt-3.5 border-t border-g-border flex items-center justify-between font-mono">
+                  <span className="text-emerald-400">Conforming: <strong className="font-semibold"><AnimatedNumber value={data.summary.total_good} decimals={0} /></strong></span>
+                  <span className="text-g-textMuted">|</span>
+                  <span className="text-rose-400">Rejects: <strong className="font-semibold"><AnimatedNumber value={data.summary.total_scrap} decimals={0} /></strong></span>
                 </div>
               </SpotlightCard>
             </RevealItem>
@@ -4930,14 +4896,14 @@ export default function DashboardWorkspace({
             <RevealItem variant="grid" className="flex">
               <SpotlightCard
                 onClick={() => setSelectedKpiModal('financial')}
-                className="w-full p-6 sm:p-7 flex flex-col justify-between cursor-pointer group"
+                className="w-full p-5 sm:p-6 flex flex-col justify-between cursor-pointer group bg-g-surface border border-g-border rounded-xl"
               >
-                <div className="flex items-center justify-between text-[13px] text-silver gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <RomanMedallion numeral="03" size="md" active />
-                    <span className="font-cinzel tracking-wider font-semibold truncate">SHIFT ECONOMIC YIELD</span>
+                <div className="flex items-center justify-between text-[13px] text-g-textSecondary gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-g-surfaceElevated border border-g-border text-g-textSecondary font-semibold">03</span>
+                    <span className="font-sans font-semibold tracking-wide text-g-text truncate">SHIFT ECONOMIC YIELD</span>
                   </div>
-                  <span className="text-xs font-mono text-laurel px-2 py-0.5 rounded bg-laurel/10 border border-laurel/25 shrink-0">+{siteCurrency.symbol}{siteCurrency.unitBaseline.toLocaleString()}/unit</span>
+                  <span className="text-xs font-mono text-emerald-400 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/25 shrink-0">+{siteCurrency.symbol}{siteCurrency.unitBaseline.toLocaleString()}/unit</span>
                 </div>
                 <div className="my-4 flex items-center justify-between gap-3">
                   <div className="flex flex-col gap-1">
@@ -4945,9 +4911,9 @@ export default function DashboardWorkspace({
                       value={data.summary.financial_roi?.net_shift_value_usd || 14970}
                       decimals={2}
                       prefix={siteCurrency.symbol}
-                      className="font-cinzel text-3xl sm:text-4xl xl:text-[40px] font-bold text-marble tracking-tight leading-none"
+                      className="font-sans text-3xl sm:text-4xl xl:text-[40px] font-bold text-g-text tracking-tight leading-none"
                     />
-                    <span className="text-xs text-silver font-sans">Realized Net Shift Value</span>
+                    <span className="text-xs text-g-textSecondary font-sans">Realized Net Shift Value</span>
                   </div>
                   {/* Rising Shift Yield Mini Bars */}
                   <div className="hidden sm:flex items-end gap-1.5 h-10 shrink-0" aria-hidden="true">
@@ -4963,10 +4929,10 @@ export default function DashboardWorkspace({
                     ))}
                   </div>
                 </div>
-                <div className="text-[13px] text-silver pt-3.5 border-t border-line flex items-center justify-between font-mono">
-                  <span className="text-crimson">Downtime: -<AnimatedNumber value={data.summary.financial_roi?.downtime_cost_usd || 0} decimals={0} prefix={siteCurrency.symbol} /></span>
-                  <span className="text-line">|</span>
-                  <span>Gross: <strong className="text-marble font-semibold"><AnimatedNumber value={data.summary.financial_roi?.revenue_generated_usd || 0} decimals={0} prefix={siteCurrency.symbol} /></strong></span>
+                <div className="text-[13px] text-g-textSecondary pt-3.5 border-t border-g-border flex items-center justify-between font-mono">
+                  <span className="text-rose-400">Downtime: -<AnimatedNumber value={data.summary.financial_roi?.downtime_cost_usd || 0} decimals={0} prefix={siteCurrency.symbol} /></span>
+                  <span className="text-g-textMuted">|</span>
+                  <span>Gross: <strong className="text-g-text font-semibold"><AnimatedNumber value={data.summary.financial_roi?.revenue_generated_usd || 0} decimals={0} prefix={siteCurrency.symbol} /></strong></span>
                 </div>
               </SpotlightCard>
             </RevealItem>
@@ -4975,14 +4941,14 @@ export default function DashboardWorkspace({
             <RevealItem variant="grid" className="flex">
               <SpotlightCard
                 onClick={() => setSelectedKpiModal('energy')}
-                className="w-full p-6 sm:p-7 flex flex-col justify-between cursor-pointer group"
+                className="w-full p-5 sm:p-6 flex flex-col justify-between cursor-pointer group bg-g-surface border border-g-border rounded-xl"
               >
-                <div className="flex items-center justify-between text-[13px] text-silver gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <RomanMedallion numeral="04" size="md" active />
-                    <span className="font-cinzel tracking-wider font-semibold truncate">FLEET POWER &amp; LOAD</span>
+                <div className="flex items-center justify-between text-[13px] text-g-textSecondary gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-g-surfaceElevated border border-g-border text-g-textSecondary font-semibold">04</span>
+                    <span className="font-sans font-semibold tracking-wide text-g-text truncate">FLEET POWER &amp; LOAD</span>
                   </div>
-                  <span className="text-xs font-mono text-laurel px-2 py-0.5 rounded bg-laurel/10 border border-laurel/25 shrink-0"><AnimatedNumber value={data.summary.energy?.green_energy_pct || 44.5} decimals={1} suffix="%" /> Clean</span>
+                  <span className="text-xs font-mono text-emerald-400 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/25 shrink-0"><AnimatedNumber value={data.summary.energy?.green_energy_pct || 44.5} decimals={1} suffix="%" /> Clean</span>
                 </div>
                 <div className="my-4 space-y-3">
                   <div className="flex items-baseline justify-between gap-2">
@@ -4990,18 +4956,18 @@ export default function DashboardWorkspace({
                       value={data.summary.energy?.total_power_kw || 79.3}
                       decimals={1}
                       suffix=" kW"
-                      className="font-cinzel text-4xl xl:text-[42px] font-bold text-marble tracking-tight leading-none"
+                      className="font-sans text-4xl xl:text-[42px] font-bold text-g-text tracking-tight leading-none"
                     />
-                    <span className="text-xs text-silver font-sans">Active Load</span>
+                    <span className="text-xs text-g-textSecondary font-sans">Active Load</span>
                   </div>
                   <div className="w-full h-1.5 rounded-full bg-g-surfaceElevated overflow-hidden border border-g-border/50">
-                    <GrowBar value={data.summary.energy?.green_energy_pct || 44.5} className="h-full rounded-full bg-laurel" />
+                    <GrowBar value={data.summary.energy?.green_energy_pct || 44.5} className="h-full rounded-full bg-emerald-500" />
                   </div>
                 </div>
-                <div className="text-[13px] text-silver pt-3.5 border-t border-line flex items-center justify-between font-mono">
-                  <span className="text-laurel"><strong className="font-semibold"><AnimatedNumber value={data.summary.running_machines} decimals={0} /></strong> Active Assets</span>
-                  <span className="text-line">|</span>
-                  <span><strong className="text-marble font-semibold"><AnimatedNumber value={data.summary.energy?.specific_energy_kwh_per_unit || 0.43} decimals={2} /></strong> kWh/unit</span>
+                <div className="text-[13px] text-g-textSecondary pt-3.5 border-t border-g-border flex items-center justify-between font-mono">
+                  <span className="text-emerald-400"><strong className="font-semibold"><AnimatedNumber value={data.summary.running_machines} decimals={0} /></strong> Active Assets</span>
+                  <span className="text-g-textMuted">|</span>
+                  <span><strong className="text-g-text font-semibold"><AnimatedNumber value={data.summary.energy?.specific_energy_kwh_per_unit || 0.43} decimals={2} /></strong> kWh/unit</span>
                 </div>
               </SpotlightCard>
             </RevealItem>
@@ -5038,8 +5004,9 @@ export default function DashboardWorkspace({
                               key={sKey}
                               onClick={() => {
                                 setActiveShift(sKey);
+                                const currentLead = shiftSupervisors[sKey] || SHIFT_CONFIGS[sKey].supervisor;
                                 pushEvent(
-                                  `Shift window changed to ${SHIFT_CONFIGS[sKey].name} (${SHIFT_CONFIGS[sKey].supervisor})`,
+                                  `Shift window changed to ${SHIFT_CONFIGS[sKey].name} (${currentLead})`,
                                   'Shift',
                                   'blue'
                                 );
@@ -5056,9 +5023,22 @@ export default function DashboardWorkspace({
                       </div>
                     </SlidingTabGroup>
                     <span className="hidden sm:inline text-g-textMuted">·</span>
-                    <span>Supervisor: <span className="text-g-text font-semibold">{SHIFT_CONFIGS[activeShift].supervisor}</span></span>
+                    <button
+                      type="button"
+                      onClick={() => setShowSupervisorModal(true)}
+                      className="inline-flex items-center gap-1.5 px-2 py-0.5 -my-0.5 rounded-md hover:bg-g-surfaceElevated border border-transparent hover:border-g-border transition-colors cursor-pointer group text-left"
+                      title="Manage Shift Supervisor & Operator Badge-In (ISA-95 Rota)"
+                    >
+                      <span className="text-g-textSecondary">Supervisor:</span>
+                      <span className="text-g-text font-semibold underline decoration-dotted decoration-g-blue/60 underline-offset-2 group-hover:text-g-blue transition-colors">
+                        {currentSupervisor}
+                      </span>
+                      <svg className="w-3 h-3 text-g-textMuted group-hover:text-g-blue transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                      </svg>
+                    </button>
                     <span className="hidden sm:inline text-g-textMuted">·</span>
-                    <span>{SHIFT_CONFIGS[activeShift].hours} UTC ({SHIFT_CONFIGS[activeShift].elapsedPct}% elapsed)</span>
+                    <span>{SHIFT_CONFIGS[activeShift].hours} ({SHIFT_CONFIGS[activeShift].elapsedPct}% elapsed)</span>
                     <div className="hidden lg:block w-20 h-1.5 rounded-full bg-g-surfaceElevated overflow-hidden border border-g-border/50" title={`${SHIFT_CONFIGS[activeShift].elapsedPct}% shift elapsed`}>
                       <GrowBar value={SHIFT_CONFIGS[activeShift].elapsedPct} className="h-full rounded-full bg-g-blue" />
                     </div>
@@ -5075,7 +5055,7 @@ export default function DashboardWorkspace({
                       <button
                         type="button"
                         onClick={() => setShowEventPopover((v) => !v)}
-                        className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-g-surfaceElevated hover:bg-g-surfaceSubtle border border-g-border text-xs font-mono text-g-text cursor-pointer max-w-[240px]"
+                        className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-g-surfaceElevated hover:bg-g-surfaceSubtle border border-g-border text-xs font-mono text-g-text cursor-pointer max-w-[280px]"
                         title="Toggle live shift event feed"
                       >
                         <StatusDot
@@ -5087,11 +5067,11 @@ export default function DashboardWorkspace({
                           initial={shouldReduce ? false : { opacity: 0, y: 5 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.2, ease }}
-                          className="truncate text-[11px] text-g-textSecondary"
+                          className="truncate text-[11px] text-g-textSecondary max-w-[150px]"
                         >
                           {eventLog[0]?.label || 'Telemetry online'}
                         </motion.span>
-                        <span className="text-[10px] text-g-blue font-semibold shrink-0">
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-g-blue/15 text-g-blue font-semibold shrink-0">
                           {eventLog.length}
                         </span>
                       </button>
@@ -7991,10 +7971,10 @@ export default function DashboardWorkspace({
                     </span>
                   </div>
                   <h3 className="text-xl font-bold text-g-text tracking-tight mt-1.5">
-                    {activeSite?.name.replace(/\s*\(Production Live\)/i, '') || 'Detroit Site 04'} — Shift 1 Operational Handover Summary
+                    {activeSite?.name.replace(/\s*\(Production Live\)/i, '') || 'Detroit Site 04'} — {SHIFT_CONFIGS[activeShift].label} Operational Handover Summary
                   </h3>
                   <p className="text-xs text-g-textSecondary font-mono mt-0.5">
-                    Generated at {new Date().toUTCString()} • Host: synapsys-mfg-engine-01 • Supervisor: Operations Lead
+                    Generated at {new Date().toUTCString()} • Host: synapsys-mfg-engine-01 • Supervisor: {currentSupervisor}
                   </p>
                 </div>
 
@@ -8076,9 +8056,14 @@ export default function DashboardWorkspace({
 
               {/* Operator Handover Signoff Checklist */}
               <div className="bg-g-surfaceElevated p-4 rounded-xl border border-g-border space-y-2 text-xs">
-                <span className="font-bold text-g-text uppercase tracking-wider font-mono block text-[11px]">
-                  Shift Handover Safety & Quality Signoff:
-                </span>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-g-border/60 pb-1.5">
+                  <span className="font-bold text-g-text uppercase tracking-wider font-mono text-[11px]">
+                    Shift Handover Safety & Quality Signoff:
+                  </span>
+                  <span className="text-[11px] font-mono text-emerald-700 dark:text-emerald-400 font-semibold">
+                    Certified Lead in Charge: {currentSupervisor}
+                  </span>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-g-textSecondary font-mono text-[11px]">
                   <div className="flex items-center gap-2">
                     <svg className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
@@ -8130,6 +8115,265 @@ export default function DashboardWorkspace({
                   Close
                 </button>
               </div>
+        </MotionModal>
+
+        {/* Shift Supervisor & Operator Roster Assignment Modal (ISA-95 Level 3) */}
+        <MotionModal
+          isOpen={showSupervisorModal}
+          backdropClassName="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 font-sans"
+          panelClassName="bg-g-surface border border-g-border rounded-xl max-w-2xl w-full p-4 sm:p-6 flex flex-col gap-4 sm:gap-5 shadow-2xl max-h-[88vh] sm:max-h-[92vh] overflow-y-auto"
+        >
+          {/* Modal Header */}
+          <div className="flex items-start justify-between border-b border-g-border pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-1 rounded text-xs font-mono font-bold bg-g-blueLight text-g-blue border border-g-blue/30">
+                  ISA-95 LEVEL 3 // SHIFT ROTA & BADGE-IN
+                </span>
+                <span className="text-xs text-g-textSecondary font-mono uppercase">
+                  ISO-22400 Custody Transfer
+                </span>
+              </div>
+              <h3 className="text-xl font-bold text-g-text tracking-tight mt-1.5">
+                Shift Supervisor & Operator Assignment
+              </h3>
+              <p className="text-xs text-g-textSecondary font-mono mt-0.5">
+                Active Window: {SHIFT_CONFIGS[activeShift].label} ({SHIFT_CONFIGS[activeShift].hours}) • Plant: {activeSite?.name.replace(/\s*\(Production Live\)/i, '') || 'Detroit Site 04'}
+              </p>
+            </div>
+            <button
+              onClick={() => setShowSupervisorModal(false)}
+              className="p-1 rounded-md text-g-textSecondary hover:text-g-text hover:bg-g-surfaceElevated transition-colors"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Active Lead in Charge Card */}
+          <div className="bg-g-surfaceElevated p-4 rounded-xl border border-g-border flex items-center justify-between gap-4 font-mono">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-lg bg-g-blue/10 border border-g-blue/30 text-g-blue font-bold text-base flex items-center justify-center font-sans">
+                {currentSupervisor.charAt(0)}
+              </div>
+              <div>
+                <span className="text-[10px] text-g-textSecondary uppercase tracking-wider block">
+                  Active Shift Lead in Charge
+                </span>
+                <span className="text-base font-bold text-g-text block font-sans">
+                  {currentSupervisor}
+                </span>
+                <span className="text-xs text-emerald-700 dark:text-emerald-400">
+                  Authorized for line interlock clears & certified handover signoff
+                </span>
+              </div>
+            </div>
+            <div className="hidden sm:flex flex-col items-end text-xs">
+              <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-[11px] font-semibold">
+                ACTIVE CUSTODY
+              </span>
+              <span className="text-[10px] text-g-textMuted mt-1">
+                Target: {SHIFT_CONFIGS[activeShift].target} units
+              </span>
+            </div>
+          </div>
+
+          {/* Quick Action: Take Over as Session User */}
+          {currentUser && (
+            <div className="bg-gradient-to-r from-g-blueLight/50 to-transparent p-4 rounded-xl border border-g-blue/20 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-g-surfaceElevated border border-g-border text-g-text font-bold text-sm flex items-center justify-center font-sans">
+                  {currentUser.full_name ? currentUser.full_name.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-g-text">{currentUser.full_name || 'Operator'}</span>
+                    <span className="px-1.5 py-0.5 rounded bg-g-surfaceElevated border border-g-border text-[10px] font-mono text-g-blue uppercase">
+                      {currentUser.role}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-g-textSecondary font-mono block">
+                    Session Identity: {currentUser.email} • Badge: BADGE-USR-{String(currentUser.id || 1).padStart(4, '0')}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  handleAssignSupervisor(currentUser.full_name || 'Lead Operator', `USR-${currentUser.id || 1}`);
+                  setShowSupervisorModal(false);
+                }}
+                className="px-3.5 py-1.5 rounded-lg bg-g-blue hover:bg-g-blueHover text-white text-xs font-semibold font-mono transition-colors shadow-sm cursor-pointer"
+              >
+                Badge In Current User
+              </button>
+            </div>
+          )}
+
+          {/* Certified Plant Personnel Roster */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-g-text uppercase tracking-wider font-mono">
+                Certified Plant Roster (Prescheduled Rota)
+              </span>
+              <span className="text-[11px] text-g-textSecondary font-mono">
+                {CERTIFIED_PLANT_ROSTER.length} Certified Operators
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-2">
+              {CERTIFIED_PLANT_ROSTER.map((op) => {
+                const isSelected = currentSupervisor.toLowerCase().includes(op.name.toLowerCase());
+                return (
+                  <div
+                    key={op.badgeId}
+                    className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 font-mono ${
+                      isSelected
+                        ? 'bg-emerald-500/5 border-emerald-500/40 text-g-text'
+                        : 'bg-g-surfaceElevated border-g-border hover:border-g-border/80'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 font-sans ${
+                        isSelected
+                          ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30'
+                          : 'bg-g-surface border border-g-border text-g-textSecondary'
+                      }`}>
+                        {op.name.charAt(0)}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-bold text-g-text text-xs">{op.name}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-g-surface border border-g-border text-g-textSecondary">
+                            {op.badgeId}
+                          </span>
+                          <span className="text-[10px] text-g-blue font-semibold">
+                            {op.level}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-g-textSecondary truncate">
+                          {op.role} • {op.cert}
+                        </p>
+                        <span className="text-[10px] text-g-textMuted block">
+                          Location: {op.location}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="shrink-0">
+                      {isSelected ? (
+                        <span className="px-2.5 py-1 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-[11px] font-bold">
+                          Assigned Lead
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleAssignSupervisor(op.name, op.badgeId);
+                            setShowSupervisorModal(false);
+                          }}
+                          className="px-3 py-1 rounded-lg bg-g-surface hover:bg-g-surfaceSubtle border border-g-border hover:border-g-blue/50 text-g-text text-xs font-semibold transition-colors cursor-pointer"
+                        >
+                          Assign Lead
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Custom RFID / NFC Badge Tap Simulation */}
+          <div className="bg-g-surfaceElevated p-4 rounded-xl border border-g-border space-y-3 font-mono">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-g-text uppercase tracking-wider block">
+                Simulate Physical RFID / NFC Badge Tap
+              </span>
+              <span className="text-[10px] text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Reader Online (13.56 MHz HF)
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] text-g-textSecondary block mb-1">Operator Full Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. D. Chen / CNC Lead"
+                  value={customSupervisorName}
+                  onChange={(e) => setCustomSupervisorName(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-lg bg-g-surface border border-g-border text-g-text text-xs focus:outline-none focus:border-g-blue font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] text-g-textSecondary block mb-1">RFID Transponder Badge ID</label>
+                <input
+                  type="text"
+                  placeholder="e.g. OPR-7820-X"
+                  value={customBadgeId}
+                  onChange={(e) => setCustomBadgeId(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-lg bg-g-surface border border-g-border text-g-text text-xs focus:outline-none focus:border-g-blue font-mono"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-[10px] text-g-textMuted">
+                Writes operator UID to Level 2 SCADA tag: PLC.Cell.ActiveOperator
+              </span>
+              <button
+                type="button"
+                disabled={badgeScanStatus === 'scanning'}
+                onClick={() => {
+                  const targetName = customSupervisorName.trim() || 'D. Chen';
+                  const targetBadge = customBadgeId.trim() || 'OPR-7820-X';
+                  setBadgeScanStatus('scanning');
+                  setTimeout(() => {
+                    handleAssignSupervisor(targetName, targetBadge);
+                    setBadgeScanStatus('success');
+                    setCustomSupervisorName('');
+                    setCustomBadgeId('');
+                    setTimeout(() => {
+                      setBadgeScanStatus('idle');
+                      setShowSupervisorModal(false);
+                    }, 600);
+                  }, 500);
+                }}
+                className="px-3.5 py-1.5 rounded-lg bg-g-blue hover:bg-g-blueHover text-white text-xs font-semibold transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {badgeScanStatus === 'scanning' ? (
+                  <>
+                    <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10" strokeWidth="4" className="opacity-25" /><path d="M4 12a8 8 0 018-8" strokeWidth="4" className="opacity-75" /></svg>
+                    <span>Reading RFID Tag...</span>
+                  </>
+                ) : badgeScanStatus === 'success' ? (
+                  <span>Badge Accepted</span>
+                ) : (
+                  <span>Simulate RFID Tap & Assign</span>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Modal Actions */}
+          <div className="pt-3 border-t border-g-border flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+            <button
+              type="button"
+              onClick={() => {
+                handleAssignSupervisor(SHIFT_CONFIGS[activeShift].supervisor, 'ROTA-DEFAULT');
+                setShowSupervisorModal(false);
+              }}
+              className="text-g-textSecondary hover:text-g-text underline decoration-dotted text-xs cursor-pointer"
+            >
+              Reset to Default Shift Schedule ({SHIFT_CONFIGS[activeShift].supervisor})
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowSupervisorModal(false)}
+              className="px-4 py-2 rounded-lg bg-g-surfaceElevated hover:bg-g-surfaceSubtle border border-g-border text-g-text font-medium transition-colors cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
         </MotionModal>
 
         {/* Detailed Work Order Inspection & Telemetry Modal */}
@@ -9544,7 +9788,7 @@ export default function DashboardWorkspace({
           backdropClassName="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4"
           panelClassName="bg-g-surface border border-g-border rounded-xl max-w-2xl sm:max-w-3xl w-full p-4 sm:p-7 flex flex-col gap-4 sm:gap-5 shadow-2xl relative max-h-[90vh] overflow-y-auto"
         >
-          {() => {
+          {(() => {
             const safeIdx = Math.max(0, Math.min(TUTORIAL_STEPS.length - 1, tutorialStep));
             const currentStep = TUTORIAL_STEPS[safeIdx] || TUTORIAL_STEPS[0];
 
@@ -9660,7 +9904,6 @@ export default function DashboardWorkspace({
                       </strong>
                       <span className="text-g-textSecondary">{currentStep.proTip}</span>
                     </div>
-
                   </div>
                 )}
 
@@ -9715,7 +9958,283 @@ export default function DashboardWorkspace({
                 </div>
               </>
             );
-          }}
+          })()}
+        </MotionModal>
+
+        {/* Corporate User Profile Modal */}
+        <MotionModal
+          isOpen={showProfileModal}
+          backdropClassName="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4"
+          panelClassName="bg-g-surface border border-g-border rounded-xl max-w-md w-full p-5 sm:p-6 flex flex-col gap-4 shadow-2xl max-h-[88vh] overflow-y-auto"
+        >
+              <div className="flex items-center justify-between border-b border-g-border pb-3.5">
+                <div className="flex items-center gap-3.5">
+          panelClassName="bg-g-surface border border-g-border rounded-xl max-w-lg w-full p-5 sm:p-6 flex flex-col gap-4 shadow-2xl relative max-h-[88vh] overflow-y-auto font-mono text-xs"
+        >
+              <div className="flex items-start justify-between border-b border-g-border pb-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded bg-g-blueLight text-g-blue border border-g-blue/30 font-bold uppercase text-[10px]">
+                      Hotkeys
+                    </span>
+                    <h3 className="text-base font-bold text-g-text font-sans">Keyboard Shortcuts</h3>
+                  </div>
+                  <p className="text-g-textSecondary text-xs font-sans mt-0.5">
+                    Fast supervisory navigation and platform interlock controls
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowHotkeysModal(false)}
+                  className="p-1 rounded text-g-textSecondary hover:text-g-text hover:bg-g-surfaceElevated transition-colors"
+                  title="Close Shortcuts"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <span className="text-[10px] font-semibold text-g-textSecondary uppercase tracking-wider block">
+                  Primary Navigation
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center justify-between p-2 rounded bg-g-surfaceElevated border border-g-borderSubtle">
+                    <span className="text-g-text">Fleet Overview</span>
+                    <kbd className="px-2 py-0.5 rounded bg-g-surface border border-g-border text-g-blue font-bold">1</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded bg-g-surfaceElevated border border-g-borderSubtle">
+                    <span className="text-g-text">Field Connectors</span>
+                    <kbd className="px-2 py-0.5 rounded bg-g-surface border border-g-border text-g-blue font-bold">2</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded bg-g-surfaceElevated border border-g-borderSubtle">
+                    <span className="text-g-text">Digital Twin Floor</span>
+                    <kbd className="px-2 py-0.5 rounded bg-g-surface border border-g-border text-g-blue font-bold">3</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded bg-g-surfaceElevated border border-g-borderSubtle">
+                    <span className="text-g-text">Six Big Losses</span>
+                    <kbd className="px-2 py-0.5 rounded bg-g-surface border border-g-border text-g-blue font-bold">4</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded bg-g-surfaceElevated border border-g-borderSubtle">
+                    <span className="text-g-text">Work Orders</span>
+                    <kbd className="px-2 py-0.5 rounded bg-g-surface border border-g-border text-g-blue font-bold">5</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded bg-g-surfaceElevated border border-g-borderSubtle">
+                    <span className="text-g-text">Alarms & Incidents</span>
+                    <kbd className="px-2 py-0.5 rounded bg-g-surface border border-g-border text-g-blue font-bold">6</kbd>
+                  </div>
+
+                </div>
+
+                <span className="text-[10px] font-semibold text-g-textSecondary uppercase tracking-wider block pt-2">
+                  Telemetry & System Actions
+                </span>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between p-2 rounded bg-g-surfaceElevated border border-g-borderSubtle">
+                    <span className="text-g-text">Focus Global Search Omnibox</span>
+                    <kbd className="px-2.5 py-0.5 rounded bg-g-surface border border-g-border text-g-blue font-bold">/ or Ctrl+K</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded bg-g-surfaceElevated border border-g-borderSubtle">
+                    <span className="text-g-text">Pause / Resume Telemetry Stream</span>
+                    <kbd className="px-2.5 py-0.5 rounded bg-g-surface border border-g-border text-g-text font-bold">Space</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded bg-g-surfaceElevated border border-g-borderSubtle">
+                    <span className="text-g-text">Toggle Keyboard Hotkeys Guide</span>
+                    <kbd className="px-2.5 py-0.5 rounded bg-g-surface border border-g-border text-g-text font-bold">?</kbd>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded bg-g-surfaceElevated border border-g-borderSubtle">
+                    <span className="text-g-text">Close Any Active Modal / Drawer</span>
+                    <kbd className="px-2.5 py-0.5 rounded bg-g-surface border border-g-border text-g-text font-bold">Esc</kbd>
+                  </div>
+
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-g-border flex justify-end">
+                <button
+                  onClick={() => setShowHotkeysModal(false)}
+                  className="px-4 py-1.5 rounded-lg bg-g-blue text-white font-medium font-sans"
+                >
+                  Got It
+                </button>
+              </div>
+        </MotionModal>
+
+        {/* Enterprise Platform Onboarding Guide Modal */}
+        <MotionModal
+          isOpen={showTutorial}
+          backdropClassName="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4"
+          panelClassName="bg-g-surface border border-g-border rounded-xl max-w-2xl sm:max-w-3xl w-full p-4 sm:p-7 flex flex-col gap-4 sm:gap-5 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+        >
+          {(() => {
+            const safeIdx = Math.max(0, Math.min(TUTORIAL_STEPS.length - 1, tutorialStep));
+            const currentStep = TUTORIAL_STEPS[safeIdx] || TUTORIAL_STEPS[0];
+
+            return (
+              <>
+                {/* Modal Header */}
+                <div className="flex items-start justify-between border-b border-g-border pb-4">
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-g-surfaceElevated text-g-blue border border-g-border font-mono">
+                        {currentStep.badge}
+                      </span>
+                      <span className="text-xs text-g-textSecondary uppercase tracking-wider">
+                        Operations guide
+                      </span>
+                    </div>
+                    <h3 className="text-lg sm:text-xl font-semibold text-g-text tracking-tight mt-1.5">
+                      {currentStep.title}
+                    </h3>
+                    <p className="text-xs font-normal text-g-textSecondary mt-0.5">
+                      {currentStep.subtitle}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowTutorial(false)}
+                    className="p-1 rounded-md text-g-textSecondary hover:text-g-text hover:bg-g-surfaceElevated transition-colors"
+                    title="Close Guide"
+                  >
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Stepper Navigation Tabs (6 Steps) */}
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 text-xs font-mono">
+                  {TUTORIAL_STEPS.map((s, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        setTutorialStep(idx);
+                        setActiveTab(s.actionTab as any);
+                      }}
+                      className={`py-1.5 px-2 rounded-lg text-center transition-all border cursor-pointer ${safeIdx === idx
+                          ? 'bg-amber-500/20 text-amber-800 dark:text-amber-400 border-amber-500 font-semibold shadow-xs ring-1 ring-amber-500/50'
+                          : 'bg-g-surfaceElevated border-g-border text-g-textSecondary hover:text-g-text'
+                        }`}
+                    >
+                      <span className="block text-[10px] opacity-80">Step {idx + 1}</span>
+                      <span className="truncate block font-sans text-[11px] font-medium">
+                        {s.shortTitle}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Body Explanation */}
+                <div className="text-xs sm:text-sm text-g-text leading-relaxed bg-g-surfaceElevated p-3.5 sm:p-4 rounded-lg border border-g-borderSubtle">
+                  {currentStep.content}
+                </div>
+
+                {/* Interactive Action Guide */}
+                {currentStep.howToUse && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 sm:p-3.5 text-xs">
+                    <div className="flex items-center gap-1.5 text-amber-800 dark:text-amber-400 font-semibold font-mono uppercase tracking-wider mb-1">
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zm-7.518-.267A8.25 8.25 0 1120.25 10.5M8.288 14.212A5.25 5.25 0 1117.25 10.5" />
+                      </svg>
+                      Interactive Action Guide (How to Operate)
+                    </div>
+                    <p className="text-g-text leading-relaxed font-sans">
+                      {currentStep.howToUse}
+                    </p>
+                  </div>
+                )}
+
+                {/* Key Capabilities Bullet Points */}
+                <div className="space-y-2">
+                  <span className="text-[11px] font-semibold text-g-text uppercase tracking-wider block font-mono">
+                    Key Architectural Capabilities:
+                  </span>
+                  <div className="grid grid-cols-1 gap-2">
+                    {currentStep.keyPoints?.map((point, pIdx) => {
+                      const colonIdx = point.indexOf(':');
+                      const title = colonIdx !== -1 ? point.slice(0, colonIdx) : '';
+                      const body = colonIdx !== -1 ? point.slice(colonIdx + 1) : point;
+                      return (
+                        <div key={pIdx} className="flex items-start gap-2.5 text-xs text-g-text bg-g-surfaceElevated p-2.5 rounded-lg border border-g-borderSubtle">
+                          <span className="w-5 h-5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 flex items-center justify-center flex-shrink-0 mt-0.5 border border-emerald-500/30">
+                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                          </span>
+                          <div className="leading-relaxed">
+                            {title && <strong className="font-semibold text-g-text mr-1">{title}:</strong>}
+                            <span className="text-g-textSecondary">{body}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Pro-Tip Callout Box */}
+                {currentStep.proTip && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-xs flex items-start gap-2.5">
+                    <span className="w-5 h-5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-400 flex items-center justify-center flex-shrink-0 mt-0.5 border border-amber-500/30">
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                      </svg>
+                    </span>
+                    <div className="text-g-text leading-relaxed">
+                      <strong className="font-semibold text-amber-800 dark:text-amber-400 uppercase tracking-wider font-mono text-[11px] block mb-0.5">
+                        Plant Operator Pro-Tip
+                      </strong>
+                      <span className="text-g-textSecondary">{currentStep.proTip}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Stepper Footer Controls */}
+                <div className="pt-3 border-t border-g-border flex items-center justify-between gap-2 flex-wrap">
+                  <button
+                    onClick={() => setShowTutorial(false)}
+                    className="text-xs text-g-textSecondary hover:text-g-text font-medium underline-offset-4 hover:underline"
+                  >
+                    Skip Guide
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    {tutorialStep > 0 && (
+                      <button
+                        onClick={() => {
+                          const prev = Math.max(0, safeIdx - 1);
+                          setTutorialStep(prev);
+                          setActiveTab(TUTORIAL_STEPS[prev].actionTab as any);
+                        }}
+                        className="px-3 py-1.5 rounded-lg border border-g-border text-g-text text-xs font-medium hover:bg-g-surfaceElevated transition-colors cursor-pointer"
+                      >
+                        Previous
+                      </button>
+                    )}
+                    {safeIdx < TUTORIAL_STEPS.length - 1 ? (
+                      <button
+                        onClick={() => {
+                          const next = Math.min(TUTORIAL_STEPS.length - 1, safeIdx + 1);
+                          setTutorialStep(next);
+                          setActiveTab(TUTORIAL_STEPS[next].actionTab as any);
+                        }}
+                        className="px-4 py-1.5 rounded-lg bg-g-blue hover:bg-g-blueHover text-white text-xs font-medium shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <span>Next section</span>
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                        </svg>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setShowTutorial(false)}
+                        className="px-4 py-1.5 rounded-lg bg-g-blue hover:bg-g-blueHover text-white text-xs font-medium shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <span>Enter platform</span>
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </>
+            );
+          })()}
         </MotionModal>
 
         {/* Corporate User Profile Modal */}
@@ -9810,106 +10329,210 @@ export default function DashboardWorkspace({
         </footer>
       </main>
 
-      {/* Mobile Sticky Bottom Navigation Bar (Thumb-Friendly for Plant Floor Operators) */}
-      <nav
-        aria-label="Mobile Bottom Navigation"
-        className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-g-surface/95 backdrop-blur-md border-t border-g-border shadow-lg safe-bottom flex items-center justify-around px-2 py-1.5"
-      >
-        <button
-          onClick={() => setActiveTab('overview')}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-lg transition-colors cursor-pointer ${activeTab === 'overview' ? 'text-g-blue font-semibold' : 'text-g-textSecondary hover:text-g-text'
-            }`}
+      {/* Dynamic SCADA Cockpit Floating Dock (Universal across Desktop, Tablet & Mobile) */}
+      <div className="fixed bottom-5 sm:bottom-6 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
+        <nav
+          aria-label="SCADA Operational Modules Floating Dock"
+          className="relative flex items-center gap-1 sm:gap-2.5 p-1.5 sm:p-2 rounded-full bg-[#0a0e17]/90 backdrop-blur-2xl border border-white/[0.12] shadow-[0_20px_50px_rgba(0,0,0,0.7),0_0_30px_rgba(59,130,246,0.15)] max-w-[calc(100vw-20px)] overflow-x-auto no-scrollbar scroll-smooth"
         >
-          <div className="relative">
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
-            </svg>
-            <span className="absolute -top-1 -right-2 text-[9px] font-mono font-bold bg-g-blue text-white rounded-full px-1">
-              {data.machines.length}
-            </span>
-          </div>
-          <span className="text-[10px] mt-0.5 font-medium">Fleet</span>
-        </button>
+          {[
+            {
+              id: 'overview',
+              label: 'Fleet',
+              fullTitle: 'Fleet & OEE Telemetry',
+              key: '1',
+              accentColor: 'text-blue-400',
+              pipColor: 'bg-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.9)]',
+              icon: (
+                <svg className="w-5 h-5 sm:w-5.5 sm:h-5.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <circle cx="12" cy="12" r="9" strokeOpacity="0.4" strokeDasharray="3 3" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v3m0 12v3M3 12h3m12 0h3" />
+                  <circle cx="12" cy="12" r="3.5" fill="currentColor" fillOpacity="0.15" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8.5v3.5l2.5 2.5" />
+                </svg>
+              ),
+            },
+            {
+              id: 'connectors',
+              label: 'Ingest',
+              fullTitle: 'Field & Shift Ingest Gateway',
+              key: '2',
+              accentColor: 'text-cyan-400',
+              pipColor: 'bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.9)]',
+              icon: (
+                <svg className="w-5 h-5 sm:w-5.5 sm:h-5.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <rect x="3" y="14" width="18" height="7" rx="2" strokeLinecap="round" />
+                  <circle cx="7" cy="17.5" r="1" fill="currentColor" />
+                  <circle cx="11" cy="17.5" r="1" fill="currentColor" />
+                  <circle cx="15" cy="17.5" r="1" fill="currentColor" />
+                  <path strokeLinecap="round" d="M12 14V8m-4 3a6 6 0 018 0m-6-4a9 9 0 0110 0" />
+                </svg>
+              ),
+            },
+            {
+              id: 'twin',
+              label: 'Twin',
+              fullTitle: 'Digital Twin Floor (2D Spatial)',
+              key: '3',
+              accentColor: 'text-emerald-400',
+              pipColor: 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.9)]',
+              icon: (
+                <svg className="w-5 h-5 sm:w-5.5 sm:h-5.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 2.5L3.5 7.5v9L12 21.5l8.5-5v-9L12 2.5z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 2.5v9.5m0 0l8.5-4.5M12 12l-8.5-4.5" />
+                  <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+                </svg>
+              ),
+            },
+            {
+              id: 'losses',
+              label: 'Losses',
+              fullTitle: 'Six Big Losses (ISO-22400)',
+              key: '4',
+              accentColor: 'text-amber-400',
+              pipColor: 'bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.9)]',
+              icon: (
+                <svg className="w-5 h-5 sm:w-5.5 sm:h-5.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 20h18M4 16v-4a1 1 0 011-1h2a1 1 0 011 1v4m3 0V9a1 1 0 011-1h2a1 1 0 011 1v7m3 0V5a1 1 0 011-1h2a1 1 0 011 1v11" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 6l6 3 8-5" strokeDasharray="1.5 1.5" />
+                </svg>
+              ),
+            },
+            {
+              id: 'workorders',
+              label: 'Orders',
+              fullTitle: 'Production Work Orders',
+              key: '5',
+              accentColor: 'text-indigo-400',
+              pipColor: 'bg-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.9)]',
+              icon: (
+                <svg className="w-5 h-5 sm:w-5.5 sm:h-5.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <rect x="5" y="4" width="14" height="17" rx="2.5" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 2.5h6a1 1 0 011 1V5H8v-1.5a1 1 0 011-1z" />
+                  <path strokeLinecap="round" d="M9 10h6m-6 3.5h6M9 17h3" />
+                </svg>
+              ),
+            },
+            {
+              id: 'alarms',
+              label: 'Alarms',
+              fullTitle: 'ISA-18.2 Incident Alarms',
+              key: '6',
+              accentColor: 'text-rose-400',
+              pipColor: 'bg-rose-400 shadow-[0_0_10px_rgba(251,113,133,0.9)]',
+              hasActiveAlarm: data.active_alarms.filter((a) => !a.acknowledged).length > 0,
+              alarmCount: data.active_alarms.filter((a) => !a.acknowledged).length,
+              icon: (
+                <svg className="w-5 h-5 sm:w-5.5 sm:h-5.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3.5L2.5 19.5h19L12 3.5z" />
+                  <line x1="12" y1="9" x2="12" y2="13.5" strokeLinecap="round" />
+                  <circle cx="12" cy="16.5" r="1" fill="currentColor" />
+                </svg>
+              ),
+            },
+            {
+              id: 'inventory',
+              label: 'Spares',
+              fullTitle: 'Inventory & MRO Spares',
+              key: '7',
+              accentColor: 'text-teal-400',
+              pipColor: 'bg-teal-400 shadow-[0_0_10px_rgba(45,212,191,0.9)]',
+              icon: (
+                <svg className="w-5 h-5 sm:w-5.5 sm:h-5.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.5 7.5L12 3l8.5 4.5v9L12 21l-8.5-4.5v-9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.5 7.5h17M8 10v4m8-4v4" />
+                  <circle cx="12" cy="14" r="1.5" fill="currentColor" />
+                </svg>
+              ),
+            },
+            {
+              id: 'acoustic_ai',
+              label: 'Acoustic',
+              fullTitle: 'Acoustic AI Ultrasonic Twin',
+              key: '8',
+              accentColor: 'text-purple-400',
+              pipColor: 'bg-purple-400 shadow-[0_0_10px_rgba(192,132,252,0.9)]',
+              icon: (
+                <svg className="w-5 h-5 sm:w-5.5 sm:h-5.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <circle cx="12" cy="12" r="3" fill="currentColor" fillOpacity="0.2" />
+                  <path strokeLinecap="round" d="M8 8a5.5 5.5 0 000 8m8-8a5.5 5.5 0 010 8m-11-11a9.5 9.5 0 000 14m14-14a9.5 9.5 0 010 14" />
+                </svg>
+              ),
+            },
+            {
+              id: 'sandbox',
+              label: 'Sandbox',
+              fullTitle: 'Process Simulation Sandbox',
+              key: '9',
+              accentColor: 'text-sky-400',
+              pipColor: 'bg-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.9)]',
+              icon: (
+                <svg className="w-5 h-5 sm:w-5.5 sm:h-5.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 3h6m-4 0v5.5L4.5 19a2 2 0 001.7 3h11.6a2 2 0 001.7-3L13 8.5V3" />
+                  <circle cx="12" cy="16" r="1.5" fill="currentColor" />
+                  <path strokeLinecap="round" d="M8 17.5h8" strokeDasharray="1.5 1.5" />
+                </svg>
+              ),
+            },
+          ].map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`group relative flex flex-col items-center justify-center px-2 sm:px-3 py-1.5 rounded-2xl transition-all duration-200 cursor-pointer select-none shrink-0 ${
+                  isActive ? tab.accentColor : 'text-g-textMuted hover:text-white'
+                }`}
+                title={`${tab.fullTitle} (Press ${tab.key})`}
+              >
+                {/* Active Capsule Glass Highlight */}
+                {isActive && (
+                  <motion.div
+                    layoutId="scada-dock-active-bg"
+                    className="absolute inset-0 rounded-2xl bg-white/[0.08] border border-white/[0.12] shadow-inner pointer-events-none"
+                    transition={{ type: 'spring', bounce: 0.15, duration: 0.35 }}
+                  />
+                )}
 
-        <button
-          onClick={() => setActiveTab('twin')}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-lg transition-colors cursor-pointer ${activeTab === 'twin' ? 'text-g-blue font-semibold' : 'text-g-textSecondary hover:text-g-text'
-            }`}
-        >
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0H3" />
-          </svg>
-          <span className="text-[10px] mt-0.5 font-medium">Floor Twin</span>
-        </button>
+                {/* Custom Module Logo / Icon */}
+                <div className="relative z-10 transition-transform duration-200 group-hover:-translate-y-1 group-hover:scale-115">
+                  {tab.icon}
 
-        <button
-          onClick={() => setActiveTab('workorders')}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-lg transition-colors cursor-pointer ${activeTab === 'workorders' ? 'text-g-blue font-semibold' : 'text-g-textSecondary hover:text-g-text'
-            }`}
-        >
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
-          </svg>
-          <span className="text-[10px] mt-0.5 font-medium">Orders</span>
-        </button>
+                  {/* ISA-18.2 Live Alarm Beacon Strobe */}
+                  {tab.hasActiveAlarm && (
+                    <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-80" />
+                      <span className="relative inline-flex items-center justify-center rounded-full h-3 w-3 bg-rose-500 text-[8px] font-mono font-bold text-white border border-rose-900 shadow-[0_0_8px_#f43f5e]">
+                        {tab.alarmCount}
+                      </span>
+                    </span>
+                  )}
+                </div>
 
-        <button
-          onClick={() => setActiveTab('alarms')}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-lg transition-colors cursor-pointer ${activeTab === 'alarms' ? 'text-g-blue font-semibold' : 'text-g-textSecondary hover:text-g-text'
-            }`}
-        >
-          <div className="relative">
-            <svg className={`w-5 h-5 ${data.active_alarms.filter((a) => !a.acknowledged).length > 0 ? 'text-rose-500' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-            </svg>
-            {data.active_alarms.filter((a) => !a.acknowledged).length > 0 && (
-              <span className="absolute -top-1 -right-2 text-[9px] font-mono font-bold bg-rose-500 text-white rounded-full px-1 animate-pulse">
-                {data.active_alarms.filter((a) => !a.acknowledged).length}
-              </span>
-            )}
-          </div>
-          <span className="text-[10px] mt-0.5 font-medium">Alarms</span>
-        </button>
+                {/* Label */}
+                <span className={`relative z-10 text-[10px] sm:text-[11px] font-medium tracking-tight mt-1 transition-colors ${
+                  isActive ? 'text-white font-semibold' : 'text-g-textMuted group-hover:text-g-text'
+                }`}>
+                  {tab.label}
+                </span>
 
-        <button
-          onClick={() => setActiveTab('inventory')}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-lg transition-colors cursor-pointer ${activeTab === 'inventory' ? 'text-g-blue font-semibold' : 'text-g-textSecondary hover:text-g-text'
-            }`}
-        >
-          <svg className="w-5 h-5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-          </svg>
-          <span className="text-[10px] mt-0.5 font-medium">Inventory</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('acoustic_ai')}
-          className={`flex flex-col items-center justify-center py-1 px-3 rounded-lg transition-colors cursor-pointer ${activeTab === 'acoustic_ai' ? 'text-purple-400 font-semibold' : 'text-g-textSecondary hover:text-g-text'
-            }`}
-        >
-          <div className="relative">
-            <svg className="w-5 h-5 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.757 3.63 8.25 4.51 8.25H6.75z" />
-            </svg>
-            <span className="absolute -top-1 -right-2 text-[8px] font-mono font-bold bg-purple-500 text-white rounded px-0.5">
-              AI
-            </span>
-          </div>
-          <span className="text-[10px] mt-0.5 font-medium">Acoustic</span>
-        </button>
-
-        <button
-          onClick={() => setShowCopilot(true)}
-          className="flex flex-col items-center justify-center py-1 px-3 rounded-lg text-cyan-700 dark:text-cyan-400 hover:text-cyan-900 dark:hover:text-cyan-300 transition-colors cursor-pointer"
-        >
-          <div className="w-5 h-5 rounded bg-gradient-to-tr from-cyan-600 to-blue-600 flex items-center justify-center text-white text-[10px] shadow-xs border border-cyan-400/30">
-            <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" />
-            </svg>
-          </div>
-          <span className="text-[10px] mt-0.5 font-semibold font-tactical tracking-wide uppercase">Copilot</span>
-        </button>
-      </nav>
+                {/* Glowing Neon Status Pip */}
+                <div className="h-1.5 flex items-center justify-center mt-0.5">
+                  {isActive ? (
+                    <motion.span
+                      layoutId="scada-dock-active-pip"
+                      className={`w-1.5 h-1.5 rounded-full ${tab.pipColor}`}
+                      transition={{ type: 'spring', bounce: 0.25, duration: 0.35 }}
+                    />
+                  ) : (
+                    <span className="w-1.5 h-1.5 opacity-0" />
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </nav>
+      </div>
     </motion.div>
   );
 }

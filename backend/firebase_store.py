@@ -70,6 +70,10 @@ class FirebaseStore:
         self.last_checked_at: Optional[str] = None
         self.synced_records: int = 0
         self.last_sync_at: Optional[str] = None
+        self.consecutive_failures: int = 0
+        self.circuit_open_until: float = 0.0
+        self.last_ping_time: float = 0.0
+        self.cached_status: Optional[Dict[str, Any]] = None
 
         if self.is_configured():
             self.ping()
@@ -89,8 +93,16 @@ class FirebaseStore:
             headers["Authorization"] = f"Bearer {self.auth_token}"
         return headers
 
-    def ping(self) -> Dict[str, Any]:
+    def _record_failure(self) -> None:
+        self.consecutive_failures += 1
+        if self.consecutive_failures >= 3:
+            # Trip circuit breaker for 60 seconds to protect threads and prevent DoS cascading
+            self.circuit_open_until = time.time() + 60.0
+
+    def ping(self, force: bool = False) -> Dict[str, Any]:
+        now = time.time()
         self.last_checked_at = datetime.now(timezone.utc).isoformat()
+
         if not self.is_configured():
             self.connected = False
             self.schema_ready = False
@@ -98,6 +110,19 @@ class FirebaseStore:
             self.last_error = None
             return self.get_status()
 
+        # DoS & Flooding Guard: Cache ping results for 10 seconds unless forced
+        if not force and self.cached_status and (now - self.last_ping_time < 10.0):
+            return self.cached_status
+
+        # Circuit Breaker Guard: If upstream failed 3 times, serve local fallback instantly
+        if now < self.circuit_open_until:
+            self.connected = False
+            self.schema_ready = False
+            self.last_error = f"Circuit breaker open: Cloud Firestore temporarily unreachable. Local SQLite buffer active (auto-retry in {int(self.circuit_open_until - now)}s)."
+            self.cached_status = self.get_status()
+            return self.cached_status
+
+        self.last_ping_time = now
         started = time.perf_counter()
         try:
             # Query the production_sites collection limit 1
@@ -113,22 +138,27 @@ class FirebaseStore:
                 self.connected = True
                 self.schema_ready = True
                 self.last_error = None
+                self.consecutive_failures = 0
             elif res.status_code in (401, 403):
                 # Reachable but permissions or rules required
                 self.connected = True
                 self.schema_ready = False
                 self.last_error = "Firestore connected. Check Security Rules or provide Web API Key / Service Token."
+                self.consecutive_failures = 0
             else:
                 self.connected = False
                 self.schema_ready = False
                 self.last_error = f"Firestore returned HTTP {res.status_code}: {res.text[:120]}"
+                self._record_failure()
         except Exception as exc:
             self.connected = False
             self.schema_ready = False
             self.latency_ms = None
             self.last_error = str(exc)
+            self._record_failure()
 
-        return self.get_status()
+        self.cached_status = self.get_status()
+        return self.cached_status
 
     def configure(self, project_id: str, api_key: str = "", auth_token: str = "") -> Dict[str, Any]:
         clean_project = project_id.strip()
@@ -166,6 +196,8 @@ class FirebaseStore:
     def set_document(self, collection: str, doc_id: str, data: Dict[str, Any]) -> bool:
         if not self.is_configured() or not self.connected:
             return False
+        if time.time() < self.circuit_open_until:
+            return False
         try:
             url = f"{self.base_url}/{collection}/{doc_id}"
             if self.api_key:
@@ -176,15 +208,20 @@ class FirebaseStore:
             if res.status_code in (200, 201):
                 self.synced_records += 1
                 self.last_sync_at = datetime.now(timezone.utc).isoformat()
+                self.consecutive_failures = 0
                 return True
             self.last_error = f"Firestore set_doc failed ({res.status_code}): {res.text[:120]}"
+            self._record_failure()
             return False
         except Exception as exc:
             self.last_error = f"Firestore set_doc error: {exc}"
+            self._record_failure()
             return False
 
     def add_document(self, collection: str, data: Dict[str, Any]) -> bool:
         if not self.is_configured() or not self.connected:
+            return False
+        if time.time() < self.circuit_open_until:
             return False
         try:
             url = f"{self.base_url}/{collection}"
@@ -196,11 +233,14 @@ class FirebaseStore:
             if res.status_code in (200, 201):
                 self.synced_records += 1
                 self.last_sync_at = datetime.now(timezone.utc).isoformat()
+                self.consecutive_failures = 0
                 return True
             self.last_error = f"Firestore add_doc failed ({res.status_code}): {res.text[:120]}"
+            self._record_failure()
             return False
         except Exception as exc:
             self.last_error = f"Firestore add_doc error: {exc}"
+            self._record_failure()
             return False
 
     def delete_document(self, collection: str, doc_id: str) -> bool:
