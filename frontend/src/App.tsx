@@ -10,6 +10,9 @@ const LazyHomePage = lazy(() =>
 const LazyLoginPage = lazy(() =>
   import('./LoginPage').then((m) => ({ default: m.LoginPage }))
 );
+const LazyLegalPage = lazy(() =>
+  import('./LegalPage').then((m) => ({ default: m.LegalPage }))
+);
 const LazyAuthLoadingPage = lazy(() =>
   import('./components/AuthLoadingPage').then((m) => ({
     default: m.AuthLoadingPage,
@@ -61,11 +64,20 @@ export default function App() {
   const [showPublicShowcase, setShowPublicShowcase] = useState<boolean>(false);
   const [isLoginRoute, setIsLoginRoute] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
-    return (
-      window.location.pathname === '/login' ||
-      window.location.search.includes('page=login') ||
-      window.location.hash === '#login'
-    );
+    const p = window.location.pathname.toLowerCase();
+    const s = window.location.search.toLowerCase();
+    const h = window.location.hash.toLowerCase();
+    return p === '/login' || s.includes('page=login') || h === '#login';
+  });
+
+  const [legalRoute, setLegalRoute] = useState<'terms' | 'privacy' | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const p = window.location.pathname.toLowerCase();
+    const s = window.location.search.toLowerCase();
+    const h = window.location.hash.toLowerCase();
+    if (p === '/terms' || s.includes('page=terms') || h === '#terms') return 'terms';
+    if (p === '/privacy' || s.includes('page=privacy') || h === '#privacy') return 'privacy';
+    return null;
   });
 
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
@@ -81,11 +93,17 @@ export default function App() {
 
   useEffect(() => {
     const syncRoute = () => {
-      setIsLoginRoute(
-        window.location.pathname === '/login' ||
-          window.location.search.includes('page=login') ||
-          window.location.hash === '#login'
-      );
+      const p = window.location.pathname.toLowerCase();
+      const s = window.location.search.toLowerCase();
+      const h = window.location.hash.toLowerCase();
+      setIsLoginRoute(p === '/login' || s.includes('page=login') || h === '#login');
+      if (p === '/terms' || s.includes('page=terms') || h === '#terms') {
+        setLegalRoute('terms');
+      } else if (p === '/privacy' || s.includes('page=privacy') || h === '#privacy') {
+        setLegalRoute('privacy');
+      } else {
+        setLegalRoute(null);
+      }
     };
     window.addEventListener('popstate', syncRoute);
     window.addEventListener('hashchange', syncRoute);
@@ -242,6 +260,26 @@ export default function App() {
             isDarkMode={isDarkMode}
             progress={authLoadProgress}
             activeStageIndex={authLoadStage}
+          />
+        </PageTransition>
+      </Suspense>
+    );
+  }
+
+  if (legalRoute) {
+    return (
+      <Suspense fallback={<ChunkRouteFallback label="Loading legal governance documentation..." />}>
+        <PageTransition pageKey="page-legal">
+          <LazyLegalPage
+            initialTab={legalRoute}
+            isDarkMode={isDarkMode}
+            onToggleTheme={toggleTheme}
+            onBackHome={() => {
+              setLegalRoute(null);
+              if (typeof window !== 'undefined') {
+                window.history.pushState({}, '', '/');
+              }
+            }}
           />
         </PageTransition>
       </Suspense>

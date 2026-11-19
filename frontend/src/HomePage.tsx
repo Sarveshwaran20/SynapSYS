@@ -1532,13 +1532,27 @@ export const HomePage: React.FC<HomePageProps> = ({
                   <ul className="space-y-2 text-[14px] text-g-textSecondary">
                     {col.links.map((link) => (
                       <li key={link.label}>
-                        <button
-                          type="button"
-                          onClick={() => scrollToSection(link.target)}
-                          className="hover:text-g-text transition-colors cursor-pointer text-left"
-                        >
-                          {link.label}
-                        </button>
+                        {link.target === 'terms' || link.target === 'privacy' ? (
+                          <a
+                            href={link.target === 'terms' ? '/terms' : '/privacy'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:text-g-text transition-colors text-left inline-flex items-center gap-1.5"
+                          >
+                            <span>{link.label}</span>
+                            <svg className="w-3 h-3 opacity-50 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </a>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => scrollToSection(link.target)}
+                            className="hover:text-g-text transition-colors cursor-pointer text-left"
+                          >
+                            {link.label}
+                          </button>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -1550,27 +1564,29 @@ export const HomePage: React.FC<HomePageProps> = ({
           <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[13px] text-g-textMuted border-t border-g-borderSubtle">
             <span>© {new Date().getFullYear()} {DEMO_DATA.brand}. All rights reserved.</span>
             <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-[13px]">
-              <button
-                type="button"
-                onClick={() => {
-                  setLegalModalTab('terms');
-                  setLegalModalOpen(true);
-                }}
-                className="hover:text-g-text text-g-textSecondary transition-colors cursor-pointer"
+              <a
+                href="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-g-text text-g-textSecondary transition-colors inline-flex items-center gap-1.5"
               >
-                Terms & Conditions
-              </button>
+                <span>Terms & Conditions</span>
+                <svg className="w-3 h-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
               <span aria-hidden="true" className="text-g-border">·</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setLegalModalTab('privacy');
-                  setLegalModalOpen(true);
-                }}
-                className="hover:text-g-text text-g-textSecondary transition-colors cursor-pointer"
+              <a
+                href="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-g-text text-g-textSecondary transition-colors inline-flex items-center gap-1.5"
               >
-                Privacy Policy
-              </button>
+                <span>Privacy Policy</span>
+                <svg className="w-3 h-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
               <span aria-hidden="true" className="text-g-border">·</span>
               <span className="text-g-textMuted font-mono text-[12px]">IEC 62443 · ISO 22400</span>
             </div>
