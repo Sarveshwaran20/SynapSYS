@@ -82,6 +82,25 @@ export const DigitalTwinFloor: React.FC<DigitalTwinFloorProps> = ({
   const [chronosPlaying, setChronosPlaying] = useState<boolean>(false);
   const [chronosSpeed, setChronosSpeed] = useState<1 | 2 | 5 | 10>(1);
 
+  const handlePause = React.useCallback(() => {
+    setChronosPlaying(false);
+  }, []);
+
+  const handleJumpToLive = React.useCallback(() => {
+    setChronosPlaying(false);
+    setChronosTimeOffset(0);
+  }, []);
+
+  const handleTogglePlay = React.useCallback(() => {
+    setChronosPlaying((prev) => {
+      const willPlay = !prev;
+      if (willPlay && chronosTimeOffset >= 0) {
+        setChronosTimeOffset(-3600);
+      }
+      return willPlay;
+    });
+  }, [chronosTimeOffset]);
+
   // Sample incident bookmarks for Chronos timeline scrubbing
   const incidentMarkers: IncidentMarker[] = useMemo(() => [
     {
@@ -260,7 +279,9 @@ export const DigitalTwinFloor: React.FC<DigitalTwinFloorProps> = ({
         timeOffsetSec={chronosTimeOffset}
         onChangeTimeOffset={setChronosTimeOffset}
         isPlaying={chronosPlaying}
-        onTogglePlay={() => setChronosPlaying(!chronosPlaying)}
+        onTogglePlay={handleTogglePlay}
+        onPause={handlePause}
+        onJumpToLive={handleJumpToLive}
         playbackSpeed={chronosSpeed}
         onChangePlaybackSpeed={setChronosSpeed}
         incidents={incidentMarkers}

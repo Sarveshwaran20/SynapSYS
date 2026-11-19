@@ -15,6 +15,8 @@ export interface ChronosTimelineScrubberProps {
   onChangeTimeOffset: (offset: number) => void;
   isPlaying: boolean;
   onTogglePlay: () => void;
+  onPause?: () => void;
+  onJumpToLive?: () => void;
   playbackSpeed: 1 | 2 | 5 | 10;
   onChangePlaybackSpeed: (speed: 1 | 2 | 5 | 10) => void;
   incidents?: IncidentMarker[];
@@ -28,6 +30,8 @@ export const ChronosTimelineScrubber: React.FC<ChronosTimelineScrubberProps> = R
     onChangeTimeOffset,
     isPlaying,
     onTogglePlay,
+    onPause,
+    onJumpToLive,
     playbackSpeed,
     onChangePlaybackSpeed,
     incidents = [],
@@ -36,18 +40,39 @@ export const ChronosTimelineScrubber: React.FC<ChronosTimelineScrubberProps> = R
     const shouldReduce = useReducedMotion();
     const trackRef = useRef<HTMLDivElement>(null);
 
+    const stopPlaying = () => {
+      if (onPause) {
+        onPause();
+      } else if (isPlaying && onTogglePlay) {
+        onTogglePlay();
+      }
+    };
+
+    const handleJumpToLive = () => {
+      onChangeTimeOffset(0);
+      stopPlaying();
+      onJumpToLive?.();
+    };
+
     // Auto-advance timeline when playing
     useEffect(() => {
       if (!isPlaying) return;
       const interval = window.setInterval(() => {
-        onChangeTimeOffset(
-          timeOffsetSec >= 0
-            ? -maxPastSeconds
-            : Math.min(0, timeOffsetSec + 1 * playbackSpeed)
-        );
+        if (timeOffsetSec >= 0) {
+          onChangeTimeOffset(0);
+          stopPlaying();
+          return;
+        }
+        const next = timeOffsetSec + 1 * playbackSpeed;
+        if (next >= 0) {
+          onChangeTimeOffset(0);
+          stopPlaying();
+        } else {
+          onChangeTimeOffset(next);
+        }
       }, 1000 / playbackSpeed);
       return () => window.clearInterval(interval);
-    }, [isPlaying, timeOffsetSec, maxPastSeconds, playbackSpeed, onChangeTimeOffset]);
+    }, [isPlaying, timeOffsetSec, playbackSpeed, onChangeTimeOffset, onPause, onTogglePlay]);
 
     const isLive = timeOffsetSec >= 0;
     const progressPct = ((maxPastSeconds + timeOffsetSec) / maxPastSeconds) * 100;
@@ -66,7 +91,11 @@ export const ChronosTimelineScrubber: React.FC<ChronosTimelineScrubberProps> = R
       const clickX = e.clientX - rect.left;
       const ratio = Math.max(0, Math.min(1, clickX / rect.width));
       const targetSec = Math.round(ratio * maxPastSeconds - maxPastSeconds);
-      onChangeTimeOffset(targetSec >= -5 ? 0 : targetSec);
+      if (targetSec >= -5) {
+        handleJumpToLive();
+      } else {
+        onChangeTimeOffset(targetSec);
+      }
     };
 
     return (
@@ -178,7 +207,7 @@ export const ChronosTimelineScrubber: React.FC<ChronosTimelineScrubberProps> = R
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
                 type="button"
-                onClick={() => onChangeTimeOffset(0)}
+                onClick={handleJumpToLive}
                 className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold inline-flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
               >
                 <span>Jump to Live</span>
