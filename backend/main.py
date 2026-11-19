@@ -15,6 +15,7 @@ import hashlib
 import secrets
 import hmac
 import time
+import math
 
 from fastapi import FastAPI, HTTPException, Body, Query, Header, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -983,6 +984,8 @@ recent_cycle_history: Dict[str, deque] = {}
 active_alarms_map: Dict[str, AlarmEvent] = {}
 alarm_start_times: Dict[str, float] = {}
 alarm_ack_state: Dict[str, bool] = {}
+_telemetry_last_tick: Dict[str, float] = {}
+_telemetry_cycle_accumulator: Dict[str, float] = {}
 current_data_source_mode = "hybrid" # "hybrid", "live_plc", "simulation", "dataset_replay"
 
 # Real-World Industrial Connectors Registry
@@ -3064,9 +3067,22 @@ def get_dashboard(site_id: Optional[str] = Query(default=None), company_domain: 
 
     for m_id in machine_ids:
         meta = MACHINE_METADATA.get(m_id, {})
+        ideal_c = float(meta.get("ideal_cycle", 12.0))
+        target_c = int(meta.get("default_target", 250))
+
+        is_inj = (m_id == "INJ-202" or "injection" in meta.get("name", "").lower())
+        nominal_temp = 64.0 if is_inj else 52.0
+        nominal_power = 31.0 if is_inj else 21.6
+        nominal_vib = 1.45
+        nominal_press = 158.0 if is_inj else 6.2
+
         payload = latest_telemetry.get(m_id)
 
         if not payload:
+            init_out = max(25, int(target_c * 0.33))
+            init_scrap = max(1, int(init_out * 0.012))
+            init_good = init_out - init_scrap
+            init_uptime = round(init_out * ideal_c * 1.04, 1)
             payload = TelemetryPayload(
                 timestamp=now_iso,
                 machine_id=m_id,
@@ -3074,23 +3090,95 @@ def get_dashboard(site_id: Optional[str] = Query(default=None), company_domain: 
                 location=meta.get("location", "Bay 01"),
                 operator=meta.get("operator", "Shift Operator"),
                 status="Running",
-                output_count=82,
-                target_output=meta.get("default_target", 250),
-                good_count=81,
-                scrap_count=1,
-                cycle_time_sec=meta.get("ideal_cycle", 12.0),
-                ideal_cycle_time_sec=meta.get("ideal_cycle", 12.0),
-                uptime_seconds=984.0,
-                downtime_seconds=38.0,
+                output_count=init_out,
+                target_output=target_c,
+                good_count=init_good,
+                scrap_count=init_scrap,
+                cycle_time_sec=ideal_c,
+                ideal_cycle_time_sec=ideal_c,
+                uptime_seconds=init_uptime,
+                downtime_seconds=round(init_uptime * 0.038, 1),
                 active_alarm=None,
                 alarm_severity="None",
                 sensors=MachineSensors(
-                    temperature_c=52.4,
-                    vibration_mm_s=1.45,
-                    power_kw=21.6,
-                    pressure_bar=6.2,
+                    temperature_c=nominal_temp,
+                    vibration_mm_s=nominal_vib,
+                    power_kw=nominal_power,
+                    pressure_bar=nominal_press,
                 ),
             )
+            latest_telemetry[m_id] = payload
+            _telemetry_last_tick[m_id] = now_epoch
+            _telemetry_cycle_accumulator[m_id] = float(abs(hash(m_id)) % int(max(1.0, ideal_c)))
+
+        # Dynamic simulation engine tick
+        last_tick = _telemetry_last_tick.get(m_id, now_epoch)
+        dt = now_epoch - last_tick
+        dt = max(0.0, min(15.0, dt))
+        _telemetry_last_tick[m_id] = now_epoch
+
+        m_hash = abs(hash(m_id))
+
+        if payload.status == "Running":
+            payload.uptime_seconds = round((payload.uptime_seconds or 0.0) + dt, 1)
+            accum = _telemetry_cycle_accumulator.get(m_id, 0.0) + dt
+            cycle_target = payload.ideal_cycle_time_sec or ideal_c or 12.0
+
+            while accum >= cycle_target:
+                accum -= cycle_target
+                payload.output_count += 1
+                if random.random() < 0.988:
+                    payload.good_count = (payload.good_count or 0) + 1
+                else:
+                    payload.scrap_count = (payload.scrap_count or 0) + 1
+
+                actual_cycle = round(cycle_target * random.uniform(0.965, 1.035), 2)
+                payload.cycle_time_sec = actual_cycle
+                if m_id not in recent_cycle_history:
+                    recent_cycle_history[m_id] = deque(maxlen=25)
+                recent_cycle_history[m_id].append(actual_cycle)
+
+            _telemetry_cycle_accumulator[m_id] = accum
+
+            # Real-time physical oscillation & telemetry jitter
+            phase_t = now_epoch * 0.06 + (m_hash % 19)
+            phase_p = now_epoch * 0.14 + (m_hash % 13)
+            phase_v = now_epoch * 0.25 + (m_hash % 11)
+            phase_b = now_epoch * 0.09 + (m_hash % 7)
+
+            t_drift = 1.6 * math.sin(phase_t) + random.uniform(-0.15, 0.15)
+            p_drift = 2.4 * math.cos(phase_p) + random.uniform(-0.35, 0.35)
+            v_drift = 0.12 * math.sin(phase_v) + random.uniform(-0.03, 0.03)
+            b_drift = 0.18 * math.sin(phase_b) + random.uniform(-0.02, 0.02)
+
+            if not payload.sensors:
+                payload.sensors = MachineSensors(
+                    temperature_c=round(nominal_temp + t_drift, 1),
+                    vibration_mm_s=round(max(0.3, nominal_vib + v_drift), 2),
+                    power_kw=round(max(4.0, nominal_power + p_drift), 1),
+                    pressure_bar=round(max(1.0, nominal_press + b_drift), 1),
+                )
+            else:
+                payload.sensors.temperature_c = round(nominal_temp + t_drift, 1)
+                payload.sensors.vibration_mm_s = round(max(0.3, nominal_vib + v_drift), 2)
+                payload.sensors.power_kw = round(max(4.0, nominal_power + p_drift), 1)
+                payload.sensors.pressure_bar = round(max(1.0, nominal_press + b_drift), 1)
+
+        elif payload.status == "Down":
+            payload.downtime_seconds = round((payload.downtime_seconds or 0.0) + dt, 1)
+            if payload.sensors:
+                payload.sensors.power_kw = round(max(1.2, 1.8 + random.uniform(-0.1, 0.1)), 1)
+                if payload.active_alarm and "overheat" in payload.active_alarm.lower():
+                    payload.sensors.temperature_c = round(84.5 + random.uniform(-0.3, 0.3), 1)
+                else:
+                    payload.sensors.temperature_c = round(max(32.0, payload.sensors.temperature_c - (dt * 0.05)), 1)
+
+        elif payload.status == "Idle":
+            if payload.sensors:
+                payload.sensors.power_kw = round(max(2.5, 3.6 + random.uniform(-0.15, 0.15)), 1)
+                payload.sensors.vibration_mm_s = round(max(0.1, 0.35 + random.uniform(-0.02, 0.02)), 2)
+
+        payload.timestamp = now_iso
 
         oee_result = calculate_oee(payload)
         losses = compute_six_big_losses(payload)
@@ -3122,19 +3210,7 @@ def get_dashboard(site_id: Optional[str] = Query(default=None), company_domain: 
             seed = payload.ideal_cycle_time_sec
             cycle_history = [seed * random.uniform(0.97, 1.03) for _ in range(8)]
 
-        if payload.sensors:
-            sensors = payload.sensors
-        else:
-            base_temp = 54.0 if payload.status == "Running" else (81.0 if payload.status == "Down" else 35.0)
-            base_vib = 1.6 if payload.status == "Running" else (4.8 if payload.status == "Down" else 0.4)
-            base_power = 24.0 if payload.status == "Running" else (1.8 if payload.status == "Down" else 4.2)
-            sensors = MachineSensors(
-                temperature_c=round(base_temp + random.uniform(-1.0, 1.5), 1),
-                vibration_mm_s=round(base_vib + random.uniform(-0.15, 0.2), 2),
-                power_kw=round(base_power + random.uniform(-0.6, 0.8), 1),
-                pressure_bar=round(6.2 + random.uniform(-0.1, 0.1), 1),
-            )
-
+        sensors = payload.sensors
         accumulated_power_kw += sensors.power_kw
         pdm = compute_predictive_diagnostics(payload, sensors)
         duration = int(now_epoch - alarm_start_times.get(m_id, now_epoch)) if m_id in alarm_start_times else 0
@@ -3270,6 +3346,11 @@ def get_dashboard(site_id: Optional[str] = Query(default=None), company_domain: 
         data_source_mode=current_data_source_mode,
         active_connectors_count=active_conn_count,
     )
+
+    now_live_str = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+    for conn in industrial_connectors.values():
+        if conn.status == "Connected":
+            conn.last_heartbeat = f"Live ({now_live_str})"
 
     return DashboardResponseModel(
         site_id=site_id,
