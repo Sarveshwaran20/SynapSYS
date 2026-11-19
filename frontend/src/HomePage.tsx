@@ -30,6 +30,7 @@ import {
   DemoPlantData,
   FeatureCard,
   HeroPreview,
+  LegalModal,
   type ProductModuleId,
   ProtocolMarqueeRibbon,
   StepCard,
@@ -401,6 +402,15 @@ export const DEMO_DATA = {
         { label: 'Workspace sign in', target: 'login' },
       ],
     },
+    {
+      heading: 'Governance',
+      links: [
+        { label: 'Terms & Conditions', target: 'terms' },
+        { label: 'Privacy Policy', target: 'privacy' },
+        { label: 'Cybersecurity (IEC 62443)', target: 'privacy' },
+        { label: 'Data Sovereignty', target: 'terms' },
+      ],
+    },
   ],
 };
 
@@ -491,6 +501,25 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [liveOeeOffset, setLiveOeeOffset] = useState<number>(0);
   const [mountBackdrop, setMountBackdrop] = useState<boolean>(false);
   const [hydratedSections, setHydratedSections] = useState<Record<string, boolean>>({});
+  const [legalModalOpen, setLegalModalOpen] = useState<boolean>(false);
+  const [legalModalTab, setLegalModalTab] = useState<'terms' | 'privacy'>('terms');
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const checkHash = () => {
+      const h = window.location.hash.toLowerCase();
+      if (h === '#terms' || h === '#terms-and-conditions') {
+        setLegalModalTab('terms');
+        setLegalModalOpen(true);
+      } else if (h === '#privacy' || h === '#privacy-policy') {
+        setLegalModalTab('privacy');
+        setLegalModalOpen(true);
+      }
+    };
+    checkHash();
+    window.addEventListener('hashchange', checkHash);
+    return () => window.removeEventListener('hashchange', checkHash);
+  }, []);
 
   useEffect(() => {
     const win = window as Window & {
@@ -670,6 +699,16 @@ export const HomePage: React.FC<HomePageProps> = ({
     setMobileMenuOpen(false);
     if (id === 'login') {
       setShowLoginModal(true);
+      return;
+    }
+    if (id === 'terms') {
+      setLegalModalTab('terms');
+      setLegalModalOpen(true);
+      return;
+    }
+    if (id === 'privacy') {
+      setLegalModalTab('privacy');
+      setLegalModalOpen(true);
       return;
     }
     setHydratedSections((prev) => (prev[id] ? prev : { ...prev, [id]: true }));
@@ -1484,7 +1523,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               </p>
             </RevealItem>
 
-            <RevealItem variant="grid" className="md:col-span-7 grid grid-cols-2 sm:grid-cols-3 gap-8">
+            <RevealItem variant="grid" className="md:col-span-7 grid grid-cols-2 sm:grid-cols-4 gap-6 sm:gap-8">
               {DEMO_DATA.footerColumns.map((col) => (
                 <div key={col.heading} className="space-y-3">
                   <h3 className="font-cinzel text-[13px] font-semibold text-g-text tracking-wide">
@@ -1496,7 +1535,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                         <button
                           type="button"
                           onClick={() => scrollToSection(link.target)}
-                          className="hover:text-g-text transition-colors cursor-pointer"
+                          className="hover:text-g-text transition-colors cursor-pointer text-left"
                         >
                           {link.label}
                         </button>
@@ -1508,9 +1547,33 @@ export const HomePage: React.FC<HomePageProps> = ({
             </RevealItem>
           </RevealGroup>
 
-          <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-[13px] text-g-textMuted">
+          <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[13px] text-g-textMuted border-t border-g-borderSubtle">
             <span>© {new Date().getFullYear()} {DEMO_DATA.brand}. All rights reserved.</span>
-            <span>Simulated public showcase</span>
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-[13px]">
+              <button
+                type="button"
+                onClick={() => {
+                  setLegalModalTab('terms');
+                  setLegalModalOpen(true);
+                }}
+                className="hover:text-g-text text-g-textSecondary transition-colors cursor-pointer"
+              >
+                Terms & Conditions
+              </button>
+              <span aria-hidden="true" className="text-g-border">·</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setLegalModalTab('privacy');
+                  setLegalModalOpen(true);
+                }}
+                className="hover:text-g-text text-g-textSecondary transition-colors cursor-pointer"
+              >
+                Privacy Policy
+              </button>
+              <span aria-hidden="true" className="text-g-border">·</span>
+              <span className="text-g-textMuted font-mono text-[12px]">IEC 62443 · ISO 22400</span>
+            </div>
           </div>
         </div>
       </footer>
@@ -1863,6 +1926,14 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         )}
       </MotionModal>
+
+      {/* Enterprise Legal, Terms & Privacy Governance Modal */}
+      <LegalModal
+        isOpen={legalModalOpen}
+        onClose={() => setLegalModalOpen(false)}
+        initialTab={legalModalTab}
+        isDarkMode={isDarkMode}
+      />
     </div>
   );
 };

@@ -18,5 +18,7 @@ export type {
   FeatureSpotlightDeckProps,
   ProductModuleId,
 } from './FeatureSpotlightDeck';
+export { LegalModal } from './LegalModal';
+export type { LegalModalProps } from './LegalModal';
 
 
