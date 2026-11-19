@@ -10104,19 +10104,17 @@ export default function DashboardWorkspace({
       </main>
 
       {/* Dynamic Proximity Peek Handle (Subtle resting notch when dock is retracted) */}
-      <div
-        className="fixed bottom-0 left-1/2 -translate-x-1/2 z-40 pb-2 pt-3 px-6 pointer-events-auto cursor-pointer group flex flex-col items-center select-none"
-        onClick={() => setIsDockPopped(true)}
-        onMouseEnter={() => {
-          if (dockTimeoutRef.current) clearTimeout(dockTimeoutRef.current);
-          setIsDockPopped(true);
-        }}
-        aria-label="Reveal SCADA Cockpit Dock"
-      >
+      <div className="fixed bottom-0 inset-x-0 flex justify-center z-40 pb-2 pt-3 pointer-events-none select-none">
         <motion.div
           animate={isDockPopped ? { opacity: 0, y: 14, scale: 0.9 } : { opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-          className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#080d16]/90 backdrop-blur-xl border border-white/15 shadow-[0_8px_24px_rgba(0,0,0,0.7),0_0_15px_rgba(59,130,246,0.25)] group-hover:border-blue-400/60 group-hover:shadow-[0_0_20px_rgba(59,130,246,0.45)] transition-all"
+          onClick={() => setIsDockPopped(true)}
+          onMouseEnter={() => {
+            if (dockTimeoutRef.current) clearTimeout(dockTimeoutRef.current);
+            setIsDockPopped(true);
+          }}
+          className="pointer-events-auto cursor-pointer group flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#080d16]/90 backdrop-blur-xl border border-white/15 shadow-[0_8px_24px_rgba(0,0,0,0.7),0_0_15px_rgba(59,130,246,0.25)] group-hover:border-blue-400/60 group-hover:shadow-[0_0_20px_rgba(59,130,246,0.45)] transition-all"
+          aria-label="Reveal SCADA Cockpit Dock"
         >
           <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse shadow-[0_0_8px_#60a5fa]" />
           <span className="text-[10px] sm:text-[11px] font-mono font-semibold tracking-wider text-g-textSecondary uppercase group-hover:text-white transition-colors">
@@ -10129,30 +10127,31 @@ export default function DashboardWorkspace({
       </div>
 
       {/* Dynamic SCADA Cockpit Floating Dock (Enlarged Capsule with Proximity Pop-Up) */}
-      <motion.div
-        initial={false}
-        animate={isDockPopped ? { y: 0, opacity: 1, scale: 1 } : { y: 110, opacity: 0, scale: 0.94 }}
-        transition={{ type: 'spring', stiffness: 340, damping: 28, mass: 0.8 }}
-        className={`fixed bottom-5 sm:bottom-7 left-1/2 -translate-x-1/2 z-50 transition-shadow ${
-          isDockPopped ? 'pointer-events-auto' : 'pointer-events-none'
-        }`}
-        onMouseEnter={() => {
-          if (dockTimeoutRef.current) clearTimeout(dockTimeoutRef.current);
-          setIsDockPopped(true);
-        }}
-        onMouseLeave={() => {
-          if (!dockTimeoutRef.current) {
-            dockTimeoutRef.current = setTimeout(() => {
-              setIsDockPopped(false);
-              dockTimeoutRef.current = null;
-            }, 450);
-          }
-        }}
-      >
-        <nav
-          aria-label="SCADA Operational Modules Floating Dock"
-          className="relative flex items-center gap-1.5 sm:gap-2.5 p-2 sm:p-2.5 px-3 sm:px-4 rounded-3xl sm:rounded-full bg-[#080d17]/95 backdrop-blur-2xl border border-white/[0.16] shadow-[0_24px_70px_rgba(0,0,0,0.85),0_0_40px_rgba(59,130,246,0.22),inset_0_1px_0_rgba(255,255,255,0.2)] max-w-[calc(100vw-24px)] overflow-x-auto no-scrollbar scroll-smooth"
+      <div className="fixed bottom-5 sm:bottom-7 inset-x-0 flex justify-center z-50 pointer-events-none px-3">
+        <motion.div
+          initial={false}
+          animate={isDockPopped ? { y: 0, opacity: 1, scale: 1 } : { y: 110, opacity: 0, scale: 0.94 }}
+          transition={{ type: 'spring', stiffness: 340, damping: 28, mass: 0.8 }}
+          className={`transition-shadow ${
+            isDockPopped ? 'pointer-events-auto' : 'pointer-events-none'
+          }`}
+          onMouseEnter={() => {
+            if (dockTimeoutRef.current) clearTimeout(dockTimeoutRef.current);
+            setIsDockPopped(true);
+          }}
+          onMouseLeave={() => {
+            if (!dockTimeoutRef.current) {
+              dockTimeoutRef.current = setTimeout(() => {
+                setIsDockPopped(false);
+                dockTimeoutRef.current = null;
+              }, 450);
+            }
+          }}
         >
+          <nav
+            aria-label="SCADA Operational Modules Floating Dock"
+            className="relative flex items-center gap-1.5 sm:gap-2.5 p-2 sm:p-2.5 px-3 sm:px-4 rounded-3xl sm:rounded-full bg-[#080d17]/95 backdrop-blur-2xl border border-white/[0.16] shadow-[0_24px_70px_rgba(0,0,0,0.85),0_0_40px_rgba(59,130,246,0.22),inset_0_1px_0_rgba(255,255,255,0.2)] max-w-[calc(100vw-24px)] overflow-x-auto no-scrollbar scroll-smooth"
+          >
           {[
             {
               id: 'overview',
@@ -10351,6 +10350,7 @@ export default function DashboardWorkspace({
           })}
         </nav>
       </motion.div>
-    </motion.div>
-  );
+    </div>
+  </motion.div>
+);
 }
